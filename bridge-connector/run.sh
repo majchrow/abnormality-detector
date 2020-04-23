@@ -1,11 +1,13 @@
-if [[ ! -d ".venv" ]]
-then
-	python3 -m venv .venv
+if [[ ! -d ".venv" ]]; then
+  python3 -m venv .venv
 fi
 
-
-python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python3 main.py
+echo 'Running server'
+python3 main.py &
+echo 'Running client'
+python3 main.py --client
+sleep 3
+killall python3
 deactivate
