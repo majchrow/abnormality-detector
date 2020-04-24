@@ -43,7 +43,7 @@ class Client:
 
     @staticmethod
     def save_to_file(msg):
-        with open("messages.txt", "w") as file:
+        with open("messages.txt", "a") as file:
             file.write(msg)
 
     async def recv_msg(self, ws):
