@@ -65,25 +65,41 @@ class Server:
     async def handler(self, ws: WebSocketServerProtocol) -> None:
         while True:
             msg = await ws.recv()
+            await self._parse_message(ws, msg)
             logging.info(f"Got from {ws} message {msg}")
+
+    async def _parse_message(self, ws: WebSocketServerProtocol, msg: str) -> None:
+        try:
+            msg_parsed = json.loads(msg)['message']
+            if msg_parsed['type'] == "subscribeRequest":
+                subscriptions = msg_parsed['subscriptions']
+                for subscription in subscriptions:
+                    if subscription['type'] == "callRoster":
+                        self.call_roaster_clients.append(ws)
+                    elif subscription['type'] == "callInfo":
+                        self.call_info_data.append(ws)
+                    else:
+                        self.calls_data.append(ws)
+        except:
+            logging.info(msg)
 
     async def stream_call_info(self) -> None:
         for data in self.call_info_data:
             logging.info(data)
             for client in self.call_info_clients:
-                await client.send(data)
+                await client.send(json.dumps(data))
             await asyncio.sleep(2)
 
     async def stream_call_roaster(self) -> None:
         for data in self.call_roaster_data:
             logging.info(data)
             for client in self.call_roaster_clients:
-                await client.send(data)
+                await client.send(json.dumps(data))
             await asyncio.sleep(2)
 
     async def stream_calls(self) -> None:
         for data in self.calls_data:
             logging.info(data)
             for client in self.calls_clients:
-                await client.send(data)
+                await client.send(json.dumps(data))
             await asyncio.sleep(2)

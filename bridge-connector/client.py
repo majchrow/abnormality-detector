@@ -25,25 +25,26 @@ class Client:
                                   [{"index": 1,
                                     "type": "callRoster",
                                     "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
-                                    "elements": ["name", "uri", "state", "audioMuted", "videoMuted", "importance", "layout", "activeSpeaker", "presenter"]},
-                                    {"index": 2,
-                                     "type": "callInfo",
-                                     "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
+                                    "elements": ["name", "uri", "state", "audioMuted", "videoMuted", "importance",
+                                                 "layout", "activeSpeaker", "presenter"]},
+                                   {"index": 2,
+                                    "type": "callInfo",
+                                    "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
                                     "elements": ["name", "participants", "recording", "streaming"]
-                                     }]}}
+                                    }]}}
         print(subscribe_msg)
         await ws.send(json.dumps(subscribe_msg))
 
     async def send_ack(self, message_id, ws):
-        msg = {"type":"messageAck",
+        msg = {"type": "messageAck",
                "messageAck":
                    {"messageId": message_id,
-                    "status":"success"}}
-        ws.send(json.dumps(msg))
+                    "status": "success"}}
+        await ws.send(json.dumps(msg))
 
     @staticmethod
     def save_to_file(msg):
-        with open("messages.txt", "a") as file:
+        with open("client_log.json", "a") as file:
             file.write(msg)
 
     async def recv_msg(self, ws):
@@ -59,4 +60,3 @@ class Client:
         async with connect(uri) as ws:
             await self.subscribe(ws)
             await self.recv_msg(ws)
-
