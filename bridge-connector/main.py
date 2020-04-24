@@ -10,9 +10,13 @@ def create_parser():
                         type=str,
                         default='localhost',
                         help='host ip')
+    parser.add_argument('--logfile',
+                        type=str,
+                        default='log.json',
+                        help='host ip')
     parser.add_argument('--port',
                         type=int,
-                        default=11111,
+                        default=12345,
                         help='port number')
     parser.add_argument('--client',
                         dest='client',
