@@ -32,7 +32,6 @@ class Client:
                                     "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
                                     "elements": ["name", "participants", "recording", "streaming"]
                                     }]}}
-        print(subscribe_msg)
         await ws.send(json.dumps(subscribe_msg))
 
     async def send_ack(self, message_id, ws):
@@ -44,8 +43,10 @@ class Client:
 
     @staticmethod
     def save_to_file(msg):
+        msg_parsed = json.loads(msg)
         with open("client_log.json", "a") as file:
-            file.write(msg)
+            json.dump(msg_parsed, file, indent=4)
+            file.write(",\n")
 
     async def recv_msg(self, ws):
         while True:
