@@ -12,9 +12,9 @@ class Server:
     def __init__(self, FLAGS) -> None:
         self.FLAGS = FLAGS
         self.clients = set()
-        self.call_info_clients = []
-        self.call_roaster_clients = []
-        self.calls_clients = []
+        self.call_info_clients = set()
+        self.call_roaster_clients = set()
+        self.calls_clients = set()
         self.call_info_data = []
         self.call_roaster_data = []
         self.calls_data = []
@@ -44,6 +44,12 @@ class Server:
             elif message['message']['type'] == "callListUpdate":
                 queue = self.calls_data
             queue.append(message)
+        self.calls_data.append(
+            {"type": "message", "message": {"messageId": 3, "type": "callListUpdate", "subscriptionIndex": 3,
+                                            "updates": [
+                                                {"call": "97c771ae-fc2e-4257-b129-30ee818e034b", "updateType": "add",
+                                                 "name": "Andy'scoSpace", "participants": 0}]}}
+        )
 
     async def ws_handler(self, ws: WebSocketServerProtocol, url: str) -> None:
         await self.register(ws)
@@ -58,8 +64,8 @@ class Server:
         logging.info(f"{ws.remote_address} disconnected.")
 
     def start_streams(self) -> None:
-        self.loop.create_task(self.stream_call_info())
-        self.loop.create_task(self.stream_call_roaster())
+        # self.loop.create_task(self.stream_call_info())
+        # self.loop.create_task(self.stream_call_roaster())
         self.loop.create_task(self.stream_calls())
 
     async def handler(self, ws: WebSocketServerProtocol) -> None:
@@ -75,11 +81,11 @@ class Server:
                 subscriptions = msg_parsed['subscriptions']
                 for subscription in subscriptions:
                     if subscription['type'] == "callRoster":
-                        self.call_roaster_clients.append(ws)
+                        self.call_roaster_clients.add(ws)
                     elif subscription['type'] == "callInfo":
-                        self.call_info_data.append(ws)
+                        self.call_info_clients.add(ws)
                     else:
-                        self.calls_data.append(ws)
+                        self.calls_clients.add(ws)
         except:
             logging.info(msg)
 
@@ -103,3 +109,6 @@ class Server:
             for client in self.calls_clients:
                 await client.send(json.dumps(data))
             await asyncio.sleep(2)
+        self.start_streams()
+        self.loop.create_task(self.stream_call_info())
+        self.loop.create_task(self.stream_call_roaster())

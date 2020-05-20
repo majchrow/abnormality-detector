@@ -5,7 +5,7 @@ from websockets import connect
 
 from utils import enable_logger
 
-INIT_SUBSCRIBTION = {
+INIT_SUBSCRIPTION = {
     "index": 3,
     "type": "calls",
     "elements": [
@@ -20,7 +20,7 @@ class Client:
         self.FLAGS = FLAGS
         self.message_id = 0
         self.calls = set()
-        self.subsribtions = [INIT_SUBSCRIBTION]
+        self.subscriptions = [INIT_SUBSCRIPTION]
         enable_logger(directory="logs/client", filename="client")
 
     def start(self) -> None:
@@ -29,7 +29,7 @@ class Client:
         loop.run_until_complete()
 
     @staticmethod
-    def get_call_info_subscribtion(call):
+    def get_call_info_subscription(call):
         return {"index": 2,
                 "type": "callInfo",
                 "call": call,
@@ -39,7 +39,7 @@ class Client:
                 }
 
     @staticmethod
-    def get_call_roster_subscribtion(call):
+    def get_call_roster_subscription(call):
         return {"index": 1,
                 "type": "callRoster",
                 "call": call,
@@ -49,19 +49,19 @@ class Client:
                              "movedParticipantCallBridge"]}
 
     def update_subscribtions(self, call):
-        call_info = self.get_call_info_subscribtion(call)
-        call_roster = self.get_call_roster_subscribtion(call)
-        self.subsribtions.append(call_roster)
-        self.subsribtions.append(call_info)
+        call_info = self.get_call_info_subscription(call)
+        call_roster = self.get_call_roster_subscription(call)
+        self.subscriptions.append(call_roster)
+        self.subscriptions.append(call_info)
 
     def get_subscribtion_request(self):
         self.message_id = self.message_id + 1
         return {"type": "message",
-                         "message":
-                             {"messageId": self.message_id,
-                              "type": "subscribeRequest",
-                              "subscriptions": self.subsribtions
-                                  }}
+                "message":
+                    {"messageId": self.message_id,
+                     "type": "subscribeRequest",
+                     "subscriptions": self.subscriptions
+                     }}
 
     async def subscribe(self, ws):
         await ws.send(json.dumps(self.get_subscribtion_request()))
