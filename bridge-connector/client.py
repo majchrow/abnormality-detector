@@ -57,7 +57,7 @@ class Client:
             await self.send_ack(msg_id, ws)
 
     async def _connect_to_websocket(self) -> None:
-        uri = f"ws://{self.FLAGS.host}:{self.FLAGS.port}"
+        uri = f"wss://{self.FLAGS.host}:{self.FLAGS.port}/events/v1?authToken={self.FLAGS.authToken}"
         async with connect(uri) as ws:
             await self.subscribe(ws)
             await self.recv_msg(ws)
