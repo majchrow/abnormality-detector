@@ -25,12 +25,11 @@ class Client:
                                   [{"index": 1,
                                     "type": "callRoster",
                                     "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
-                                    "elements": ["name", "uri", "state", "audioMuted", "videoMuted", "importance",
-                                                 "layout", "activeSpeaker", "presenter"]},
+                                    "elements": ["name", "uri", "state", "direction", "audioMuted", "videoMuted", "importance", "layout", "activeSpeaker", "presenter", "endpointRecording", "canMove", "movedParticipant", "movedParticipantCallBridge"]},
                                    {"index": 2,
                                     "type": "callInfo",
                                     "call": "2c62fcd9-ec14-40c1-8608-847ea30fb13f",
-                                    "elements": ["name", "participants", "recording", "streaming"]
+                                    "elements": ["name", "participants", "distributedInstances", "recording", "endpointRecording", "streaming", "lockState", "callType", "callCorrelator", "joinAudioMuteOverride"]
                                     }]}}
         await ws.send(json.dumps(subscribe_msg))
 
