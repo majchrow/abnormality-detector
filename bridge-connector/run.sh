@@ -8,7 +8,7 @@ echo 'Running server'
 python3 main.py --server &
 sleep 3
 echo 'Running client'
-python3 main.py --auth_token empty
+python3 main.py --username username --password password
 sleep 3
 killall python3
 deactivate
