@@ -10,9 +10,12 @@ def create_parser():
                         type=str,
                         default='localhost',
                         help='host ip')
-    parser.add_argument('--auth_token',
+    parser.add_argument('--username',
                         type=str,
-                        help='authentication token')
+                        help='username account with sufficient privilege')
+    parser.add_argument('--password',
+                        type=str,
+                        help='password account with sufficient privilege ')
     parser.add_argument('--logfile',
                         type=str,
                         default='log.json',
