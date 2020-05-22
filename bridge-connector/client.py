@@ -40,7 +40,7 @@ class Client:
 
     def _refresh_auth_token(self):
         try:
-            url = f"{self.FLAGS.host}:8080/api/v1/authTokens"
+            url = f"http://{self.FLAGS.host}:{self.FLAGS.port}/api/v1/authTokens"
             response = requests.post(url, data={}, auth=(self.FLAGS.username, self.FLAGS.password))
             self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
         except Exception as e:
