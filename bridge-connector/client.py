@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-
+import time
 import requests
 from websockets import connect
 
@@ -37,6 +37,7 @@ class Client:
         self.calls = set()
         self.subscriptions = [INIT_SUBSCRIPTION]
         self._refresh_auth_token()
+        time.sleep(2)
 
     def _refresh_auth_token(self):
         try:
