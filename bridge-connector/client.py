@@ -41,7 +41,7 @@ class Client:
 
     def _refresh_auth_token(self):
         try:
-            url = f"http://{self.FLAGS.host}:{self.FLAGS.port}/api/v1/authTokens"
+            url = f"https://{self.FLAGS.host}:{self.FLAGS.port}/api/v1/authTokens"
             response = requests.post(url, data={}, auth=(self.FLAGS.username, self.FLAGS.password))
             self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
         except Exception as e:
@@ -105,7 +105,7 @@ class Client:
                         self.calls.add(call)
                         self.update_subscriptions(call)
                         await self.subscribe(ws)
-                        return msg_dict["message"]["messageId"]
+                return msg_dict["message"]["messageId"]
         except Exception as e:
             logging.error(e)
         return None
