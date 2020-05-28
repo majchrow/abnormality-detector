@@ -1,7 +1,10 @@
 import asyncio
 import json
 import logging
+import os
 import time
+from datetime import datetime
+
 import requests
 from websockets import connect
 
@@ -41,8 +44,8 @@ class Client:
 
     def _refresh_auth_token(self):
         try:
-            url = f"http://{self.FLAGS.host}:{self.FLAGS.port}/api/v1/authTokens"
-            response = requests.post(url, data={}, auth=(self.FLAGS.username, self.FLAGS.password))
+            url = f"https://{self.FLAGS.host}:{self.FLAGS.port}/api/v1/authTokens"
+            response = requests.post(url, data={}, auth=(os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]))
             self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
         except Exception as e:
             logging.error(e)
@@ -105,16 +108,15 @@ class Client:
                         self.calls.add(call)
                         self.update_subscriptions(call)
                         await self.subscribe(ws)
-                        return msg_dict["message"]["messageId"]
+                return msg_dict["message"]["messageId"]
         except Exception as e:
             logging.error(e)
         return None
 
-    @staticmethod
-    def save_to_file(msg):
-        msg_parsed = json.loads(msg)
-        with open("client_log.json", "a") as file:
-            json.dump(msg_parsed, file, indent=4)
+    def save_to_file(self, msg_dict):
+        msg_dict['date'] = datetime.now().isoformat()
+        with open(self.FLAGS.logfile, "a") as file:
+            json.dump(msg_dict, file, indent=4)
             file.write(",\n")
 
     async def recv_msg(self, ws):
@@ -122,7 +124,7 @@ class Client:
             msg = await ws.recv()
             msg_dict = json.loads(msg)
             msg_id = await self.process_message(msg_dict, ws)
-            self.save_to_file(msg)
+            self.save_to_file(msg_dict)
             if msg_id:
                 await self.send_ack(msg_id, ws)
 
