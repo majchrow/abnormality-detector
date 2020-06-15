@@ -1,0 +1,28 @@
+a.icon-block {
+  display: inline-block;
+  width: 10em;
+  float: left;
+  text-align: center;
+}
+
+a.icon-block i,
+a.icon-block span {
+  display: block;
+  width: 100%;
+  clear: both;
+}
+
+a { color: inherit; }
+
+.app-icon {
+  padding: 0 14px;
+}
+
+.app-icon-medium {
+  font-size: 30px;
+  padding: 0 5px;
+}
+
+.app-icon:hover {
+  cursor: pointer;
+}

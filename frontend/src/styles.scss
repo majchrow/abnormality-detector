@@ -1,0 +1,51 @@
+@import '~@angular/material/theming';
+@import url("https://fonts.googleapis.com/icon?family=Material+Icons");
+
+@include mat-core();
+
+$app-primary: mat-palette($mat-purple);
+$app-accent: mat-palette($mat-purple, 800);
+$app-warn: mat-palette($mat-red);
+$app-theme: mat-dark-theme($app-primary, $app-accent, $app-warn);
+
+@mixin mix-app-theme($app-theme) {
+  $primary: map-get($app-theme, primary);
+  $accent: map-get($app-theme, accent);
+
+  .mat-button-toggle {
+    background-color: mat-color($primary);
+    color: mat-color($primary, default-contrast);
+  }
+
+  .mat-button-toggle-checked {
+    background-color: mat-color($accent);
+    color: mat-color($accent, default-contrast);
+  }
+}
+
+@include angular-material-theme($app-theme);
+@include mix-app-theme($app-theme);
+
+body {
+  font-family: Roboto, Arial, sans-serif;
+  margin: 0;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+.main-body {
+  padding: 100px 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.app-spacer {
+  flex: 1 1 auto;
+}
+
+mat-card {
+  text-align: center;
+  width: 400px;
+  height: 400px;
+}
