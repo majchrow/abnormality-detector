@@ -1,0 +1,22 @@
+<mat-toolbar color="primary">
+  <mat-toolbar-row>
+    <span class="app-spacer"></span>
+    <mat-button-toggle-group #group="matButtonToggleGroup" (change)="navigate($event.value)" value="home">
+      <mat-button-toggle value="home">
+        Home <i class="app-icon-medium fa fa-home fa-2x"></i>
+      </mat-button-toggle>
+      <mat-button-toggle value="meetings">
+        Spotkania <i class="app-icon-medium fa fa-calendar fa-2x"></i>
+      </mat-button-toggle>
+      <mat-button-toggle value="logs">
+        Logi <i class="app-icon-medium fa fa-line-chart fa-2x"></i>
+      </mat-button-toggle>
+      <mat-button-toggle value="settings">
+        Ustawienia <i class="app-icon-medium fa fa-cog fa-2x"></i>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+    <span class="app-spacer"></span>
+    <a href="https://github.com/majchrow/abnormality-detector" target="_blank"><i
+      class="app-icon fa fa-github fa-2x"></i></a>
+  </mat-toolbar-row>
+</mat-toolbar>
