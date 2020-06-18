@@ -8,13 +8,17 @@ import {Router} from '@angular/router';
 })
 export class HeaderComponent implements OnInit {
 
+  public href = '';
+
   constructor(private router: Router) {
   }
 
   ngOnInit(): void {
+    this.href = this.router.url;
   }
 
   navigate(value) {
+    console.log();
     this.router.navigate([`/${value}`]);
   }
 

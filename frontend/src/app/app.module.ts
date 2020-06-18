@@ -24,6 +24,9 @@ import {MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
 import { LogComponent } from './components/logs/log/log.component';
 import { PlotComponent } from './components/logs/plot/plot.component';
+import { FirstCardComponent } from './components/home/first-card/first-card.component';
+import { SecondCardComponent } from './components/home/second-card/second-card.component';
+import { ThirdCardComponent } from './components/home/third-card/third-card.component';
 
 @NgModule({
   declarations: [
@@ -36,7 +39,10 @@ import { PlotComponent } from './components/logs/plot/plot.component';
     MeetingCardComponent,
     MatConfirmDialogComponent,
     LogComponent,
-    PlotComponent
+    PlotComponent,
+    FirstCardComponent,
+    SecondCardComponent,
+    ThirdCardComponent
   ],
   imports: [
     BrowserModule,
