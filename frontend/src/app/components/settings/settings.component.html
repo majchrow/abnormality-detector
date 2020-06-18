@@ -1,7 +1,35 @@
 <div class="main-body">
   <span class="app-spacer"></span>
-  <mat-card>
-    Settings
+  <mat-card class="setting-card">
+    <mat-card-header style="justify-content: center;">
+      <mat-card-title>
+        <h2>Settings</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <section>
+        <div fxLayout="row wrap" class="card-deck-container mat-elevation-z4">
+          <div class="setting-toogle-div" *ngFor="let entry of config | keyvalue">
+            <mat-slide-toggle class="setting-toogle"
+                              color="warn"
+                              [checked]="entry.value">
+            </mat-slide-toggle>
+            {{ entry.key }}
+          </div>
+        </div>
+      </section>
+      <mat-card-actions>
+        <div fxFlex></div>
+        <button class="save-button"
+                mat-flat-button
+                color="primary"
+                (click)="save()"
+        >
+          Save changes <i class="app-icon-medium fa fa-save fa-2x"></i>
+        </button>
+        <div fxFlex></div>
+      </mat-card-actions>
+    </mat-card-content>
   </mat-card>
   <span class="app-spacer"></span>
 </div>
