@@ -1,0 +1,34 @@
+.confirm-dialog-container .content-container {
+  margin: 5px 5px 15px 5px;
+  display: flex;
+}
+
+.confirm-dialog-container span.content-span {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 22px;
+}
+
+.confirm-dialog-container #no-button {
+  height: 50px;
+  width: 50%;
+}
+
+.confirm-dialog-container #yes-button {
+  height: 50px;
+  width: 50%;
+}
+
+.confirm-dialog-container #close-icon {
+  margin-left: auto;
+  order: 2;
+}
+
+.confirm-dialog-container #close-icon:hover {
+  cursor: pointer;
+}
+
+.confirm-dialog-container .mat-dialog-container {
+  border-radius: .25em .25em .4em .4em;
+  padding: 0;
+}

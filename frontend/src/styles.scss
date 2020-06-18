@@ -44,8 +44,43 @@ body {
   flex: 1 1 auto;
 }
 
-mat-card {
+.footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
   text-align: center;
-  width: 400px;
-  height: 400px;
+}
+
+
+a {
+  color: inherit;
+}
+
+.app-icon {
+  padding: 0 14px;
+}
+
+.app-icon-medium {
+  font-size: 30px;
+  padding: 0 5px;
+}
+
+.app-icon:hover {
+  cursor: pointer;
+}
+
+snack-bar-container.success {
+  background-color: #388E3C;
+  color: #fff;
+}
+
+snack-bar-container.warn {
+  background-color: #c40233;
+  color: #fff;
+}
+
+snack-bar-container.notification simple-snack-bar {
+  font-size: 18px !important;
+  font-weight: bold;
 }
