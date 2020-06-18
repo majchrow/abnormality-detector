@@ -1,7 +1,24 @@
 <div class="main-body">
-  <span class="app-spacer"></span>
-  <mat-card>
-    Home
+  <mat-card class="home-card">
+    <mat-card-header style="justify-content: center;">
+      <mat-card-title>
+        <h2>Home</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <mat-card-content>
+        <div fxLayout="row">
+          <div fxFlex="33%">
+            <app-first-card></app-first-card>
+          </div>
+          <div fxFlex="33%">
+            <app-second-card></app-second-card>
+          </div>
+          <div fxFlex="33%">
+            <app-third-card></app-third-card>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card-content>
   </mat-card>
-  <span class="app-spacer"></span>
 </div>
