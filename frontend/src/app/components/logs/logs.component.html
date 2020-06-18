@@ -1,7 +1,19 @@
 <div class="main-body">
-  <span class="app-spacer"></span>
-  <mat-card>
-    Logs
+  <mat-card class="logs-card">
+    <mat-card-header style="justify-content: center;">
+      <mat-card-title>
+        <h2>Logs</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div fxLayout="row">
+        <div fxFlex="50%">
+          <app-log></app-log>
+        </div>
+        <div fxFlex="50%">
+          <app-plot></app-plot>
+        </div>
+      </div>
+    </mat-card-content>
   </mat-card>
-  <span class="app-spacer"></span>
 </div>

@@ -1,7 +1,41 @@
 <div class="main-body">
-  <span class="app-spacer"></span>
   <mat-card>
-    Meetings
+    <mat-card-header style="justify-content: center;">
+      <mat-card-title>
+        <h2>Meetings</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div fxLayout="row wrap" fxFlex.md="50" class="card-deck-container mat-elevation-z4">
+        <div *ngFor="let meeting of meetings" class="card-item">
+          <app-meeting-card
+            [meeting]="meeting"
+            (deleted)="delete(meeting)">
+
+          </app-meeting-card>
+        </div>
+        <div class="card-item">
+          <mat-card class="add-card"
+                    [ngStyle]="{'width':'400' + 'px'}"
+                    (click)="addMeeting()">
+            <mat-card-header style="justify-content: center;">
+              <mat-card-title>
+                Dodaj spotkanie
+              </mat-card-title>
+            </mat-card-header>
+          </mat-card>
+
+        </div>
+
+        <div class="footer" *ngIf="meetings.length !== 0">
+          <mat-paginator
+            [length]="paginatorSize"
+            [pageSize]="numberOfProductsDisplayedInPage"
+            [pageSizeOptions]="pageSizeOptions"
+            (page)="updateMeetingsDisplayedInPage($event)">
+          </mat-paginator>
+        </div>
+      </div>
+    </mat-card-content>
   </mat-card>
-  <span class="app-spacer"></span>
 </div>

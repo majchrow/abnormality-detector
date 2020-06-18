@@ -1,0 +1,16 @@
+.card-deck-container {
+  width: 100%;
+  position: relative;
+  border-radius: 2px;
+  padding: 10px 10px 10px 10px;
+  margin: 10px 10px 10px 0px;
+  background-color: #202020;
+}
+
+.card-item {
+  padding: 5px 5px 5px 5px;
+}
+
+.add-card:hover {
+  cursor: pointer;
+}

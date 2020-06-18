@@ -1,0 +1,15 @@
+<mat-card class="log-card">
+  <mat-card-content>
+    <mat-list>
+      <div mat-subheader>Info</div>
+      <mat-list-item [ngSwitch]="info.type" *ngFor="let info of infos">
+          <mat-icon mat-list-icon *ngSwitchCase="'info'">info</mat-icon>
+          <mat-icon mat-list-icon *ngSwitchCase="'warning'" color="warn">warning</mat-icon>
+          <mat-icon id="green" mat-list-icon *ngSwitchCase="'success'">feedback</mat-icon>
+          <mat-icon mat-list-icon *ngSwitchDefault>folder</mat-icon>
+        <div mat-line>{{info.text}}</div>
+        <div mat-line> {{info.date}} </div>
+      </mat-list-item>
+    </mat-list>
+  </mat-card-content>
+</mat-card>
