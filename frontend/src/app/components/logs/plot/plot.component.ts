@@ -17,7 +17,7 @@ export class PlotComponent implements OnInit {
       animationEnabled: true,
       exportEnabled: true,
       title: {
-        text: 'Logs info'
+        text: 'Dashboard'
       },
       data: [{
         type: 'pie',

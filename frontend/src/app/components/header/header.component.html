@@ -1,7 +1,7 @@
 <mat-toolbar color="primary">
   <mat-toolbar-row>
     <span class="app-spacer"></span>
-    <mat-button-toggle-group #group="matButtonToggleGroup" (change)="navigate($event.value)" value="home">
+    <mat-button-toggle-group #group="matButtonToggleGroup" (change)="navigate($event.value)" [value]="href.substr(1)">
       <mat-button-toggle value="home">
         Home <i class="app-icon-medium fa fa-home fa-2x"></i>
       </mat-button-toggle>
