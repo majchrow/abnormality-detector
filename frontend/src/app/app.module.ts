@@ -22,6 +22,8 @@ import {MatConfirmDialogComponent} from './components/mat-confirm-dialog/mat-con
 import {MatDialogModule} from '@angular/material/dialog';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
+import { LogComponent } from './components/logs/log/log.component';
+import { PlotComponent } from './components/logs/plot/plot.component';
 
 @NgModule({
   declarations: [
@@ -32,7 +34,9 @@ import {MatSlideToggleModule} from '@angular/material/slide-toggle';
     LogsComponent,
     SettingsComponent,
     MeetingCardComponent,
-    MatConfirmDialogComponent
+    MatConfirmDialogComponent,
+    LogComponent,
+    PlotComponent
   ],
   imports: [
     BrowserModule,
