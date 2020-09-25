@@ -27,6 +27,9 @@ import { PlotComponent } from './components/logs/plot/plot.component';
 import { FirstCardComponent } from './components/home/first-card/first-card.component';
 import { SecondCardComponent } from './components/home/second-card/second-card.component';
 import { ThirdCardComponent } from './components/home/third-card/third-card.component';
+import { MeetingSettingComponent } from './components/meetings/meeting-setting/meeting-setting.component';
+import {MatFormFieldModule} from "@angular/material/form-field";
+import {MatInputModule} from "@angular/material/input";
 
 @NgModule({
   declarations: [
@@ -42,7 +45,8 @@ import { ThirdCardComponent } from './components/home/third-card/third-card.comp
     PlotComponent,
     FirstCardComponent,
     SecondCardComponent,
-    ThirdCardComponent
+    ThirdCardComponent,
+    MeetingSettingComponent
   ],
   imports: [
     BrowserModule,
@@ -58,7 +62,9 @@ import { ThirdCardComponent } from './components/home/third-card/third-card.comp
     MatListModule,
     MatDialogModule,
     MatSnackBarModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatFormFieldModule,
+    MatInputModule
   ],
   providers: [],
   bootstrap: [AppComponent]

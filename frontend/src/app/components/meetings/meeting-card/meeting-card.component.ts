@@ -9,7 +9,8 @@ import {Meeting} from '../class/meeting';
 export class MeetingCardComponent implements OnInit {
 
   @Input() meeting: Meeting;
-  @Output() deleted = new EventEmitter<Meeting>();
+  @Output() deleteEmitter = new EventEmitter<Meeting>();
+  @Output() settingEmitter = new EventEmitter<Meeting>();
 
   constructor() {
   }
@@ -17,12 +18,16 @@ export class MeetingCardComponent implements OnInit {
   ngOnInit(): void {
   }
 
+  settings(event: MouseEvent) {
+    this.settingEmitter.emit(this.meeting);
+  }
+
   edit(event: MouseEvent) {
     console.log('edit');
   }
 
   delete(event: MouseEvent) {
-    this.deleted.emit(this.meeting);
+    this.deleteEmitter.emit(this.meeting);
   }
 
 }
