@@ -4,6 +4,6 @@
     <i id="close-icon" class="app-icon fa fa-times-circle" (click)="closeDialog()"></i>
     <span class="content-span">{{data.message}}</span>
   </div>
-  <button mat-button id="no-button" [mat-dialog-close]="false">NO</button>
   <button mat-button id="yes-button" color="warn" [mat-dialog-close]="true">YES</button>
+  <button mat-button id="no-button" [mat-dialog-close]="false">NO</button>
 </div>

@@ -18,7 +18,9 @@ export class MeetingsComponent implements OnInit {
   ) {
   }
 
-
+  // settingOn: any;
+  // settingOff: any;
+  settingMeeting: Meeting;
   paginatorSize = 1;
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
@@ -29,11 +31,18 @@ export class MeetingsComponent implements OnInit {
     new Meeting('Meeting 4', ['informatyka', '1 osoba'])
   ];
 
+
   updateMeetingsDisplayedInPage(event) {
     console.log(event);
   }
 
   ngOnInit(): void {
+    this.settingMeeting = null;
+  }
+
+
+  setting(meeting: Meeting) {
+    this.settingMeeting = meeting;
   }
 
   delete(meeting: Meeting) {
@@ -55,5 +64,9 @@ export class MeetingsComponent implements OnInit {
     this.meetings.push(
       new Meeting('Meeting X', ['Unknown'])
     );
+  }
+
+  back() {
+    this.settingMeeting = null;
   }
 }

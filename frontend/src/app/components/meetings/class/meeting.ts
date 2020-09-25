@@ -7,5 +7,11 @@ export class Meeting {
   title: string;
   content: Array<string>;
 
+  config: Map<string, boolean> = new Map([
+    ['recording allowed', true],
+    ['streaming allowed', true],
+    ['one active speaker', false]
+  ]);
+
 
 }
