@@ -22,14 +22,15 @@ import {MatConfirmDialogComponent} from './components/mat-confirm-dialog/mat-con
 import {MatDialogModule} from '@angular/material/dialog';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
-import { LogComponent } from './components/logs/log/log.component';
-import { PlotComponent } from './components/logs/plot/plot.component';
-import { FirstCardComponent } from './components/home/first-card/first-card.component';
-import { SecondCardComponent } from './components/home/second-card/second-card.component';
-import { ThirdCardComponent } from './components/home/third-card/third-card.component';
-import { MeetingSettingComponent } from './components/meetings/meeting-setting/meeting-setting.component';
-import {MatFormFieldModule} from "@angular/material/form-field";
-import {MatInputModule} from "@angular/material/input";
+import {LogComponent} from './components/logs/log/log.component';
+import {PlotComponent} from './components/logs/plot/plot.component';
+import {FirstCardComponent} from './components/home/first-card/first-card.component';
+import {SecondCardComponent} from './components/home/second-card/second-card.component';
+import {ThirdCardComponent} from './components/home/third-card/third-card.component';
+import {MeetingSettingComponent} from './components/meetings/meeting-setting/meeting-setting.component';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {HttpClientModule} from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -51,6 +52,7 @@ import {MatInputModule} from "@angular/material/input";
   imports: [
     BrowserModule,
     AppRoutingModule,
+    HttpClientModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
