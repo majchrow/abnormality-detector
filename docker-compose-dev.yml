@@ -24,7 +24,7 @@ services:
     networks:
       - backend
       - frontend
-    command: adev runserver -p 5000 streaming/app.py    
+    command: adev runserver -v -p 5000 streaming/app.py    
     
   frontend:
       build:
