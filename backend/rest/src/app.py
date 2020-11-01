@@ -1,16 +1,17 @@
 from flask import Flask
-from flask_cors import CORS
 from flask_restful import Resource, Api
+from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
 api = Api(app)
-cors = CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 
-@api.resource('/')
-class Foo(Resource):
+@api.resource('/meetings')
+class Meetings(Resource):
+    @cross_origin()
     def get(self):
-        return 'Hello, World!'
+        return {'meetings': ['a', 'b']}
 
 
 if __name__ == '__main__':

@@ -1,16 +1,31 @@
 version: '3.7'
 services:
-  backend:
+  backend-rest:
     build: 
-      context: ./backend
+      context: ./backend/rest
     volumes: 
-      - ./backend:/flask
+      - ./backend/rest:/flask
+    environment:
+      FLASK_DEBUG: 1
     ports: 
       - 5000:5000
     networks:
       - backend
       - frontend
+    command: flask run -p 5000
 
+  backend-streaming:
+    build:
+      context: ./backend/streaming
+    volumes:
+      - ./backend/streaming/:/aiohttp
+    ports:
+      - 5001:5000
+    networks:
+      - backend
+      - frontend
+    command: adev runserver -p 5000 src/app.py    
+    
   frontend:
       build:
         context: ./frontend
@@ -22,7 +37,7 @@ services:
       ports:
         - 4200:4200
       depends_on:
-        - backend
+        - backend-rest
       networks:
         - frontend
 
