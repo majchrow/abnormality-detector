@@ -14,17 +14,19 @@ class Manager:
     def __init__(self):
         self.threshold_notifications_q = defaultdict(Queue)
         self.threshold_manager = ThresholdManager(self.threshold_notifications_q)
+        # TODO: other managers for e.g. running ML predictions, retraining model etc.
 
     async def start(self):
         await self.threshold_manager.start()
 
     async def dispatch(self, conf_id: str, request: dict):
-        # TODO:
+        # TODO: types would help
         if request['type'] == 'threshold':
             await self.threshold_manager.submit(conf_id, request['criteria'])
 
     async def shutdown(self):
         await self.threshold_manager.shutdown()
+        logging.info('Worker manager task shutdown finished.')
 
 
 class ThresholdManager:
@@ -42,14 +44,14 @@ class ThresholdManager:
             stderr=asyncio.subprocess.PIPE
         )
         self.running = True
-        self.listener = asyncio.create_task(self.listen())
+        self.listener = asyncio.create_task(self._listen())
 
-    async def listen(self):
+    async def _listen(self):
         while self.running:
             line = await AsyncStreams.read_str(self.worker.stdout)
-            logging.info('bob:' + line)
+
             if not line:
-                logging.warning('Worker process shutdown!')  # TODO: handle possible errors
+                logging.info('Threshold worker process shutdown!')  # TODO: handle possible errors
                 break
 
             payload = json.loads(line)
@@ -57,10 +59,18 @@ class ThresholdManager:
             await self.notification_q[conf_id].put(response)
 
     async def submit(self, conf_id: str, criteria: dict):
+        # TODO:
+        #  - save it to DB
+        #  - on start - check if there are some criteria in DB
         payload = {'conf_id': conf_id, 'criteria': criteria}
         await AsyncStreams.send_dict(payload, self.worker.stdin)
 
     async def shutdown(self):
         self.running = False
         await AsyncStreams.send_str('POISON', self.worker.stdin)
-        await self.listener.cancel()
+        await self.worker.wait()
+        logging.info('Threshold worker process stopped.')
+
+        self.listener.cancel()
+        await self.listener
+        logging.info('Threshold worker manager task stopped.')
