@@ -1,29 +1,30 @@
 import asyncio
 import json
+import logging
 import os
 from asyncio import Queue
 from collections import defaultdict
 
-from .protocol import MonitoringRequest, ThresholdCriteria, ThresholdRequest
+from .protocol import AsyncStreams
 
 worker_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 class Manager:
     def __init__(self):
-        self.notify_threshold_q = defaultdict(Queue)
-        self.thresholds = ThresholdManager(self.notify_threshold_q)
+        self.threshold_notifications_q = defaultdict(Queue)
+        self.threshold_manager = ThresholdManager(self.threshold_notifications_q)
 
     async def start(self):
-        await self.thresholds.start()
+        await self.threshold_manager.start()
 
-    # TODO: add typing!
-    async def dispatch(self, conf_id: str, request: MonitoringRequest):
-        if request.type == 'threshold':
-            await self.thresholds.submit(conf_id, request.criteria)
+    async def dispatch(self, conf_id: str, request: dict):
+        # TODO:
+        if request['type'] == 'threshold':
+            await self.threshold_manager.submit(conf_id, request['criteria'])
 
     async def shutdown(self):
-        await self.thresholds.shutdown()
+        await self.threshold_manager.shutdown()
 
 
 class ThresholdManager:
@@ -45,33 +46,21 @@ class ThresholdManager:
 
     async def listen(self):
         while self.running:
-            line = (await self.worker.stdout.readline()).decode()
-
+            line = await AsyncStreams.read_str(self.worker.stdout)
+            logging.info('bob:' + line)
             if not line:
-                # TODO: worker process finished, handle possible errors
+                logging.warning('Worker process shutdown!')  # TODO: handle possible errors
                 break
 
             payload = json.loads(line)
             conf_id, response = payload['conf_id'], payload['response']
             await self.notification_q[conf_id].put(response)
 
-    async def submit(self, conf_id: str, criteria: ThresholdCriteria):
-        req = ThresholdRequest(conf_id=conf_id, criteria=criteria)
-        # TODO: all stream handling to separate class?
-        self.worker.stdin.write(req.bytes())
-        await self.worker.stdin.drain()
+    async def submit(self, conf_id: str, criteria: dict):
+        payload = {'conf_id': conf_id, 'criteria': criteria}
+        await AsyncStreams.send_dict(payload, self.worker.stdin)
 
     async def shutdown(self):
         self.running = False
-        self.worker.stdin.write('POISON\n'.encode())
-        await self.worker.stdin.drain()
-        await self.worker.wait()
+        await AsyncStreams.send_str('POISON', self.worker.stdin)
         await self.listener.cancel()
-
-# TODO:
-#  - module for communication protocol between processes (message classes, serialization, etc.)
-#  - remember:
-#    - async write: str -> (str + '\n').encode() -> sub.stdin.write() -> await sub.stdin.drain()
-#    - async read: (await sub.stdin.read(str + '\n')).decode() -> str
-#    - sync write: str -> sys.stdout.write(str + '\n') -> sys.stdout.flush()
-#    - sync read: sys.stdin.readline() -> str

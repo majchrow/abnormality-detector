@@ -1,28 +1,27 @@
 """Communication with worker processes over system pipes."""
 # TODO:
-#  - protobuf maybe? this kinda sucks
-#  - subprocess doesn't have access to this module anyway, change PYTHONPATH or sth...
-from typing import Literal, Union
-
-from pydantic import BaseModel
-
-
-class ThresholdCriteria(BaseModel):
-    # TODO: will need a map from ParamName to numerical/textual/boolean condition
-    dummy: dict
+#  - it would be nice not to send dictionaries, but how?
+#  - msgpack? protobuf?
+#  - subprocess doesn't have access to this module anyway (PYTHONPATH)
+import json
 
 
-class ThresholdRequest(BaseModel):
-    conf_id: str
-    criteria: ThresholdCriteria
-
-    def json(self, *args, **kwargs):
-        return super().json(*args, **kwargs) + '\n'
-
-    def bytes(self):
-        return self.json().encode()
+def serialize(payload: dict):
+    return (json.dumps(payload) + '\n').encode()
 
 
-class MonitoringRequest(BaseModel):
-    type: Literal['threshold', 'batch']
-    criteria: Union[ThresholdCriteria]  # TODO: + BatchCriteria
+class AsyncStreams:
+    @staticmethod
+    async def send_str(s: str, stream):
+        stream.write((s + '\n').encode())
+        await stream.drain()
+
+    @staticmethod
+    async def send_dict(payload: dict, stream):
+        data = serialize(payload)
+        stream.write(data)
+        await stream.drain()
+
+    @staticmethod
+    async def read_str(stream):
+        return (await stream.readline()).decode()
