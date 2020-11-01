@@ -6,9 +6,9 @@ COPY requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ src/
+COPY rest rest/
 
 ENV FLASK_RUN_HOST=0.0.0.0
-ENV FLASK_APP=src/app.py
+ENV FLASK_APP=rest/app:create_app
 
 EXPOSE 5000
