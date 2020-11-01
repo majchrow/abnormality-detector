@@ -1,13 +1,16 @@
+import logging
 from aiohttp import web
 
-from .routes import setup_cors, setup_routes
+from .monitoring import setup_monitoring
+from .routes import setup_routes
 
 
 def create_app():
+    logging.basicConfig(level=logging.INFO)
+
     app = web.Application()
     setup_routes(app)
-    setup_cors(app)
-
+    setup_monitoring(app)
     return app
 
 
