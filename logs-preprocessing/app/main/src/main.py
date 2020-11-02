@@ -12,13 +12,14 @@ SPARK = (
     .getOrCreate()
 )
 PATHS = {
-    "callInfo": "/run/media/jola/DATA/JOLEG/dokumenty/Inzynierka/abnormality-detector/logs-analysis/app/main/resources/callInfo_sample.json",
-    "roster":  "/run/media/jola/DATA/JOLEG/dokumenty/Inzynierka/abnormality-detector/logs-analysis/app/main/resources/roster_sample.json"
+    "callInfo": "/run/media/jola/DATA/JOLEG/dokumenty/Inzynierka/abnormality-detector/logs-preprocessing/app/main/resources/callInfo_sample.json",
+    "roster":  "/run/media/jola/DATA/JOLEG/dokumenty/Inzynierka/abnormality-detector/logs-preprocessing/app/main/resources/roster_sample.json"
 }
 PREPROCESSORS = {
     "callInfo": CallInfoPreprocessor,
     "roster": RosterPreprocessor
 }
+KAFKA = "localhost:9092"
 
 
 def create_parser():
@@ -31,10 +32,11 @@ def create_parser():
 
 
 if __name__ == "__main__":
+    SPARK.conf.set("spark.sql.legacy.timeParserPolicy","LEGACY")
     parser = create_parser()
     FLAGS = parser.parse_args()
-    preprocessor = PREPROCESSORS[FLAGS.type]
-    preprocessor.prepare_final_df()
+    path = PATHS[FLAGS.type]
+    preprocessor = PREPROCESSORS[FLAGS.type](SPARK, KAFKA, path)
     writer = preprocessor.create_output_stream()
-    writer.start()
-    writer.awaitTermination()
+    query = writer.start()
+    query.awaitTermination()
