@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
@@ -23,7 +24,9 @@ def create_parser():
     parser = ArgumentParser()
     parser.add_argument('--addresses',
                         type=address,
+                        required=True,
                         nargs='+',
+                        metavar='ADDRESS',
                         help='bridge server addresses')
     parser.add_argument('--logfile',
                         type=str,
@@ -42,7 +45,9 @@ if __name__ == '__main__':
     except KeyError as e:
         print("Required USERNAME and PASSWORD environmental variables")
         sys.exit(1)
-
+   
+    # TODO: async logging?
+    logging.basicConfig(level=logging.INFO)
     parser = create_parser()
     config = parser.parse_args()
     manager = ClientManager(login, password, config)

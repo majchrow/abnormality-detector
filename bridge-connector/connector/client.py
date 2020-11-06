@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import json
+import logging
 from typing import Tuple
 
 from websockets import connect
@@ -106,6 +107,8 @@ class ConnectionHandler:
         pass
 
     async def process_message(self, msg_dict):
+        logging.info(f'RECEIVED: {msg_dict}')
+
         # note: could also be "messageAck" - we ignore it
         if msg_dict["type"] != "message":
             return
@@ -170,13 +173,14 @@ class TokenManager:
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
+        await self.refresh()
+        return self
 
     async def __aexit__(self, *args):
         await self.session.close()
 
-    async def token(self):
-        if not self.auth_token:
-            await self.refresh()
+    @property
+    def token(self):
         return self.auth_token
 
     async def refresh(self):
