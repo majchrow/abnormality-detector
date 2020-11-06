@@ -2,15 +2,17 @@ import asyncio
 import logging
 from asyncio import Queue
 
-from connector.client import Client
+from connector.client import Client, TokenManager
 
 
 class ClientManager:
     def __init__(self, login, password, config):
+        self.credentials = (login, password)
         self.addresses = config.addresses
         self.logfile = config.logfile
+        self.max_ws_count = config.max_ws_count
         self.calls = {}
-        self.clients = [Client(addr, self, config.max_ws_count) for addr in self.addresses]
+        self.clients = []
         self.log_queue = Queue()
 
     def start(self):
@@ -19,12 +21,19 @@ class ClientManager:
         # TODO: do we need this try-catch clause?
         try:
             loop.create_task(self.save_log())
-            for c in self.clients:
-                c.start()
+            for addr in self.addresses:
+                loop.create_task(self.run_client(addr))
             loop.run_forever()
         finally:
             loop.close()
             logging.info('Client manager shutdown.')
+
+    async def run_client(self, address):
+        host, port = address
+        login, password = self.credentials
+        async with TokenManager(host, port, login, password) as token_manager:
+            client = Client(address, self, token_manager, self.max_ws_count)
+            await client.run()
 
     async def log(self, msg):
         await self.log_queue.put(msg)
