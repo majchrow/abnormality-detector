@@ -1,8 +1,6 @@
 import aiohttp
 import asyncio
 import json
-import logging
-from datetime import datetime
 
 from websockets import connect
 
@@ -25,10 +23,7 @@ class Client:
     def available(self):
         return len(self.call_handlers) < self.max_ws_count
 
-    def start(self):
-        asyncio.create_task(self.run_main_handler())
-
-    async def run_main_handler(self):
+    async def run(self):
         uri = f"wss://{self.host}:{self.port}/events/v1?authToken={self.token_manager.token}"
         # noinspection PyTypeChecker
         async with connect(uri, ping_timeout=None) as ws:
