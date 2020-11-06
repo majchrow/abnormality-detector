@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import json
+from typing import Tuple
 
 from websockets import connect
 
@@ -11,7 +12,7 @@ from connector.protocol import (
 
 class Client:
     """Multi-socket client for a single bridge server."""
-    def __init__(self, address, call_manager, token_manager, max_ws_count):
+    def __init__(self, address: Tuple[str, str], call_manager, token_manager, max_ws_count: int):
         self.host, self.port = address
         self.call_manager = call_manager
         self.token_manager = token_manager
@@ -23,19 +24,21 @@ class Client:
     def available(self):
         return len(self.call_handlers) < self.max_ws_count
 
+    @property
+    def event_uri(self):
+        return f"wss://{self.host}:{self.port}/events/v1?authToken={self.token_manager.token}"
+
     async def run(self):
-        uri = f"wss://{self.host}:{self.port}/events/v1?authToken={self.token_manager.token}"
         # noinspection PyTypeChecker
-        async with connect(uri, ping_timeout=None) as ws:
+        async with connect(self.event_uri, ping_timeout=None) as ws:
             self.main_handler = ConnectionHandler(ws, self)
             self.main_handler.processing_stages = [self.main_handler.dispatch_call_list_update]
             await self.main_handler.calls_subscribe()
             await self.main_handler.run()
 
     async def run_secondary_handler(self, call_id):
-        uri = f"wss://{self.host}:{self.port}/events/v1?authToken={self.token_manager.token}"
         # noinspection PyTypeChecker
-        async with connect(uri, ping_timeout=None) as ws:
+        async with connect(self.event_uri, ping_timeout=None) as ws:
             handler = ConnectionHandler(ws, self)
             handler.processing_stages = [handler.process_call_roster_update]
             self.call_handlers[call_id] = handler
@@ -78,15 +81,11 @@ class Client:
 class ConnectionHandler:
     def __init__(self, ws, owner):
         self.ws = ws
-        self.message_id = 0  # TODO: increment it actually
+        self.message_id = 0  # TODO: increment it actually!
         self.owner = owner
         self.processing_stages = []
         self.running = False
         self.stopped = asyncio.Event()
-
-    async def stop(self):
-        self.running = False
-        await self.stopped.wait()
 
     async def run(self):
         self.running = True
@@ -97,6 +96,10 @@ class ConnectionHandler:
             if msg_id:
                 await self.ws.send(json.dumps(ack(msg_id)))  # acknowledge
         self.stopped.set()
+
+    async def stop(self):
+        self.running = False
+        await self.stopped.wait()
 
     class UnsupportedError(Exception):
         """Processing stage does not handle this message type."""
@@ -153,12 +156,9 @@ class ConnectionHandler:
         await self.owner.on_call_roster_update(msg_dict)
 
 
-###
-# We ain't go no further
-###
 class TokenManager:
     """Encapsulates token API access to prevent redundant refreshes."""
-    def __init__(self, host, port, login, password):
+    def __init__(self, host: str, port: str, login: str, password: str):
         self.url = f'https://{host}:{port}/api/v1/authTokens'
         self.auth = aiohttp.BasicAuth(login, password)
 
