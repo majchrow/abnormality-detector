@@ -1,18 +1,23 @@
 import asyncio
 import logging
 from asyncio import Queue
+from typing import Tuple
 
 from connector.client import Client, TokenManager
 
+# TODO:
+#  - shutdown (cancel Client coroutines)
+#  - ...
+
 
 class ClientManager:
-    def __init__(self, login, password, config):
-        self.credentials = (login, password)
+    def __init__(self, login: str, password: str, config):
+        self.login = login
+        self.password = password
         self.addresses = config.addresses
         self.logfile = config.logfile
         self.max_ws_count = config.max_ws_count
         self.calls = {}
-        self.clients = []
         self.log_queue = Queue()
 
     def start(self):
@@ -28,10 +33,9 @@ class ClientManager:
             loop.close()
             logging.info('Client manager shutdown.')
 
-    async def run_client(self, address):
+    async def run_client(self, address: Tuple[str, str]):
         host, port = address
-        login, password = self.credentials
-        async with TokenManager(host, port, login, password) as token_manager:
+        async with TokenManager(host, port, self.login, self.password) as token_manager:
             client = Client(address, self, token_manager, self.max_ws_count)
             await client.run()
 

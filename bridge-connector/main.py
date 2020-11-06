@@ -45,5 +45,5 @@ if __name__ == '__main__':
 
     parser = create_parser()
     config = parser.parse_args()
-    conn = ClientManager(login, password, config)
-    conn.start()
+    manager = ClientManager(login, password, config)
+    manager.start()
