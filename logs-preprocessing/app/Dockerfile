@@ -1,12 +1,36 @@
 FROM python:3.8
 
-# add requirements.txt to the image
-ADD requirements.txt /app/requirements.txt
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jre-headless && \
+    apt-get clean;
 
-# set working directory to /app/
+COPY . /app
+
+ARG FILEPATH=./main/resources/callInfo_sample.json
+ENV FILEPATH="${FILEPATH}"
+
+ARG UPDATE_TYPE=callInfo
+ENV UPDATE_TYPE="${UPDATE_TYPE}"
+
+ENV KEYSPACE="test"
+
+ARG TABLE=call_info_update
+ENV TABLE="${TABLE}"
+
+ENV KAFKA="kafka:9092"
+
+ENV CASSANDRA_HOST="cassandra"
+
+ENV CASSANDRA_USER="cassandra"
+
+ENV CASSANDRA_PORT="9042"
+
+ENV CASSANDRA_PASSWORD="cassandra"
+
+ENV PATH=$PATH:/app/main/src
+ENV PYTHONPATH=/app/main/src
+
 WORKDIR /app/
-
-# setting environment variables
-ENV 
-
 RUN pip install -r requirements.txt
+
+CMD ["python3", "./main/src/run.py"]
