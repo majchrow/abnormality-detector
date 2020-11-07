@@ -94,13 +94,14 @@ class ClientManager:
             with ThreadPoolExecutor() as executor:
                 while True:
                     msg, call_id = await self.log_queue.get()
+                    msg_dict['date'] = datetime.now().isoformat()
+                    msg_dict['call'] = call_id
                     task = partial(self._save_to_file, msg)
                     await loop.run_in_executor(executor, task)
         except asyncio.CancelledError:
             pass  # TODO: release thread locks?
 
     def _save_to_file(self, msg_dict):
-        msg_dict['date'] = datetime.now().isoformat()
         with open(self.config.logfile, "a") as file:
             json.dump(msg_dict, file, indent=4)
             file.write(",\n")
