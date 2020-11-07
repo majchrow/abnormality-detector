@@ -2,7 +2,6 @@ import aiohttp
 import asyncio
 import json
 import logging
-from typing import Tuple
 
 from websockets import connect
 
@@ -12,9 +11,13 @@ from connector.protocol import (
 
 
 class Client:
+
+    TAG = 'Client'
+
     """Multi-socket client for a single bridge server."""
-    def __init__(self, address: Tuple[str, str], call_manager, token_manager, max_ws_count: int):
-        self.host, self.port = address
+    def __init__(self, host: str, port: int, call_manager, token_manager, max_ws_count: int):
+        self.host = host
+        self.port = port
         self.call_manager = call_manager
         self.token_manager = token_manager
         self.max_ws_count = max_ws_count
@@ -33,7 +36,6 @@ class Client:
         # noinspection PyTypeChecker
         async with connect(self.event_uri, ping_timeout=None) as ws:
             self.main_handler = ConnectionHandler(ws, self)
-            self.main_handler.processing_stages = [self.main_handler.dispatch_call_list_update]
             await self.main_handler.calls_subscribe()
             await self.main_handler.run()
 
@@ -41,50 +43,48 @@ class Client:
         # noinspection PyTypeChecker
         async with connect(self.event_uri, ping_timeout=None) as ws:
             handler = ConnectionHandler(ws, self)
-            handler.processing_stages = [handler.process_call_roster_update]
             self.call_handlers[call_id] = handler
             await handler.call_subscribe(call_id)
             await handler.run()
 
-    async def on_add_call(self, call_id):
-        await self.call_manager.on_add_call(call_id, self)
-
-    async def on_update_call(self, call_id):
-        await self.call_manager.on_add_call(call_id, self)
-
-    async def on_remove_call(self, call_id):
-        await self.call_manager.on_remove_call(call_id, self)
-
-        try:
-            handler = self.call_handlers[call_id]
-            if handler == self.main_handler:
-                await handler.calls_subscribe()
-                handler.processing_stages.pop()
-            else:
-                await handler.stop()
-                del self.call_handlers[call_id]
-        except KeyError:
-            pass
+    async def on_calls_update(self, call_id, update_type):
+        if update_type == 'add':
+            await self.call_manager.on_add_call(call_id, self)
+        elif update_type == 'update':
+            await self.call_manager.on_update_call(call_id, self)
+        elif update_type == 'remove':
+            try:
+                handler = self.call_handlers[call_id]
+                if handler == self.main_handler:
+                    await handler.calls_subscribe()
+                else:
+                    await handler.stop()
+                    del self.call_handlers[call_id]
+            except KeyError:
+                pass
+            await self.call_manager.on_remove_call(call_id, self)
+        else:
+            logging.error(f'{self.TAG}: received calls update of type {update_type}')
 
     async def on_call_roster_update(self, msg_dict):
-        # TODO: create_task maybe, JIC of full queue
         await self.call_manager.log(msg_dict)
 
     async def on_connect_to(self, call_id):
         if len(self.call_handlers) == 0:
             self.call_handlers[call_id] = self.main_handler
-            await self.main_handler.all_subscribe(call_id)
-            self.main_handler.processing_stages.append(ConnectionHandler.process_call_roster_update)
+            await self.main_handler.full_subscribe(call_id)
         else:
             asyncio.create_task(self.run_secondary_handler(call_id))
 
 
 class ConnectionHandler:
+
+    TAG = 'ConnectionHandler'
+
     def __init__(self, ws, owner):
         self.ws = ws
-        self.message_id = 0  # TODO: increment it actually!
         self.owner = owner
-        self.processing_stages = []
+        self.message_id = 0
         self.running = False
         self.stopped = asyncio.Event()
 
@@ -102,74 +102,53 @@ class ConnectionHandler:
         self.running = False
         await self.stopped.wait()
 
-    class UnsupportedError(Exception):
-        """Processing stage does not handle this message type."""
-        pass
+    async def calls_subscribe(self):
+        await self._subscribe([calls_subscription])
+
+    async def call_subscribe(self, call_id):
+        subscriptions = [call_info_subscription(call_id), call_roster_subscription(call_id)]
+        await self._subscribe(subscriptions)
+
+    async def full_subscribe(self, call_id):
+        subscriptions = [calls_subscription, call_info_subscription(call_id), call_roster_subscription(call_id)]
+        await self._subscribe(subscriptions)
+
+    async def _subscribe(self, subscriptions):
+        request = subscription_request(subscriptions, self.message_id)
+        await self.ws.send(json.dumps(request))
+        self.message_id += 1
 
     async def process_message(self, msg_dict):
-        logging.info(f'RECEIVED: {msg_dict}')
+        logging.info(f'{self.TAG}: RECEIVED: {msg_dict}')
 
         # note: could also be "messageAck" - we ignore it
         if msg_dict["type"] != "message":
             return
 
         msg_type = msg_dict["message"]["type"]
-
-        for stage in self.processing_stages:
-            try:
-                await stage(msg_dict, msg_type)
-                break
-            except ConnectionHandler.UnsupportedError:
-                pass
-        return msg_dict["message"]["messageId"]
-
-    # Init stages
-    async def calls_subscribe(self):
-        request = subscription_request([calls_subscription], self.message_id)
-        await self.ws.send(json.dumps(request))
-
-    async def call_subscribe(self, call_id):
-        subscriptions = [call_info_subscription(call_id), call_roster_subscription(call_id)]
-        request = subscription_request(subscriptions, self.message_id)
-        await self.ws.send(json.dumps(request))
-
-    # Processing stages
-    async def dispatch_call_list_update(self, msg_dict, msg_type):
-        if "callListUpdate" not in msg_type:
-            raise ConnectionHandler.UnsupportedError
-
-        updates = msg_dict["message"]["updates"]
-        for update in updates:
-            call_id = update["call"]
-            update_type = update["updateType"]
-            await self.dispatch(call_id, update_type)
-
-    async def dispatch(self, call_id, update_type):
-        method_name = f'on_{update_type}_call'
-        try:
-            method = getattr(self.owner, method_name)
-            await method(call_id, self)
-        except AttributeError:
-            pass  # TODO: log error
-
-    async def process_call_roster_update(self, msg_dict,  msg_type):
-        if not ("callInfoUpdate" in msg_type or "rosterUpdate" in msg_type):
-            raise ConnectionHandler.UnsupportedError
-
-        await self.owner.on_call_roster_update(msg_dict)
+        if "callListUpdate" in msg_type:
+            updates = msg_dict["message"]["updates"]
+            for update in updates:
+                call_id = update["call"]
+                update_type = update["updateType"]
+                await self.owner.on_calls_update(call_id, update_type)
+        elif "callInfoUpdate" in msg_type or "rosterUpdate" in msg_type:
+            await self.owner.on_call_roster_update(msg_dict)
+        else:
+            logging.error(f'{self.TAG}: unknown message type {msg_type}')
 
 
 class TokenManager:
     """Encapsulates token API access to prevent redundant refreshes."""
-    def __init__(self, host: str, port: str, login: str, password: str):
+    def __init__(self, host: str, port: int, login: str, password: str):
         self.url = f'https://{host}:{port}/api/v1/authTokens'
         self.auth = aiohttp.BasicAuth(login, password)
+        self.session = None
 
         self.auth_token = None
-        self.refresh_interval_s = 10
         self.is_fresh = False
         self.refresh_lock = asyncio.Lock()
-        self.session = None
+        self.refresh_interval_s = 10
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
