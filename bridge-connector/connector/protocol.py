@@ -5,26 +5,28 @@ calls_subscription = {
     "index": 1,
     "type": "calls",
     "elements": [
-        "name", "participants", "distributedInstances", "recording", "endpointRecording", "streaming", "lockState",
-        "callType", "callCorrelator"
+        "name",
+        # note: these are handled by call_info_subscription below
+        # "participants", "distributedInstances", "recording", "endpointRecording", "streaming", "lockState",
+        # "callType", "callCorrelator"
     ]
 }
 
 
-def call_info_subscription(call: str, ind: int):
+def call_info_subscription(call_id: str, ind: int):
     return {"index": ind,
             "type": "callInfo",
-            "call": call,
+            "call": call_id,
             "elements": ["name", "participants", "distributedInstances", "recording",
                          "endpointRecording", "streaming", "lockState", "callType",
                          "callCorrelator", "joinAudioMuteOverride"]
             }
 
 
-def call_roster_subscription(call: str, ind: int):
+def call_roster_subscription(call_id: str, ind: int):
     return {"index": ind,
             "type": "callRoster",
-            "call": call,
+            "call": call_id,
             "elements": ["name", "uri", "state", "direction", "audioMuted", "videoMuted",
                          "importance", "layout", "activeSpeaker", "presenter",
                          "endpointRecording", "canMove", "movedParticipant",

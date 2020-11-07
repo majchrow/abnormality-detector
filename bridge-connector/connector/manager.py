@@ -69,8 +69,8 @@ class ClientManager:
 
         loop.stop()
 
-    async def log(self, msg: dict):
-        await self.log_queue.put(msg)
+    async def log(self, msg: dict, call_id: str):
+        await self.log_queue.put((msg, call_id))
 
     async def save_log(self):
         while True:

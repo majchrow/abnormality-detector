@@ -2,7 +2,6 @@ import aiohttp
 import asyncio
 import json
 import logging
-from typing import Set
 
 from websockets import connect
 
@@ -24,7 +23,9 @@ class Client:
 
         self.ws = None
         self.message_id = 0
-        self.calls = set()
+        self.subscription_ind = 2
+        self.call_ids = {}  # subscription index -> call ID
+        self.subscriptions = {}  # call ID -> call info subscription index
 
     @property
     def event_uri(self):
@@ -34,6 +35,8 @@ class Client:
         # noinspection PyTypeChecker
         async with connect(self.event_uri, ping_timeout=None) as ws:
             self.ws = ws
+            await self._subscribe()
+
             while True:
                 msg = await ws.recv()
                 msg_dict = json.loads(msg)
@@ -56,7 +59,12 @@ class Client:
                 update_type = update["updateType"]
                 await self.on_calls_update(call_id, update_type)
         elif "callInfoUpdate" in msg_type or "rosterUpdate" in msg_type:
-            await self.call_manager.log(msg_dict)
+            index = msg_dict["message"]["subscriptionIndex"]
+            if index in self.call_ids:
+                call_id = self.call_ids[index]
+                await self.call_manager.log(msg_dict, call_id)
+            else:
+                logging.warning(f'{self.TAG}: received update after "remove": {msg_dict}')
         elif "subscriptionUpdate" in msg_type:
             pass
         else:
@@ -66,17 +74,26 @@ class Client:
         return msg_dict["message"]["messageId"]
 
     async def on_connect_to(self, call_id):
-        self.calls.add(call_id)
-        await self.subscribe(self.calls)
+        self._add_call(call_id)
+        await self._subscribe()
 
-    async def subscribe(self, calls: Set[str]):
+    def _add_call(self, call_id):
+        # Setup subscription indexes for call info and roster info
+        s_ind = self.subscription_ind
+        self.subscription_ind += 2
+
+        self.subscriptions[call_id] = s_ind
+        self.call_ids[s_ind] = self.call_ids[s_ind + 1] = call_id
+
+    async def _subscribe(self):
         subscriptions = [calls_subscription]
 
-        for index, call_id in enumerate(calls):
-            index = 2 * index + 2  # start with 2
+        for call_id in self.subscriptions:
+            call_info_sub_ind = self.subscriptions[call_id]
+
             subscriptions.extend([
-                call_info_subscription(call_id, index),
-                call_roster_subscription(call_id, index + 1)
+                call_info_subscription(call_id, call_info_sub_ind),
+                call_roster_subscription(call_id, call_info_sub_ind + 1)
             ])
 
         request = subscription_request(subscriptions, self.message_id)
@@ -89,7 +106,12 @@ class Client:
         elif update_type == 'update':
             await self.call_manager.on_update_call(call_id, self)
         elif update_type == 'remove':
-            self.calls.discard(call_id)  # TODO: should we change subscription immediately?
+            if call_id in self.subscriptions:
+                # TODO: should we subscribe again immediately?
+                s_ind = self.subscriptions[call_id]
+                del self.call_ids[s_ind]
+                del self.call_ids[s_ind + 1]
+                del self.subscriptions[call_id]
             await self.call_manager.on_remove_call(call_id, self)
         else:
             logging.error(f'{self.TAG}: received calls update of type {update_type}')
