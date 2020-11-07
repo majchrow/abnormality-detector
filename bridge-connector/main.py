@@ -22,13 +22,6 @@ def address(arg):
     return host, port
 
 
-def positive_int(arg):
-    val = int(arg)
-    if val <= 0:
-        raise ArgumentTypeError(f'Argument must be a positibe integer')
-    return val
-
-
 def parse_config():
     parser = ArgumentParser()
     parser.add_argument('--addresses',
@@ -41,15 +34,8 @@ def parse_config():
                         type=str,
                         default='client_log.json',
                         help='default client logfile')
-    parser.add_argument('--max-ws-connections',
-                        type=positive_int,
-                        default=5,
-                        help='max number of WebSockets per server')
     args = parser.parse_args()
-    return Config(
-        login=login, password=password, addresses=args.addresses,
-        logfile=args.logfile, max_ws_connections=args.max_ws_connections
-    )
+    return Config(login=login, password=password, addresses=args.addresses, logfile=args.logfile)
 
 
 if __name__ == '__main__':

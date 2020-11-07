@@ -8,4 +8,3 @@ class Config:
     password: str
     addresses: List[Tuple[str, int]]
     logfile: str
-    max_ws_connections: int

@@ -1,5 +1,8 @@
+from typing import Dict, List
+
+
 calls_subscription = {
-    "index": 3,
+    "index": 1,
     "type": "calls",
     "elements": [
         "name", "participants", "distributedInstances", "recording", "endpointRecording", "streaming", "lockState",
@@ -8,8 +11,8 @@ calls_subscription = {
 }
 
 
-def call_info_subscription(call):
-    return {"index": 2,
+def call_info_subscription(call: str, ind: int):
+    return {"index": ind,
             "type": "callInfo",
             "call": call,
             "elements": ["name", "participants", "distributedInstances", "recording",
@@ -18,8 +21,8 @@ def call_info_subscription(call):
             }
 
 
-def call_roster_subscription(call):
-    return {"index": 1,
+def call_roster_subscription(call: str, ind: int):
+    return {"index": ind,
             "type": "callRoster",
             "call": call,
             "elements": ["name", "uri", "state", "direction", "audioMuted", "videoMuted",
@@ -28,7 +31,7 @@ def call_roster_subscription(call):
                          "movedParticipantCallBridge"]}
 
 
-def subscription_request(subscriptions, message_id):
+def subscription_request(subscriptions: List[Dict], message_id: int):
     return {"type": "message",
             "message":
                 {"messageId": message_id,
@@ -37,7 +40,7 @@ def subscription_request(subscriptions, message_id):
                  }}
 
 
-def ack(message_id):
+def ack(message_id: int):
     return {"type": "messageAck",
             "messageAck":
                 {"messageId": message_id,
