@@ -1,9 +1,4 @@
-Wspólne:
-Czas rzeczywisty -> datetime
-Godzina -> hour
-Dzień tygodnia -> week_day_number
-
-Info:
+Preprocessing - callInfoUpdate:
 Czas od rozpoczęcia spotkania -> time_diff
 Spotkanie nagrywane -> recording
 Spotkanie streamowane -> streaming
@@ -13,8 +8,11 @@ Spotkanie
 Aktualna liczba uczestników -> current_participants
 Średnia liczba uczestników w danym spotkaniu -> mean_participants
 Maksymalna liczba uczestników danego spotkania -> max_participants
+Czas rzeczywisty -> datetime
+Godzina -> hour
+Dzień tygodnia -> week_day_number
 
-Roster:
+Preprocessing - rosterUpdate:
 Liczba uczestników w stanie initial -> initial
 Liczba uczestników w stanie ringing -> ringing
 Liczba uczestników w stanie connected -> connected
@@ -24,3 +22,9 @@ Liczba uczestników z videoMuted -> videomuted (muszę dodać)
 Liczba uczestników z activeSpeaker -> activespeaker
 Liczba uczestników presenter -> presenter
 Liczba uczestników endpointRecording -> endpoint_recording
+Czas rzeczywisty -> datetime
+Godzina -> hour
+Dzień tygodnia -> week_day_number
+
+Kafka:
+W katalogu logs-preprocessing/kafka/resources należy umieścić plik JSON z danymi, które mają być wrzucane do kafki.
