@@ -134,8 +134,12 @@ class ConnectionHandler:
                 await self.owner.on_calls_update(call_id, update_type)
         elif "callInfoUpdate" in msg_type or "rosterUpdate" in msg_type:
             await self.owner.on_call_roster_update(msg_dict)
+        elif "subscriptionUpdate" in msg_type:
+            pass
         else:
             logging.error(f'{self.TAG}: unknown message type {msg_type}')
+            return
+        return msg_dict["message"]["messageId"]
 
 
 class TokenManager:
