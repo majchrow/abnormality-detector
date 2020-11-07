@@ -4,7 +4,7 @@ import sys
 from argparse import ArgumentParser, ArgumentTypeError
 
 from .config import Config
-from .manager import ClientManager
+from connector.client import ClientManager
 
 
 # Argument types
@@ -41,7 +41,7 @@ def main():
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
     except KeyError as e:
-        print("Required USERNAME and PASSWORD environmental variables")
+        print("Required BRIDGE_USERNAME and BRIDGE_PASSWORD environmental variables")
         sys.exit(1)
 
     logging.basicConfig(level=logging.INFO)

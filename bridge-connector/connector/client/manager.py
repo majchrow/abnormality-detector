@@ -1,17 +1,17 @@
+import aiohttp
 import asyncio
 import logging
 import signal
 from asyncio import Queue
 
-from .client import Client, TokenManager
-from .config import Config
+from .client import Client
+from ..config import Config
 
 
 # TODO:
-#  - shutdown (cancel Client coroutines)
 #  - exception handling
 #    - failure to fetch token
-#    -
+#    - HTTP 401 (?) error - refresh token?
 #  - async logging and saving to file
 #  - publishing to Kafka
 
@@ -33,6 +33,8 @@ class ClientManager:
 
     def __init__(self, config: Config):
         self.config = config
+        self.session = aiohttp.ClientSession()
+
         self.calls = {}
         self.log_queue = Queue()
 
@@ -53,14 +55,21 @@ class ClientManager:
             logging.info(f'{self.TAG}: shutdown complete.')
 
     async def run_client(self, host: str, port: int):
-        async with TokenManager(host, port, self.config.login, self.config.password) as token_manager:
-            client = Client(host, port, self, token_manager)
-            await client.run()
+        client = Client(host, port, self)
+        while True:
+            try:
+                logging.info(f'{self.TAG}: starting client for {host}:{port}...')
+                await client.run(self.config.login, self.config.password, self.session)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logging.error(f'{self.TAG}: client run failed with {e}')
 
     async def shutdown(self, loop, signal):
         if signal:
             logging.info(f'{self.TAG}: received exit signal {signal.name}...')
-        
+
+        await self.session.close()
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         [task.cancel() for task in tasks]
 
