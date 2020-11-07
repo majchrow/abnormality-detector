@@ -133,7 +133,7 @@ class Client:
             try:
                 if self.auth_token:
                     uri = f"wss://{self.FLAGS.host}:{self.FLAGS.port}/events/v1?authToken={self.auth_token}"
-                    async with connect(uri) as ws:
+                    async with connect(uri, ping_timeout=None) as ws:
                         await self.subscribe(ws)
                         await self.recv_msg(ws)
                 else:
