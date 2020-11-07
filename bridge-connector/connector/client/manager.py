@@ -81,7 +81,7 @@ class ClientManager:
 
         logging.info(f"{self.TAG}: cancelling {len(tasks)} outstanding tasks")
         await asyncio.gather(*tasks, return_exceptions=True)
-
+        
         loop.stop()
 
     async def log(self, msg: dict, call_id: str):

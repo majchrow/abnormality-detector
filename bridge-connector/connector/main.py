@@ -44,7 +44,7 @@ def main():
         print("Required BRIDGE_USERNAME and BRIDGE_PASSWORD environmental variables")
         sys.exit(1)
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     args = parse_args()
     config = Config(
         login=login, password=password, addresses=args.addresses, logfile=args.logfile

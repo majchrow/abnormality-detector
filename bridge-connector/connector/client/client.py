@@ -38,24 +38,20 @@ class Client:
     async def run(self, login: str, password: str, session: aiohttp.ClientSession):
         auth = aiohttp.BasicAuth(login, password)
 
-        try:
-            async with session.post(self.token_uri, data={}, auth=auth) as response:
-                self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
+        async with session.post(self.token_uri, data={}, auth=auth) as response:
+            self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
 
-                # noinspection PyTypeChecker
-                async with connect(self.event_uri, ping_timeout=None) as ws:
-                    self.ws = ws
-                    await self._subscribe()
+            # noinspection PyTypeChecker
+            async with connect(self.event_uri, ping_interval=None) as ws:
+                self.ws = ws
+                await self._subscribe()
 
-                    while True:
-                        msg = await ws.recv()
-                        msg_dict = json.loads(msg)
-                        msg_id = await self.process_message(msg_dict)
-                        if msg_id:
-                            await ws.send(json.dumps(ack(msg_id)))  # acknowledge
-        finally:
-            await session.close()
-            self.ws = None
+                while True:
+                    msg = await ws.recv()
+                    msg_dict = json.loads(msg)
+                    msg_id = await self.process_message(msg_dict)
+                    if msg_id:
+                        await ws.send(json.dumps(ack(msg_id)))  # acknowledge
 
     async def process_message(self, msg_dict):
         logging.info(f'{self.TAG}: RECEIVED: {msg_dict}')
