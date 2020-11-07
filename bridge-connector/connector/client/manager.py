@@ -99,7 +99,7 @@ class ClientManager:
                     task = partial(self._save_to_file, msg)
                     await loop.run_in_executor(executor, task)
         except asyncio.CancelledError:
-            pass  # TODO: release thread locks?
+            raise  # TODO: release thread locks?
 
     def _save_to_file(self, msg_dict):
         with open(self.config.logfile, "a") as file:
