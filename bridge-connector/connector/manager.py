@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import signal
 from asyncio import Queue
 
 from config import Config
@@ -39,6 +40,10 @@ class ClientManager:
     def start(self):
         loop = asyncio.get_event_loop()
 
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT, signal.SIGQUIT)
+        for s in signals:
+            loop.add_signal_handler(s, lambda s=s: asyncio.create_task(self.shutdown(loop, signal=s)))
+        
         try:
             loop.create_task(self.save_log())
             for host, port in self.config.addresses:
@@ -52,6 +57,18 @@ class ClientManager:
         async with TokenManager(host, port, self.config.login, self.config.password) as token_manager:
             client = Client(host, port, self, token_manager, self.config.max_ws_connections)
             await client.run()
+
+    async def shutdown(self, loop, signal):
+        if signal:
+            logging.info(f'{self.TAG}: received exit signal {signal.name}...')
+        
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        [task.cancel() for task in tasks]
+
+        logging.info(f"{self.TAG}: cancelling {len(tasks)} outstanding tasks")
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        loop.stop()
 
     async def log(self, msg: dict):
         await self.log_queue.put(msg)
