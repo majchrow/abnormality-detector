@@ -1,14 +1,20 @@
 import aiohttp
 import asyncio
+import json
 import logging
 import signal
 from asyncio import Queue
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from functools import partial
 
 from .client import Client
 from ..config import Config
 
 
 # TODO:
+#  - add call ID info to messages saved to file/pushed to Kafka
+#    - WHAT FORMAT?
 #  - exception handling
 #    - failure to fetch token
 #    - HTTP 401 (?) error - refresh token?
@@ -82,9 +88,22 @@ class ClientManager:
         await self.log_queue.put((msg, call_id))
 
     async def save_log(self):
-        while True:
-            msg = await self.log_queue.get()
-            print(msg)  # TODO
+        loop = asyncio.get_running_loop()
+
+        try:
+            with ThreadPoolExecutor() as executor:
+                while True:
+                    msg, call_id = await self.log_queue.get()
+                    task = partial(self._save_to_file, msg)
+                    await loop.run_in_executor(executor, task)
+        except asyncio.CancelledError:
+            pass  # TODO: release thread locks?
+
+    def _save_to_file(self, msg_dict):
+        msg_dict['date'] = datetime.now().isoformat()
+        with open(self.config.logfile, "a") as file:
+            json.dump(msg_dict, file, indent=4)
+            file.write(",\n")
 
     async def on_add_call(self, call_id: str, client_endpoint: Client):
         if call_id not in self.calls:
