@@ -93,10 +93,10 @@ class ClientManager:
         try:
             with ThreadPoolExecutor() as executor:
                 while True:
-                    msg, call_id = await self.log_queue.get()
+                    msg_dict, call_id = await self.log_queue.get()
                     msg_dict['date'] = datetime.now().isoformat()
                     msg_dict['call'] = call_id
-                    task = partial(self._save_to_file, msg)
+                    task = partial(self._save_to_file, msg_dict)
                     await loop.run_in_executor(executor, task)
         except asyncio.CancelledError:
             raise  # TODO: release thread locks?
