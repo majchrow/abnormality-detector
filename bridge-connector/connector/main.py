@@ -3,8 +3,8 @@ import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 
-from config import Config
-from connector.manager import ClientManager
+from .config import Config
+from .manager import ClientManager
 
 
 # Argument types
@@ -22,7 +22,7 @@ def address(arg):
     return host, port
 
 
-def parse_config():
+def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--addresses',
                         type=address,
@@ -34,18 +34,25 @@ def parse_config():
                         type=str,
                         default='client_log.json',
                         help='default client logfile')
-    args = parser.parse_args()
-    return Config(login=login, password=password, addresses=args.addresses, logfile=args.logfile)
+    return parser.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
     except KeyError as e:
         print("Required USERNAME and PASSWORD environmental variables")
         sys.exit(1)
-   
+
     logging.basicConfig(level=logging.INFO)
-    config = parse_config()
+    args = parse_args()
+    config = Config(
+        login=login, password=password, addresses=args.addresses, logfile=args.logfile
+    )
+
     manager = ClientManager(config)
     manager.start()
+
+
+if __name__ == '__main__':
+    main()
