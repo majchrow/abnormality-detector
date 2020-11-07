@@ -4,7 +4,7 @@ import sys
 from argparse import ArgumentParser, ArgumentTypeError
 
 from .config import Config
-from connector.client import ClientManager
+from .client import ClientManager
 
 
 # Argument types
