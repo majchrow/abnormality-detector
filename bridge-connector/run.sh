@@ -6,4 +6,5 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 echo 'Running client'
-python3 main.py --host host --port 443 --logfile logfile
+bridge-connector --addresses cbr-01.mche.edu.pl:445 --logfile client_log_multi_sane.json
+

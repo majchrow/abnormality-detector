@@ -18,6 +18,7 @@ class Client:
     def __init__(self, host: str, port: int, call_manager, token_manager):
         self.host = host
         self.port = port
+        self.TAG += f' {host}:{port}'
         self.call_manager = call_manager
         self.token_manager = token_manager
 
