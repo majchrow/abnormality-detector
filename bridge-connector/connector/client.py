@@ -5,7 +5,7 @@ import logging
 
 from websockets import connect
 
-from connector.protocol import (
+from .protocol import (
     ack, calls_subscription, call_info_subscription, call_roster_subscription,subscription_request
 )
 

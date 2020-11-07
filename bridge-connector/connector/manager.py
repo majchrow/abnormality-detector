@@ -3,8 +3,8 @@ import logging
 import signal
 from asyncio import Queue
 
-from config import Config
-from connector.client import Client, TokenManager
+from .client import Client, TokenManager
+from .config import Config
 
 
 # TODO:

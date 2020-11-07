@@ -5,8 +5,6 @@ from time import sleep
 
 from websockets import WebSocketServerProtocol, serve
 
-from utils import enable_logger
-
 
 class Server:
     def __init__(self, FLAGS) -> None:
@@ -20,7 +18,6 @@ class Server:
         self.calls_data = []
         self.unknown = []
         self.loop = None
-        enable_logger(directory="logs/server", filename="server")
         self._prepare_data()
 
     def start(self) -> None:
@@ -112,3 +109,14 @@ class Server:
         self.start_streams()
         self.loop.create_task(self.stream_call_info())
         self.loop.create_task(self.stream_call_roaster())
+
+
+class TestConfig:
+    host = 'localhost'
+    port = '8080'
+    logfile = 'log.json'
+
+
+if __name__ == '__main__':
+    server = Server(TestConfig)
+    server.start()
