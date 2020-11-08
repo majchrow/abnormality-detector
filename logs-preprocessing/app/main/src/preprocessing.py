@@ -9,6 +9,8 @@ class Preprocessor:
         self.spark = spark
         self.keyspace = os.environ["KEYSPACE"]
         self.table = table
+        self.kafka = kafka
+        self.write_topic = "preprocessed_" + topic
         schema = spark.read.json(filepath).schema
         input_stream = self.__get_input_stream_for_topic(topic, kafka)
         self.df = self.__do_basic_preprocessing(input_stream, schema)
@@ -24,7 +26,7 @@ class Preprocessor:
         return (
             self.prepare_final_df()
             .writeStream.outputMode("complete")
-            .foreachBatch(self.__write_to_cassandra)
+            .foreachBatch(self.write_data)
         )
 
     def prepare_final_df(self):
@@ -35,10 +37,21 @@ class Preprocessor:
             "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
         )
 
-    def __write_to_cassandra(self, write_df, epoch_id):
+    def write_data(self, write_df, epoch_id):
+        write_df.persist()
+        self.__write_to_cassandra(write_df)
+        self.__write_to_kafka(write_df)
+        write_df.unpersist()
+
+    def __write_to_cassandra(self, write_df):
         write_df.write.format("org.apache.spark.sql.cassandra").options(
             table=self.table, keyspace=self.keyspace
         ).mode("append").save()
+
+    def __write_to_kafka(self, write_df):
+        self.prepare_for_kafka(write_df).write.format("kafka").option(
+            "kafka.bootstrap.servers", self.kafka
+        ).option("topic", self.write_topic).save()
 
     def __get_input_stream_for_topic(self, topic, kafka):
         return (
@@ -49,6 +62,8 @@ class Preprocessor:
             .selectExpr("CAST(value AS STRING)")
         )
 
+    def prepare_for_kafka(self, df):
+        pass
 
 class CallInfoPreprocessor(Preprocessor):
     def __init__(self, spark, kafka, filepath):
@@ -61,6 +76,23 @@ class CallInfoPreprocessor(Preprocessor):
             table=os.environ["TABLE"],
             helper=CallInfoPreprocessorHelper(spark),
         )
+
+    def prepare_for_kafka(self, df):
+        return df.select(func.to_json(func.struct("datetime",
+                "time_diff",
+                "call_id",
+                "recording",
+                "streaming",
+                "locked",
+                "cospace",
+                "adhoc",
+                "lync_conferencing",
+                "forwarding",
+                "current_participants",
+                "mean_participants",
+                "max_participants",
+                "week_day_number",
+                "hour")).alias("value"))
 
     def prepare_final_df(self):
         self.df = self.df.select("date", "call", "message.callInfo")
@@ -89,8 +121,7 @@ class CallInfoPreprocessor(Preprocessor):
             .getItem(0)
             .cast(IntegerType())
             .alias("current_participants"),
-            func.max("participants").cast(IntegerType()).alias("max_participants"),
-            func.mean("participants").alias("mean_participants"),
+            func.collect_list("participants").alias("participant_array"),
         )
 
         grouped.printSchema()
@@ -99,7 +130,7 @@ class CallInfoPreprocessor(Preprocessor):
             grouped.withColumn(
                 "datetime", self.helper.get_last_date_udf(grouped.date_array)
             )
-            .withColumn("time_diff", self.helper.get_diff_udf(grouped.date_array))
+            .withColumn("time_diff", self.helper.get_time_diff_udf(grouped.date_array))
             .withColumn("call_id", grouped.call)
             .withColumn(
                 "recording", self.helper.get_if_active_udf(grouped.recording_array)
@@ -117,6 +148,12 @@ class CallInfoPreprocessor(Preprocessor):
             )
             .withColumn(
                 "forwarding", self.helper.get_if_forwarding_udf(grouped.callType)
+            )
+            .withColumn(
+                "max_participants", self.helper.get_max_udf(grouped.participant_array)
+            )
+            .withColumn(
+                "mean_participants", self.helper.get_mean_udf(grouped.participant_array)
             )
             .select(
                 "datetime",
@@ -149,6 +186,19 @@ class RosterPreprocessor(Preprocessor):
             table=os.environ["TABLE"],
             helper=RosterPreprocessorHelper(spark),
         )
+
+    def prepare_for_kafka(self, df):
+        return df.select(func.to_json(func.struct("initial",
+            "connected",
+            "onhold",
+            "ringing",
+            "presenter",
+            "active_speaker",
+            "endpoint_recording",
+            "datetime",
+            "call_id",
+            "week_day_number",
+            "hour")).alias("value"))
 
     def prepare_final_df(self):
         self.df = self.df.select("date", "call", func.explode("message.updates"))
