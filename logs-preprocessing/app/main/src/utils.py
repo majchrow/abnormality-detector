@@ -22,7 +22,7 @@ class PreprocessorHelper:
 class CallInfoPreprocessorHelper(PreprocessorHelper):
     def __init__(self, spark):
         PreprocessorHelper.__init__(self, spark)
-        self.get_diff_udf = udf(self.__get_diff, LongType())
+        self.get_time_diff_udf = udf(self.__get_time_diff, LongType())
         self.get_last_date_udf = udf(self.__get_last_date, TimestampType())
         self.get_if_active_udf = udf(self.__get_if_active, BooleanType())
         self.get_if_locked_udf = udf(self.__get_if_locked, BooleanType())
@@ -30,8 +30,10 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         self.get_if_lync_udf = udf(self.__get_if_lync, BooleanType())
         self.get_if_cospace_udf = udf(self.__get_if_cospace, BooleanType())
         self.get_if_forwarding_udf = udf(self.__get_if_forwarding, BooleanType())
+        self.get_max_udf = udf(self.__get_max, IntegerType())
+        self.get_mean_udf = udf(self.__get_mean, DoubleType())
         udf_func_dict = {
-            "get_diff_udf": self.get_diff_udf,
+            "get_time_diff_udf": self.get_time_diff_udf,
             "get_last_date_udf": self.get_last_date_udf,
             "get_if_active_udf": self.get_if_active_udf,
             "get_if_locked_udf": self.get_if_locked_udf,
@@ -39,12 +41,14 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
             "get_if_lync_udf": self.get_if_lync_udf,
             "get_if_forwarding_udf": self.get_if_forwarding_udf,
             "get_if_cospace_udf": self.get_if_cospace_udf,
+            "get_max_udf": self.get_max_udf,
+            "get_mean_udf": self.get_mean_udf
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
 
     @staticmethod
-    def __get_diff(dates):
+    def __get_time_diff(dates):
         datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
         start_date = datetime.strptime(dates[0], datetime_pattern)
         end_date = datetime.strptime(dates[-1], datetime_pattern)
@@ -85,6 +89,28 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
     @staticmethod
     def __get_if_cospace(real_type):
         return CallInfoPreprocessorHelper.__get_if_type(real_type, "coSpace")
+
+    @staticmethod
+    def __get_max(values):
+        filtered = CallInfoPreprocessorHelper.__get_nonempty_values(values)
+        max_value = 0
+        for value in filtered:
+            if value > max_value:
+                max_value = value
+        return max_value
+
+    @staticmethod
+    def __get_mean(values):
+        filtered = CallInfoPreprocessorHelper.__get_nonempty_values(values)
+        total = 0
+        for value in filtered:
+            total = total + value
+        size = len(values)
+        return total/size if size else 0
+    
+    @staticmethod
+    def __get_nonempty_values(values):
+        return [value for value in values if value]
 
 
 class RosterPreprocessorHelper(PreprocessorHelper):
