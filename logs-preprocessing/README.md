@@ -46,4 +46,4 @@ Wewnątrz kontenera wykonujemy komendę cqlsh -u cassandra -p cassandra.
 Do dyspozycji mamy keyspace o nazwie `test` oraz tabele `call_info_update`, `roster_update` i `calls`.
 Jeśli chcemy wylistować dane np. tabeli `calls`, to wpisujemy:
 - `use test;`
-- `select * from calls`
+- `select * from calls;`
