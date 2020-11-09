@@ -1,4 +1,4 @@
-Preprocessing - callInfoUpdate (tabela `call_info_update`):
+# Preprocessing - callInfoUpdate (tabela `call_info_update`):
 Czas od rozpoczęcia spotkania -> time_diff
 Spotkanie nagrywane -> recording
 Spotkanie streamowane -> streaming
@@ -16,7 +16,7 @@ Dzień tygodnia -> week_day_number
 Nazwa spotkania/pokoju -> name
 ID spotkania -> call_id
 
-Preprocessing - rosterUpdate (tabela `roster_update`):
+# Preprocessing - rosterUpdate (tabela `roster_update`):
 Liczba uczestników w stanie initial -> initial
 Liczba uczestników w stanie ringing -> ringing
 Liczba uczestników w stanie connected -> connected
@@ -32,17 +32,17 @@ Dzień tygodnia -> week_day_number
 Nazwa spotkania/pokoju -> name
 ID spotkania -> call_id
 
-Preprocessing - callListUpdate (tabela `calls`):
+# Preprocessing - callListUpdate (tabela `calls`):
 Czas rzeczywisty -> datetime
 Nazwa spotkania/pokoju -> name
 ID spotkania -> call_id
 Informacja, czy spotkanie się zakończyło -> finished
 
-Kafka:
+# Kafka:
 W katalogu logs-preprocessing/kafka/resources należy umieścić plik JSON (data.json) z danymi, które mają być wrzucane do kafki.
 
-Cassandra:
-Wewnątrz kontenera wykonujemy komendę `cqlsh -u cassandra -p cassandra`.
+# Cassandra:
+Wewnątrz kontenera wykonujemy komendę cqlsh -u cassandra -p cassandra.
 Do dyspozycji mamy keyspace o nazwie `test` oraz tabele `call_info_update`, `roster_update` i `calls`.
 Jeśli chcemy wylistować dane np. tabeli `calls`, to wpisujemy:
 - `use test;`
