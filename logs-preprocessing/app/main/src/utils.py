@@ -11,19 +11,36 @@ class PreprocessorHelper:
             lambda cols: "".join([x if x is not None else "*" for x in cols]),
             StringType(),
         )
-        spark.udf.register("concat_udf", self.concat_udf)
+        self.get_name_udf = udf(self.get_name, StringType())
+        self.get_last_date_udf = udf(self.get_last_date, TimestampType())
+        udf_func_dict = {
+            "get_name_udf": self.get_name_udf,
+            "get_last_date_udf": self.get_last_date_udf,
+            "concat_udf": self.concat_udf
+        }
+        for udf_func in udf_func_dict:
+            spark.udf.register(udf_func, udf_func_dict[udf_func])
 
     @staticmethod
     def get_last_nonempty_value(values):
         nonempty_values = [i for i in values if i]
         return nonempty_values[-1] if nonempty_values else None
 
+    @staticmethod
+    def get_name(names):
+        return PreprocessorHelper.get_last_nonempty_value(names)
+
+    @staticmethod
+    def get_last_date(dates):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
+        date = datetime.strptime(dates[-1], datetime_pattern)
+        return date
+
 
 class CallInfoPreprocessorHelper(PreprocessorHelper):
     def __init__(self, spark):
         PreprocessorHelper.__init__(self, spark)
         self.get_time_diff_udf = udf(self.__get_time_diff, LongType())
-        self.get_last_date_udf = udf(self.__get_last_date, TimestampType())
         self.get_if_active_udf = udf(self.__get_if_active, BooleanType())
         self.get_if_locked_udf = udf(self.__get_if_locked, BooleanType())
         self.get_if_adhoc_udf = udf(self.__get_if_adhoc, BooleanType())
@@ -34,7 +51,6 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         self.get_mean_udf = udf(self.__get_mean, DoubleType())
         udf_func_dict = {
             "get_time_diff_udf": self.get_time_diff_udf,
-            "get_last_date_udf": self.get_last_date_udf,
             "get_if_active_udf": self.get_if_active_udf,
             "get_if_locked_udf": self.get_if_locked_udf,
             "get_if_adhoc_udf": self.get_if_adhoc_udf,
@@ -52,13 +68,7 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
         start_date = datetime.strptime(dates[0], datetime_pattern)
         end_date = datetime.strptime(dates[-1], datetime_pattern)
-        return (end_date - start_date).total_seconds()
-
-    @staticmethod
-    def __get_last_date(dates):
-        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
-        date = datetime.strptime(dates[-1], datetime_pattern)
-        return date
+        return int((end_date - start_date).total_seconds())
 
     @staticmethod
     def __get_if_active(values):
@@ -97,7 +107,7 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         for value in filtered:
             if value > max_value:
                 max_value = value
-        return max_value
+        return int(max_value)
 
     @staticmethod
     def __get_mean(values):
@@ -106,7 +116,7 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         for value in filtered:
             total = total + value
         size = len(values)
-        return total/size if size else 0
+        return float(total)/size if size else 0.0
     
     @staticmethod
     def __get_nonempty_values(values):
@@ -221,3 +231,18 @@ class RosterPreprocessorHelper(PreprocessorHelper):
     @staticmethod
     def __count_true_values(values):
         return len([value for value in values if value and value is not None])
+
+
+class CallsPreprocessorHelper(PreprocessorHelper):
+    def __init__(self, spark):
+        PreprocessorHelper.__init__(self, spark)
+        self.get_if_finished_udf = udf(self.__get_if_finished, BooleanType())
+        udf_func_dict = {
+            "get_if_finished_udf": self.get_if_finished_udf
+        }
+        for udf_func in udf_func_dict:
+            spark.udf.register(udf_func, udf_func_dict[udf_func])
+
+    @staticmethod
+    def __get_if_finished(values):
+        return "remove" in values

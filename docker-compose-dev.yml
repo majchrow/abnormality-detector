@@ -117,6 +117,22 @@ services:
     networks:
       - preprocessing
 
+  preprocessing-calls:
+    build:
+      context: ./logs-preprocessing/app
+      args:
+        FILEPATH: "./main/resources/calls_sample.json"
+        UPDATE_TYPE: "calls"
+        TABLE: "calls"
+        OUTPUT_MODE: "update"
+    restart: always
+    depends_on:
+      - kafka
+      - cassandra
+      - cassandra-load-keyspace
+    networks:
+      - preprocessing
+
   producer:
     build:
       context: ./logs-preprocessing/kafka
