@@ -4,8 +4,8 @@ import json
 import logging
 import signal
 from asyncio import Queue
+from aiohttp import ClientConnectionError
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from functools import partial
 
 from .client import Client
@@ -14,6 +14,7 @@ from ..config import Config
 
 # TODO:
 #  - add call ID info to messages saved to file/pushed to Kafka
+#    - actually, both call ID and call name o.O shit
 #    - WHAT FORMAT?
 #  - exception handling
 #    - failure to fetch token
@@ -42,7 +43,8 @@ class ClientManager:
         self.session = aiohttp.ClientSession()
 
         self.calls = {}
-        self.log_queue = Queue()
+        self.dump_queue = Queue()
+        self.publish_queue = Queue()
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -52,7 +54,11 @@ class ClientManager:
             loop.add_signal_handler(s, lambda s=s: asyncio.create_task(self.shutdown(loop, signal=s)))
         
         try:
-            loop.create_task(self.save_log())
+            loop.create_task(self.flush_to_file(self.dump_queue, self.config.dumpfile))
+
+            # TODO: to be replaced by flushing to Kafka instead of a file
+            loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
+
             for host, port in self.config.addresses:
                 loop.create_task(self.run_client(host, port))
             loop.run_forever()
@@ -62,14 +68,20 @@ class ClientManager:
 
     async def run_client(self, host: str, port: int):
         client = Client(host, port, self)
+        backoff_s = 1
+
         while True:
             try:
                 logging.info(f'{self.TAG}: starting client for {host}:{port}...')
                 await client.run(self.config.login, self.config.password, self.session)
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
-                logging.error(f'{self.TAG}: client run failed with {e}')
+            except ClientConnectionError as e :
+                logging.error(f'{self.TAG}: connection error: {e}')
+                await asyncio.sleep(backoff_s)
+                backoff_s *= 1.5
+            except:
+                logging.exception(f'{self.TAG}: run failed!')
 
     async def shutdown(self, loop, signal):
         if signal:
@@ -84,31 +96,33 @@ class ClientManager:
         
         loop.stop()
 
-    async def log(self, msg: dict, call_id: str):
-        await self.log_queue.put((msg, call_id))
+    async def publish(self, msg: dict):
+        await self.publish_queue.put(msg)
 
-    async def save_log(self):
+    async def dump(self, msg: dict):
+        await self.dump_queue.put(msg)
+
+    async def flush_to_file(self, queue, file):
         loop = asyncio.get_running_loop()
 
         try:
             with ThreadPoolExecutor() as executor:
                 while True:
-                    msg_dict, call_id = await self.log_queue.get()
-                    msg_dict['date'] = datetime.now().isoformat()
-                    msg_dict['call'] = call_id
-                    task = partial(self._save_to_file, msg_dict)
+                    msg_dict = await queue.get()
+                    task = partial(self._save_to_file, msg_dict, file)
                     await loop.run_in_executor(executor, task)
         except asyncio.CancelledError:
             raise  # TODO: release thread locks?
 
-    def _save_to_file(self, msg_dict):
-        with open(self.config.logfile, "a") as file:
+    @staticmethod
+    def _save_to_file(msg_dict, filepath):
+        with open(filepath, 'a') as file:
             json.dump(msg_dict, file, indent=4)
             file.write(",\n")
 
-    async def on_add_call(self, call_id: str, client_endpoint: Client):
+    async def on_add_call(self, call_name: str, call_id: str, client_endpoint: Client):
         if call_id not in self.calls:
-            self.calls[call_id] = Call(manager=self, call_id=call_id)
+            self.calls[call_id] = Call(manager=self, call_name=call_name, call_id=call_id)
         await self.calls[call_id].add(client_endpoint)
 
     async def on_update_call(self, call_id: str, client_endpoint: Client):
@@ -125,8 +139,9 @@ class ClientManager:
 
 
 class Call:
-    def __init__(self, manager, call_id):
+    def __init__(self, manager, call_name, call_id):
         self.manager = manager
+        self.call_name = call_name
         self.call_id = call_id
         self.handler = None
         self.clients = set()
@@ -147,7 +162,7 @@ class Call:
             # No one's been listening so this client will
             # self.clients.discard(client)
             self.handler = client
-            await client.on_connect_to(self.call_id)
+            await client.on_connect_to(self.call_name, self.call_id)
 
     async def remove(self, client):
         if client == self.handler:
@@ -156,7 +171,7 @@ class Call:
             try:
                 self.handler = next(iter(self.clients))
                 self.clients.discard(self.handler)
-                await self.handler.on_connect_to(self.call_id)
+                await self.handler.on_connect_to(self.call_name, self.call_id)
             except StopIteration:
                 # No other clients
                 self.handler = None

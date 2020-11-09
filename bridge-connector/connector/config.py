@@ -8,3 +8,5 @@ class Config:
     password: str
     addresses: List[Tuple[str, int]]
     logfile: str
+    dumpfile: str
+    kafka_file: str
