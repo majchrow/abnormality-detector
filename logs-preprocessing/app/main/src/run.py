@@ -1,7 +1,7 @@
 import os
 from pyspark.sql import SparkSession
 from argparse import ArgumentParser
-from preprocessing import CallInfoPreprocessor, RosterPreprocessor
+from preprocessing import CallInfoPreprocessor, RosterPreprocessor, CallsPreprocessor
 
 os.environ[
     "PYSPARK_SUBMIT_ARGS"
@@ -11,7 +11,7 @@ SPARK = (
     .master("local[*]")
     .getOrCreate()
 )
-PREPROCESSORS = {"callInfo": CallInfoPreprocessor, "roster": RosterPreprocessor}
+PREPROCESSORS = {"callInfo": CallInfoPreprocessor, "roster": RosterPreprocessor, "calls": CallsPreprocessor}
 
 if __name__ == "__main__":
     SPARK.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
@@ -22,6 +22,6 @@ if __name__ == "__main__":
     path = os.environ["FILEPATH"]
     kafka = os.environ["KAFKA"]
     preprocessor = PREPROCESSORS[os.environ["UPDATE_TYPE"]](SPARK, kafka, path)
-    writer = preprocessor.create_output_stream()
+    writer = preprocessor.create_output_stream(os.environ["OUTPUT_MODE"])
     query = writer.start()
     query.awaitTermination()
