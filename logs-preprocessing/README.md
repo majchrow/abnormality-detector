@@ -47,6 +47,6 @@ W katalogu logs-preprocessing/kafka/resources należy umieścić plik JSON (data
 # Cassandra
 Wewnątrz kontenera wykonujemy komendę cqlsh -u cassandra -p cassandra.
 Do dyspozycji mamy keyspace o nazwie `test` oraz tabele `call_info_update`, `roster_update` i `calls`.
-Jeśli chcemy wylistować dane np. tabeli `calls`, to wpisujemy:
+Jeśli chcemy wylistować dane np. z tabeli `calls`, to wpisujemy:
 - `use test;`
 - `select * from calls;`
