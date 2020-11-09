@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 from collections import namedtuple
+from aiohttp import ClientConnectionError
 from websockets import connect
 
 from .protocol import (
@@ -52,7 +53,10 @@ class Client:
         auth = aiohttp.BasicAuth(login, password)
 
         async with session.post(self.token_uri, data={}, auth=auth) as response:
-            self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
+            try:
+                self.auth_token = response.headers["X-Cisco-CMS-Auth-Token"]
+            except KeyError:
+                raise ClientConnectionError('X-Cisco-CMS-Auth-Token missing from response headers')
 
         # noinspection PyTypeChecker
         async with connect(self.event_uri, ping_interval=None) as ws:
@@ -67,6 +71,8 @@ class Client:
                     await ws.send(json.dumps(ack(msg_id)))  # acknowledge
 
     async def process_message(self, msg_dict):
+        logging.info(f'{self.TAG}: RECV {msg_dict}')
+
         # note: could also be "messageAck" - we ignore it
         if msg_dict["type"] != "message":
             return
