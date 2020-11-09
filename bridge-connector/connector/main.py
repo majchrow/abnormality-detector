@@ -1,10 +1,10 @@
-import logging
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 
 from .config import Config
 from .client import ClientManager
+from .utils import full_debug
 
 
 # Argument types
@@ -33,22 +33,38 @@ def parse_args():
     parser.add_argument('--logfile',
                         type=str,
                         default='client_log.json',
-                        help='default client logfile')
+                        help='default file for logging module')
+    parser.add_argument('--dumpfile',
+                        type=str,
+                        default='client_dump.json',
+                        help='default file to dump all raw server communication')
+    parser.add_argument('--kafka-file',
+                        type=str,
+                        default='client_kafka.json',
+                        help='file to dump messages as they shall be published to Kafka')
     return parser.parse_args()
 
 
+# TODO:
+#  - one instance with 4 servers & full debug logging to file
+#    to test if the app doesn't break with multiple conversations
+#  - another instance with 1 server and saving all server communication
+#    to file for simulation with out server later, info logging to stdout
+#  - for later: an option to run with Kafka producer 
 def main():
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
-    except KeyError as e:
+    except KeyError:
         print("Required BRIDGE_USERNAME and BRIDGE_PASSWORD environmental variables")
         sys.exit(1)
 
-    logging.basicConfig(level=logging.DEBUG)
     args = parse_args()
     config = Config(
-        login=login, password=password, addresses=args.addresses, logfile=args.logfile
+        login=login, password=password, addresses=args.addresses,
+        logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file
     )
+
+    full_debug(config.logfile)
 
     manager = ClientManager(config)
     manager.start()
