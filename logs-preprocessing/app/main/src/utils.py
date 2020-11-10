@@ -26,18 +26,10 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         self.get_last_date_udf = udf(self.__get_last_date, TimestampType())
         self.get_if_active_udf = udf(self.__get_if_active, BooleanType())
         self.get_if_locked_udf = udf(self.__get_if_locked, BooleanType())
-        self.get_if_adhoc_udf = udf(
-            lambda x: self.__get_if_type(x, "adHoc"), BooleanType()
-        )
-        self.get_if_lync_udf = udf(
-            lambda x: self.__get_if_type(x, "lyncConferencing"), BooleanType()
-        )
-        self.get_if_forwarding_udf = udf(
-            lambda x: self.__get_if_type(x, "forwarding"), BooleanType()
-        )
-        self.get_if_cospace_udf = udf(
-            lambda x: self.__get_if_type(x, "coSpace"), BooleanType()
-        )
+        self.get_if_adhoc_udf = udf(self.__get_if_adhoc, BooleanType())
+        self.get_if_lync_udf = udf(self.__get_if_lync, BooleanType())
+        self.get_if_cospace_udf = udf(self.__get_if_cospace, BooleanType())
+        self.get_if_forwarding_udf = udf(self.__get_if_forwarding, BooleanType())
         udf_func_dict = {
             "get_diff_udf": self.get_diff_udf,
             "get_last_date_udf": self.get_last_date_udf,
@@ -51,26 +43,48 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
 
-    def __get_diff(self, dates):
-        start_date = datetime.strptime(dates[0], self.datetime_pattern)
-        end_date = datetime.strptime(dates[-1], self.datetime_pattern)
+    @staticmethod
+    def __get_diff(dates):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
+        start_date = datetime.strptime(dates[0], datetime_pattern)
+        end_date = datetime.strptime(dates[-1], datetime_pattern)
         return (end_date - start_date).total_seconds()
 
-    def __get_last_date(self, dates):
-        date = datetime.strptime(dates[-1], self.datetime_pattern)
+    @staticmethod
+    def __get_last_date(dates):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
+        date = datetime.strptime(dates[-1], datetime_pattern)
         return date
 
-    def __get_if_active(self, values):
-        state = self.get_last_nonempty_value(values)
+    @staticmethod
+    def __get_if_active(values):
+        state = PreprocessorHelper.get_last_nonempty_value(values)
         return state == "active"
 
-    def __get_if_locked(self, values):
-        state = self.get_last_nonempty_value(values)
+    @staticmethod
+    def __get_if_locked(values):
+        state = PreprocessorHelper.get_last_nonempty_value(values)
         return state == "locked"
 
     @staticmethod
     def __get_if_type(current_type, expected_type):
         return current_type == expected_type
+
+    @staticmethod
+    def __get_if_adhoc(real_type):
+        return CallInfoPreprocessorHelper.__get_if_type(real_type, "adHoc")
+
+    @staticmethod
+    def __get_if_lync(real_type):
+        return CallInfoPreprocessorHelper.__get_if_type(real_type, "lyncConferencing")
+
+    @staticmethod
+    def __get_if_forwarding(real_type):
+        return CallInfoPreprocessorHelper.__get_if_type(real_type, "forwarding")
+
+    @staticmethod
+    def __get_if_cospace(real_type):
+        return CallInfoPreprocessorHelper.__get_if_type(real_type, "coSpace")
 
 
 class RosterPreprocessorHelper(PreprocessorHelper):
@@ -115,10 +129,12 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         )
         spark.udf.register("get_call_stats_udf", self.get_call_stats_udf)
 
-    def __get_call_stats(self, struct_array):
+    @staticmethod
+    def __get_call_stats(struct_array):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
         struct_array.sort(key=operator.itemgetter("date"))
         date = datetime.strptime(
-            [struct["date"] for struct in struct_array][-1], self.datetime_pattern
+            [struct["date"] for struct in struct_array][-1], datetime_pattern
         )
 
         removed = [
@@ -144,7 +160,7 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         final = {field: list() for field in fields}
         for events in grouped:
             for field in fields:
-                final[field].append(self.__get_current_value(events, field))
+                final[field].append(RosterPreprocessorHelper.__get_current_value(events, field))
 
         final["initial"] = 0
         final["connected"] = 0
@@ -154,13 +170,13 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         for state in final["state"]:
             final[state] = final[state] + 1
 
-        final["presenter_sum"] = self.__count_true_values(final["presenter"])
-        final["activeSpeaker_sum"] = self.__count_true_values(final["activeSpeaker"])
-        final["endpointRecording_sum"] = self.__count_true_values(
+        final["presenter_sum"] = RosterPreprocessorHelper.__count_true_values(final["presenter"])
+        final["activeSpeaker_sum"] = RosterPreprocessorHelper.__count_true_values(final["activeSpeaker"])
+        final["endpointRecording_sum"] = RosterPreprocessorHelper.__count_true_values(
             final["endpointRecording"]
         )
 
-        return self.CallStats(
+        return RosterPreprocessorHelper.CallStats(
             final["initial"],
             final["connected"],
             final["onhold"],
@@ -171,9 +187,10 @@ class RosterPreprocessorHelper(PreprocessorHelper):
             date,
         )
 
-    def __get_current_value(self, events, field):
+    @staticmethod
+    def __get_current_value(events, field):
         values = [event[field] for event in events]
-        return self.get_last_nonempty_value(values)
+        return RosterPreprocessorHelper.get_last_nonempty_value(values)
 
     @staticmethod
     def __count_true_values(values):

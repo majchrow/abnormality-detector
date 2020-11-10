@@ -9,7 +9,7 @@ class Preprocessor:
         self.keyspace = "engineering"
         self.table = table
         schema = spark.read.json(filepath).schema
-        input_stream = self.get_input_stream_for_topic(topic, kafka)
+        input_stream = self.__get_input_stream_for_topic(topic, kafka)
         self.df = self.__do_basic_preprocessing(input_stream, schema)
         self.helper = helper
 
@@ -29,8 +29,8 @@ class Preprocessor:
     def prepare_final_df(self):
         pass
 
-    def __do_post_preprocessing(self, preprocessed):
-        self.df = (
+    def do_post_preprocessing(self, preprocessed):
+        return (
             preprocessed.withColumn(
                 "id", self.helper.concat_udf(func.array("call_id", "datetime"))
             )
@@ -45,7 +45,7 @@ class Preprocessor:
             table=self.table, keyspace=self.keyspace
         ).mode("append").save()
 
-    def get_input_stream_for_topic(self, topic, kafka):
+    def __get_input_stream_for_topic(self, topic, kafka):
         return (
             self.spark.readStream.format("kafka")
             .option("kafka.bootstrap.servers", kafka)
@@ -63,9 +63,11 @@ class CallInfoPreprocessor(Preprocessor):
             topic="callInfoUpdate",
             filepath=filepath,
             kafka=kafka,
-            table="call_info_update",
-            helper=CallInfoPreprocessorHelper(spark),
+            # table="call_info_update",
+            table="test",
+            helper=CallInfoPreprocessorHelper(spark)
         )
+
 
     def prepare_final_df(self):
         self.df = self.df.select("date", "call", "message.callInfo")
@@ -98,17 +100,19 @@ class CallInfoPreprocessor(Preprocessor):
             func.mean("participants").alias("mean_participants"),
         )
 
+        grouped.printSchema()
+
         preprocessed = (
-            grouped.withColumn("datetime", self.helper.get_last_date_udf("date_array"))
-            .withColumn("time_diff", self.helper.find_diff_udf("date_array"))
-            .withColumn("call_id", "call")
-            .withColumn("recording", self.helper.get_if_active_udf("recording_array"))
-            .withColumn("streaming", self.helper.get_if_active_udf("streaming_array"))
-            .withColumn("locked", self.helper.get_if_locked_udf("lockState_array"))
-            .withColumn("cospace", self.helper.get_if_cospace_udf("callType"))
-            .withColumn("adhoc", self.helper.get_if_adhoc_udf("callType"))
-            .withColumn("lync_conferencing", self.helper.get_if_lync_udf("callType"))
-            .withColumn("forwarding", self.helper.get_if_forwarding_udf("callType"))
+            grouped.withColumn("datetime", self.helper.get_last_date_udf(grouped.date_array))
+            .withColumn("time_diff", self.helper.get_diff_udf(grouped.date_array))
+            .withColumn("call_id", grouped.call)
+            .withColumn("recording", self.helper.get_if_active_udf(grouped.recording_array))
+            .withColumn("streaming", self.helper.get_if_active_udf(grouped.streaming_array))
+            .withColumn("locked", self.helper.get_if_locked_udf(grouped.lockState_array))
+            .withColumn("cospace", self.helper.get_if_cospace_udf(grouped.callType))
+            .withColumn("adhoc", self.helper.get_if_adhoc_udf(grouped.callType))
+            .withColumn("lync_conferencing", self.helper.get_if_lync_udf(grouped.callType))
+            .withColumn("forwarding", self.helper.get_if_forwarding_udf(grouped.callType))
             .select(
                 "datetime",
                 "time_diff",
@@ -126,7 +130,7 @@ class CallInfoPreprocessor(Preprocessor):
             )
         )
 
-        self.__do_post_preprocessing(preprocessed)
+        return self.do_post_preprocessing(preprocessed)
 
 
 class RosterPreprocessor(Preprocessor):
@@ -137,8 +141,9 @@ class RosterPreprocessor(Preprocessor):
             topic="rosterUpdate",
             filepath=filepath,
             kafka=kafka,
-            table="roster_update",
-            helper=RosterPreprocessorHelper(spark),
+            # table="roster_update",
+            table = "test_part",
+            helper=RosterPreprocessorHelper(spark)
         )
 
     def prepare_final_df(self):
@@ -180,7 +185,7 @@ class RosterPreprocessor(Preprocessor):
         )
 
         preprocessed = grouped.withColumn(
-            "call_stats", self.helper.get_call_stats_udf("struct_array")
+            "call_stats", self.helper.get_call_stats_udf(grouped.struct_array)
         )
         stats = preprocessed.call_stats
 
@@ -192,6 +197,6 @@ class RosterPreprocessor(Preprocessor):
                           stats.active_speaker.alias("active_speaker"),
                           stats.endpoint_recording.alias("endpoint_recording"),
                           stats.datetime.alias("datetime"),
-                          stats.call.alias("call_id"))
+                          preprocessed.call.alias("call_id"))
 
-        self.__do_post_preprocessing(final)
+        return self.do_post_preprocessing(final)
