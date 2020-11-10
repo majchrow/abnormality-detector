@@ -3,3 +3,4 @@
 .vscode/
 out/
 venv/
+logs-preprocessing/kafka/resources/

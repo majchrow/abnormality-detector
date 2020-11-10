@@ -2,7 +2,7 @@ from pyspark.sql.types import *
 import operator
 from datetime import datetime
 from pyspark.sql.functions import *
-
+import math
 
 class PreprocessorHelper:
     def __init__(self, spark):
@@ -23,7 +23,7 @@ class PreprocessorHelper:
 
     @staticmethod
     def get_last_nonempty_value(values):
-        nonempty_values = [i for i in values if i]
+        nonempty_values = [i for i in values if i and not (type(i) == float and math.isnan(i))]
         return nonempty_values[-1] if nonempty_values else None
 
     @staticmethod
@@ -116,11 +116,11 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         for value in filtered:
             total = total + value
         size = len(values)
-        return float(total)/size if size else 0.0
+        return float(total/size) if size else 0.0
     
     @staticmethod
     def __get_nonempty_values(values):
-        return [value for value in values if value]
+        return [value for value in values if value and not (type(value) == float and math.isnan(value))]
 
 
 class RosterPreprocessorHelper(PreprocessorHelper):
