@@ -1,10 +1,11 @@
+import logging
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 
 from .config import Config
 from .client import ClientManager
-from .utils import full_debug
+from .utils import log_to_file
 
 
 # Argument types
@@ -64,7 +65,7 @@ def main():
         logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file
     )
 
-    full_debug(config.logfile)
+    log_to_file(config.logfile, level=logging.INFO)
 
     manager = ClientManager(config)
     manager.start()

@@ -3,10 +3,10 @@ import os
 import time
 
 
-def full_debug(logfile):
-    # Log DEBUG to a file, INFO to stderr
+def log_to_file(logfile, level=logging.DEBUG):
+    # Log given level to a file, INFO to stderr
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level,
         format='%(asctime)s [%(levelname)s] %(message)s',
         filename=logfile
     )
