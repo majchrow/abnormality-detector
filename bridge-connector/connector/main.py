@@ -51,11 +51,7 @@ def parse_args():
 
 
 # TODO:
-#  - one instance with 4 servers & full debug logging to file
-#    to test if the app doesn't break with multiple conversations
-#  - another instance with 1 server and saving all server communication
-#    to file for simulation with out server later, info logging to stdout
-#  - for later: an option to run with Kafka producer 
+#  an option to run with Kafka producer
 def main():
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]

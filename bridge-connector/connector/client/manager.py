@@ -12,9 +12,6 @@ from ..config import Config
 
 
 # TODO:
-#  - add call ID info to messages saved to file/pushed to Kafka
-#    - actually, both call ID and call name o.O shit
-#    - WHAT FORMAT?
 #  - exception handling
 #    - failure to fetch token
 #    - HTTP 401 (?) error - refresh token?
