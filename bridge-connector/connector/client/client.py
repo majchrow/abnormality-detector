@@ -114,6 +114,10 @@ class Client:
                 return
 
             call_id = updates[0]["call"]
+            if call_id not in self.call_ids:
+                # Conference this client does not handle
+                return
+
             call = self.call_ids[call_id]
             for update in updates:
                 update['name'] = call.name
@@ -147,7 +151,8 @@ class Client:
                 del self.call_ids[call_id]
 
                 # TODO: should we subscribe again immediately?
-            await self.call_manager.on_remove_call(call_id, self)
+                await self.call_manager.on_remove_call(call_id, self)
+                logging.info(f'{self.TAG}: removed call {call.name} with ID {call_id}')
         else:
             logging.warning(f'{self.TAG}: received calls update of type {update_type}')
 
@@ -156,12 +161,13 @@ class Client:
         s_ind = self.subscription_ind
         self.subscription_ind += 2
 
-        call = Client.Call(call_name=call_name, call_id=call_id, ci_subscription_index=s_ind)
+        call = Client.Call(name=call_name, id=call_id, ci_subscription_index=s_ind)
         self.subscriptions[s_ind] = self.subscriptions[s_ind + 1] = call
         self.call_ids[call_id] = call
 
         # Send server subscription
         await self._subscribe()
+        logging.info(f'{self.TAG}: subscribed to call {call_name} with ID {call_id}')
 
     async def _subscribe(self):
         subscriptions = [calls_subscription]
@@ -175,3 +181,4 @@ class Client:
         request = subscription_request(subscriptions, self.message_id)
         await self.ws.send(json.dumps(request))
         self.message_id += 1
+
