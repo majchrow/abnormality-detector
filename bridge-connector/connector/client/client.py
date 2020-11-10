@@ -126,6 +126,7 @@ class Client:
             call = self.subscriptions[index]
             if msg_type == 'callInfoUpdate':
                 msg_dict["message"]["callInfo"]["call"] = call.id
+                msg_dict["message"]["callInfo"]["name"] = call.name
             else:
                 msg_dict["call"] = call.id
                 msg_dict["name"] = call.name
