@@ -1,14 +1,16 @@
+import aiohttp
 import asyncio
 import json
 import logging
-from time import sleep
-
-from websockets import WebSocketServerProtocol, serve
+from aiohttp import web
+from itertools import cycle
 
 
 class Server:
-    def __init__(self, FLAGS) -> None:
-        self.FLAGS = FLAGS
+    def __init__(self, loop, username, password, dumpfile) -> None:
+        self.credentials = (username, password)
+        self.dumpfile = dumpfile
+        self.auth_token = 'Token-of-eternal-prosperity'
         self.clients = set()
         self.call_info_clients = set()
         self.call_roaster_clients = set()
@@ -17,20 +19,16 @@ class Server:
         self.call_roaster_data = []
         self.calls_data = []
         self.unknown = []
-        self.loop = None
+        self.loop = loop
         self._prepare_data()
 
-    def start(self) -> None:
-        start_server = serve(self.ws_handler, self.FLAGS.host, self.FLAGS.port)
-        self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(start_server)
-        logging.info(f"Websocket server listening on port {self.FLAGS.host}:{self.FLAGS.port}.")
-        sleep(3)
-        self.start_streams()
-        self.loop.run_forever()
+    async def start(self) -> None:
+        self.loop.create_task(self.stream_calls())
+        self.loop.create_task(self.stream_call_info())
+        self.loop.create_task(self.stream_call_roaster())
 
     def _prepare_data(self) -> None:
-        with open(self.FLAGS.logfile) as json_file:
+        with open(self.dumpfile) as json_file:
             data = json.load(json_file)
         for message in data:
             queue = self.unknown
@@ -48,34 +46,50 @@ class Server:
                                                  "name": "Andy'scoSpace", "participants": 0}]}}
         )
 
-    async def ws_handler(self, ws: WebSocketServerProtocol, url: str) -> None:
-        await self.register(ws)
-        await self.handler(ws)
+    async def token(self, request):
+        credentials = aiohttp.BasicAuth.decode(request.headers['Authorization'])
+        if self.credentials == (credentials.login, credentials.password):
+            resp = web.Response()
+            resp.headers['X-Cisco-CMS-Auth-Token'] = self.auth_token
+            return resp
+        else:
+            raise web.HTTPUnauthorized()
 
-    async def register(self, ws: WebSocketServerProtocol) -> None:
-        self.clients.add(ws)
-        logging.info(f"{ws.remote_address} connected.")
+    async def serve(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
 
-    async def unregister(self, ws: WebSocketServerProtocol) -> None:
-        self.clients.remove(ws)
-        logging.info(f"{ws.remote_address} disconnected.")
+        if request.rel_url.query['authToken'] != self.auth_token:
+            raise web.HTTPUnauthorized()
 
-    def start_streams(self) -> None:
-        # self.loop.create_task(self.stream_call_info())
-        # self.loop.create_task(self.stream_call_roaster())
-        self.loop.create_task(self.stream_calls())
+        await self.register(ws, request.remote)
+        await self.handle_ws(ws, request.remote)
+        await self.unregister(ws, request.remote)
+        logging.info('WebSocket connection closed')
 
-    async def handler(self, ws: WebSocketServerProtocol) -> None:
-        while True:
-            msg = await ws.recv()
-            await self._parse_message(ws, msg)
-            logging.info(f"Got from {ws} message {msg}")
+        return ws
 
-    async def _parse_message(self, ws: WebSocketServerProtocol, msg: str) -> None:
+    async def handle_ws(self, ws, remote_address):
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await ws.close()
+                else:
+                    msg_dict = json.loads(msg.data)
+                    await self.handle_msg(ws, msg_dict)
+                    logging.info(f"Got from {remote_address} message {msg.data}")
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print(f'WebSocket connection closed with exception {ws.exception()}')
+
+    async def handle_msg(self, ws, msg_dict):
+        if 'message' not in msg_dict:
+            # ignore acknowledgements
+            return
+
         try:
-            msg_parsed = json.loads(msg)['message']
-            if msg_parsed['type'] == "subscribeRequest":
-                subscriptions = msg_parsed['subscriptions']
+            msg = msg_dict['message']
+            if msg['type'] == "subscribeRequest":
+                subscriptions = msg['subscriptions']
                 for subscription in subscriptions:
                     if subscription['type'] == "callRoster":
                         self.call_roaster_clients.add(ws)
@@ -84,39 +98,60 @@ class Server:
                     else:
                         self.calls_clients.add(ws)
         except:
-            logging.info(msg)
+            logging.exception(msg_dict)
+
+    async def register(self, ws, remote_address) -> None:
+        self.clients.add(ws)
+        logging.info(f"{remote_address} connected.")
+
+    async def unregister(self, ws, remote_address) -> None:
+        self.clients.remove(ws)
+        logging.info(f"{remote_address} disconnected.")
 
     async def stream_call_info(self) -> None:
-        for data in self.call_info_data:
-            logging.info(data)
+        for data in cycle(self.call_info_data):
+            logging.info(f'SENT: {data}')
             for client in self.call_info_clients:
-                await client.send(json.dumps(data))
+                await client.send_json(data)
             await asyncio.sleep(2)
 
     async def stream_call_roaster(self) -> None:
-        for data in self.call_roaster_data:
-            logging.info(data)
+        for data in cycle(self.call_roaster_data):
+            logging.info(f'SENT: {data}')
             for client in self.call_roaster_clients:
-                await client.send(json.dumps(data))
+                await client.send_json(data)
             await asyncio.sleep(2)
 
     async def stream_calls(self) -> None:
-        for data in self.calls_data:
-            logging.info(data)
+        for data in cycle(self.calls_data):
+            logging.info(f'SENT: {data}')
             for client in self.calls_clients:
-                await client.send(json.dumps(data))
+                await client.send_json(data)
             await asyncio.sleep(2)
-        self.start_streams()
-        self.loop.create_task(self.stream_call_info())
-        self.loop.create_task(self.stream_call_roaster())
 
 
-class TestConfig:
-    host = 'localhost'
-    port = '8080'
-    logfile = 'log.json'
+async def start_server(app):
+    await app['server'].start()
+
+
+def main(host, port, username, password, dumpfile):
+    logging.basicConfig(level=logging.INFO)
+    loop = asyncio.get_event_loop()
+
+    try:
+        app = web.Application(loop=loop)
+        server = Server(loop, username, password, dumpfile)
+        app['server'] = server
+
+        app.on_startup.append(start_server)
+        app.add_routes([web.post('/api/v1/authTokens', server.token)])
+        app.add_routes([web.get('/events/v1', server.serve)])
+        web.run_app(app, host=host, port=port)
+
+    finally:
+        logging.info('Event loop shutdown')
+        loop.close()
 
 
 if __name__ == '__main__':
-    server = Server(TestConfig)
-    server.start()
+    main('localhost', 8080, 'username', 'password', 'test/log.json')

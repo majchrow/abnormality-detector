@@ -10,3 +10,4 @@ class Config:
     logfile: str
     dumpfile: str
     kafka_file: str
+    ssl: bool = True

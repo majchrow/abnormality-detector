@@ -17,9 +17,10 @@ class Client:
 
     Call = namedtuple('Call', ['name', 'id', 'ci_subscription_index'])
 
-    def __init__(self, host: str, port: int, call_manager):
+    def __init__(self, host: str, port: int, ssl: bool, call_manager):
         self.host = host
         self.port = port
+        self.ssl = ssl
         self.TAG += f' {host}:{port}'
 
         self.call_manager = call_manager
@@ -43,11 +44,17 @@ class Client:
 
     @property
     def token_uri(self):
-        return f'https://{self.host}:{self.port}/api/v1/authTokens'
+        if self.ssl:
+            return f'https://{self.host}:{self.port}/api/v1/authTokens'
+        else:
+            return f'http://{self.host}:{self.port}/api/v1/authTokens'
 
     @property
     def event_uri(self):
-        return f"wss://{self.host}:{self.port}/events/v1?authToken={self.auth_token}"
+        if self.ssl:
+            return f'wss://{self.host}:{self.port}/events/v1?authToken={self.auth_token}'
+        else:
+            return f'ws://{self.host}:{self.port}/events/v1?authToken={self.auth_token}'
 
     async def run(self, login: str, password: str, session: aiohttp.ClientSession):
         auth = aiohttp.BasicAuth(login, password)

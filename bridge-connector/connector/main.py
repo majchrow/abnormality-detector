@@ -43,6 +43,10 @@ def parse_args():
                         type=str,
                         default='client_kafka.json',
                         help='file to dump messages as they shall be published to Kafka')
+    parser.add_argument('--no-ssl',
+                        action='store_false',
+                        dest='ssl',
+                        help='disable SSL for HTTP and WebSocket connection - for testing purposes only')
     return parser.parse_args()
 
 
@@ -62,7 +66,8 @@ def main():
     args = parse_args()
     config = Config(
         login=login, password=password, addresses=args.addresses,
-        logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file
+        logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file,
+        ssl=args.ssl
     )
 
     log_to_file(config.logfile, level=logging.INFO)

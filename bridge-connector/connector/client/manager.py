@@ -4,7 +4,6 @@ import json
 import logging
 import signal
 from asyncio import Queue
-from aiohttp import ClientConnectionError
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -37,6 +36,8 @@ from ..config import Config
 class ClientManager:
 
     TAG = 'ClientManager'
+    backoff_factor = 1.5
+    max_backoff_s = 10
 
     def __init__(self, config: Config):
         self.config = config
@@ -67,7 +68,7 @@ class ClientManager:
             logging.info(f'{self.TAG}: shutdown complete.')
 
     async def run_client(self, host: str, port: int):
-        client = Client(host, port, self)
+        client = Client(host, port, self.config.ssl, self)
         backoff_s = 1
 
         while True:
@@ -76,12 +77,13 @@ class ClientManager:
                 await client.run(self.config.login, self.config.password, self.session)
             except asyncio.CancelledError:
                 raise
-            except ClientConnectionError as e :
-                logging.error(f'{self.TAG}: connection error: {e}')
-                await asyncio.sleep(backoff_s)
-                backoff_s *= 1.5
             except:
                 logging.exception(f'{self.TAG}: run failed!')
+                await asyncio.sleep(backoff_s)
+
+                # Reset so that doesn't stay large all the time
+                if (backoff_s := backoff_s * self.backoff_factor) > self.max_backoff_s:
+                    backoff_s = 1
 
     async def shutdown(self, loop, signal):
         if signal:
