@@ -1,5 +1,20 @@
 [
   {
+      "type": "message",
+      "message": {
+          "messageId": 3,
+          "type": "callListUpdate",
+          "subscriptionIndex": 3,
+          "updates": [
+              {
+                  "call": "97c771ae-fc2e-4257-b129-30ee818e034b",
+                  "updateType": "add",
+                  "name": "Andy'scoSpace"
+              }
+          ]
+      }
+  },
+  {
     "type": "message",
     "message": {
       "messageId": 6,

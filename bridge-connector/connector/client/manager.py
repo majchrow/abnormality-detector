@@ -3,8 +3,8 @@ import asyncio
 import json
 import logging
 import signal
+from aiokafka import AIOKafkaProducer
 from asyncio import Queue
-from aiohttp import ClientConnectionError
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -13,9 +13,6 @@ from ..config import Config
 
 
 # TODO:
-#  - add call ID info to messages saved to file/pushed to Kafka
-#    - actually, both call ID and call name o.O shit
-#    - WHAT FORMAT?
 #  - exception handling
 #    - failure to fetch token
 #    - HTTP 401 (?) error - refresh token?
@@ -37,6 +34,8 @@ from ..config import Config
 class ClientManager:
 
     TAG = 'ClientManager'
+    backoff_factor = 1.5
+    max_backoff_s = 10
 
     def __init__(self, config: Config):
         self.config = config
@@ -55,9 +54,13 @@ class ClientManager:
         
         try:
             loop.create_task(self.flush_to_file(self.dump_queue, self.config.dumpfile))
+            loop.create_task(self.push_to_kafka())
 
-            # TODO: to be replaced by flushing to Kafka instead of a file
-            loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
+            # TODO: drop file altogether?
+            if self.config.kafka_file:
+                loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
+            else:
+                logging.info(f'{self.TAG}: running without Kafka file dump')
 
             for host, port in self.config.addresses:
                 loop.create_task(self.run_client(host, port))
@@ -67,7 +70,7 @@ class ClientManager:
             logging.info(f'{self.TAG}: shutdown complete.')
 
     async def run_client(self, host: str, port: int):
-        client = Client(host, port, self)
+        client = Client(host, port, self.config.ssl, self)
         backoff_s = 1
 
         while True:
@@ -76,12 +79,13 @@ class ClientManager:
                 await client.run(self.config.login, self.config.password, self.session)
             except asyncio.CancelledError:
                 raise
-            except ClientConnectionError as e :
-                logging.error(f'{self.TAG}: connection error: {e}')
-                await asyncio.sleep(backoff_s)
-                backoff_s *= 1.5
             except:
                 logging.exception(f'{self.TAG}: run failed!')
+                await asyncio.sleep(backoff_s)
+
+                # Reset so that doesn't stay large all the time
+                if (backoff_s := backoff_s * self.backoff_factor) > self.max_backoff_s:
+                    backoff_s = 1
 
     async def shutdown(self, loop, signal):
         if signal:
@@ -98,6 +102,25 @@ class ClientManager:
 
     async def publish(self, msg: dict):
         await self.publish_queue.put(msg)
+
+    async def push_to_kafka(self):
+        if not self.config.kafka_bootstrap_address:
+            logging.info(f'{self.TAG}: running without Kafka publisher')
+            return
+
+        producer = AIOKafkaProducer(bootstrap_servers=self.config.kafka_bootstrap_address)
+        await producer.start()
+
+        logging.info(f'{self.TAG}: Kafka publisher started')
+        try:
+            while True:
+                msg_dict = await self.publish_queue.get()
+                payload = json.dumps(msg_dict).encode()
+                topic = msg_dict['message']['type']
+                await producer.send_and_wait(topic, payload)
+        finally:
+            logging.info(f'{self.TAG}: Kafka publisher stopped')
+            await producer.stop()
 
     async def dump(self, msg: dict):
         await self.dump_queue.put(msg)
