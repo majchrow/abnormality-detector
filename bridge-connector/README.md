@@ -24,4 +24,5 @@ wiadomości przeznaczone do preprocessingu.
 ### Testy
 
 Odpalamy najpierw serwer testowy przez `python test/server.py` (wymagane są zmienne środowiskowe 
-`BRIDGE_USERNAME` i `BRIDGE_PASSWORD`), potem `bridge-connector` jak wyżej, podając adres serwera testowego.
+`BRIDGE_USERNAME` i `BRIDGE_PASSWORD`), potem `bridge-connector` jak wyżej, podając adres serwera testowego
+i dodatkowo opcję `no-ssl`.
