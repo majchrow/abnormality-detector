@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import signal
+from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -53,9 +54,13 @@ class ClientManager:
         
         try:
             loop.create_task(self.flush_to_file(self.dump_queue, self.config.dumpfile))
+            loop.create_task(self.push_to_kafka())
 
-            # TODO: to be replaced by flushing to Kafka instead of a file
-            loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
+            # TODO: drop file altogether?
+            if self.config.kafka_file:
+                loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
+            else:
+                logging.info(f'{self.TAG}: running without Kafka file dump')
 
             for host, port in self.config.addresses:
                 loop.create_task(self.run_client(host, port))
@@ -97,6 +102,25 @@ class ClientManager:
 
     async def publish(self, msg: dict):
         await self.publish_queue.put(msg)
+
+    async def push_to_kafka(self):
+        if not self.config.kafka_bootstrap_address:
+            logging.info(f'{self.TAG}: running without Kafka publisher')
+            return
+
+        producer = AIOKafkaProducer(bootstrap_servers=self.config.kafka_bootstrap_address)
+        await producer.start()
+
+        logging.info(f'{self.TAG}: Kafka publisher started')
+        try:
+            while True:
+                msg_dict = await self.publish_queue.get()
+                payload = json.dumps(msg_dict).encode()
+                topic = msg_dict['message']['type']
+                await producer.send_and_wait(topic, payload)
+        finally:
+            logging.info(f'{self.TAG}: Kafka publisher stopped')
+            await producer.stop()
 
     async def dump(self, msg: dict):
         await self.dump_queue.put(msg)

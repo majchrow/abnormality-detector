@@ -2,13 +2,16 @@ import aiohttp
 import asyncio
 import json
 import logging
+import os
+import sys
 from aiohttp import web
+from argparse import ArgumentParser
 from dataclasses import dataclass, field
 from itertools import cycle
 from pprint import pformat
 from typing import Dict, List
 
-MSG_INTERVAL_S = 5
+MSG_INTERVAL_S = 2
 
 # Workflow:
 #  - client connects -> WebSocket is added to server state
@@ -192,5 +195,29 @@ def main(host, port, username, password, dumpfile):
     web.run_app(app, host=host, port=port)
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument('--host',
+                        type=str,
+                        default='localhost',
+                        help='host')
+    parser.add_argument('--port',
+                        type=int,
+                        default=8080,
+                        help='default file for logging module')
+    parser.add_argument('--dumpfile',
+                        type=str,
+                        default='test/full_log.json',
+                        help='JSON file with raw server messages')
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    main('localhost', 8080, 'username', 'password', 'test/full_log.json')
+    try:
+        login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
+    except KeyError:
+        print("Required BRIDGE_USERNAME and BRIDGE_PASSWORD environmental variables")
+        sys.exit(1)
+
+    args = parse_args()
+    main(args.host, args.port, login, password, args.dumpfile)

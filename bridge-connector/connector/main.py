@@ -41,8 +41,10 @@ def parse_args():
                         help='default file to dump all raw server communication')
     parser.add_argument('--kafka-file',
                         type=str,
-                        default='client_kafka.json',
                         help='file to dump messages as they shall be published to Kafka')
+    parser.add_argument('--kafka-bootstrap-server',
+                        type=str,
+                        help='address of Kafka bootstrap server, e.g. localhost:9092')
     parser.add_argument('--no-ssl',
                         action='store_false',
                         dest='ssl',
@@ -50,8 +52,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# TODO:
-#  an option to run with Kafka producer
 def main():
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
@@ -61,12 +61,13 @@ def main():
 
     args = parse_args()
     config = Config(
-        login=login, password=password, addresses=args.addresses,
+        login=login, password=password,
+        addresses=args.addresses, kafka_bootstrap_address=args.kafka_bootstrap_server,
         logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file,
         ssl=args.ssl
     )
 
-    log_to_file(config.logfile, level=logging.INFO)
+    log_to_file(config.logfile, level=logging.DEBUG)
 
     manager = ClientManager(config)
     manager.start()

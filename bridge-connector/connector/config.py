@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -9,5 +9,6 @@ class Config:
     addresses: List[Tuple[str, int]]
     logfile: str
     dumpfile: str
-    kafka_file: str
+    kafka_file: Optional[str]
+    kafka_bootstrap_address: Optional[str]
     ssl: bool = True
