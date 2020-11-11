@@ -4,6 +4,8 @@ Trzeba zainstalować pakiet `connector`, najlepiej w nowym virtualenvie.
  2. `source .venv/bin/activate`
  3. `pip install -r requirements.txt`
  
+ Wymaga co najmniej Pythona 3.8.
+ 
 ### Uruchomienie
 
  1. `source .env`
