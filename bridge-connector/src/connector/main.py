@@ -67,7 +67,7 @@ def main():
         ssl=args.ssl
     )
 
-    log_to_file(config.logfile, level=logging.DEBUG)
+    log_to_file(config.logfile, level=logging.INFO)
 
     manager = ClientManager(config)
     manager.start()
