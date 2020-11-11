@@ -3,7 +3,8 @@ if [[ ! -d ".venv" ]]; then
 fi
 
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 
-echo 'Running client'
-bridge-connector --addresses host1:port1 host2:port2 --logfile logs/log_sane_4_servers.json --kafka-file logs/kafka_4_servers.json --dumpfile logs/dump_4_servers.json
+source.env
+bridge-connector --addresses host1:port1 host2:port2 --logfile logs/logfile.json --kafka-file logs/kafka_file.json --dumpfile logs/dumpfile.json
