@@ -13,15 +13,6 @@ from typing import Dict, List
 
 MSG_INTERVAL_S = 2
 
-# Workflow:
-#  - client connects -> WebSocket is added to server state
-#  - clients subscribes -> we start going over message log in order and send him appropriate messages
-#  - appropriate means:
-#    - if subscribed to "calls" -> send callListUpdates with ALL his "calls" subscription indexes
-#    - to "callInfo" -> send callInfoUpdates with ALL his "callInfo" subscription indexes
-#      (IMPORTANT: this means that
-#    - same goes for "callRoster"
-
 # Notes:
 #  - acknowledgements and subscriptionUpdates are ignored and not sent at all
 #  - if subscribed to "calls", clients get all "calls" events from log in order
@@ -31,7 +22,7 @@ MSG_INTERVAL_S = 2
 #    - reasons:
 #      - ATM this data content doesn't matter so much (it's just a simulation)
 #      - it's tough to say from which call an event came - because subscription
-#        indexes were not used to differentiate calls when current log was built
+#        indexes were not used to differentiate calls when current log file was built
 #     TODO: should be changed with log from client with proper use of subscriptions
 
 
@@ -106,42 +97,6 @@ class Server:
 
         logging.info(f"{remote_address} connected.")
 
-    async def unregister(self, remote_address) -> None:
-        if task := self.streams.get(remote_address, None):
-            task.cancel()
-            await task
-            del self.streams[remote_address]
-        del self.clients[remote_address]
-
-        logging.info(f"{remote_address} disconnected.")
-
-    async def stream_log(self, client) -> None:
-        try:
-            for message in cycle(self.messages):
-                if message['message']['type'] == "callListUpdate":
-                    subscriptions = client.calls
-                elif message['message']['type'] == "callInfoUpdate":
-                    subscriptions = client.call_info
-                elif message['message']['type'] == "rosterUpdate":
-                    subscriptions = client.roster_info
-                else:
-                    logging.error(f'Unhandled message type in provided log file: {pformat(message)}')
-                    continue
-
-                # TODO:
-                #  when we decide to send data from a single real call to single subscription
-                #  instead of mixed (like now) then this is the place to change - we need to
-                #  filter subscriptions list based on the message to find ones relevant to
-                #  this message (based on call ID maybe? for rosterInfo it's more difficult)
-
-                await asyncio.sleep(MSG_INTERVAL_S)
-                for s_ind in subscriptions:
-                    message['message']['subscriptionIndex'] = s_ind
-                    await client.ws.send_json(message)
-                    logging.info(f'SENT:\n{pformat(message)}')
-        except asyncio.CancelledError:
-            logging.info(f'Event stream for {client.ip_address} stopped.')
-
     async def handle_ws(self, remote_address, ws):
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -176,6 +131,42 @@ class Server:
             # Only start streaming once we have some subscription
             if remote_address not in self.streams:
                 self.streams[remote_address] = self.loop.create_task(self.stream_log(client))
+
+    async def stream_log(self, client) -> None:
+        try:
+            for message in cycle(self.messages):
+                if message['message']['type'] == "callListUpdate":
+                    subscriptions = client.calls
+                elif message['message']['type'] == "callInfoUpdate":
+                    subscriptions = client.call_info
+                elif message['message']['type'] == "rosterUpdate":
+                    subscriptions = client.roster_info
+                else:
+                    logging.error(f'Unhandled message type in provided log file: {pformat(message)}')
+                    continue
+
+                # TODO:
+                #  when we decide to send data from a single real call to single subscription
+                #  instead of mixed (like now) then this is the place to change - we need to
+                #  filter subscriptions list based on the message to find ones relevant to
+                #  this message (based on call ID maybe? for rosterInfo it's more difficult)
+
+                await asyncio.sleep(MSG_INTERVAL_S)
+                for s_ind in subscriptions:
+                    message['message']['subscriptionIndex'] = s_ind
+                    await client.ws.send_json(message)
+                    logging.info(f'SENT:\n{pformat(message)}')
+        except asyncio.CancelledError:
+            logging.info(f'Event stream for {client.ip_address} stopped.')
+
+    async def unregister(self, remote_address) -> None:
+        if task := self.streams.get(remote_address, None):
+            task.cancel()
+            await task
+            del self.streams[remote_address]
+        del self.clients[remote_address]
+
+        logging.info(f"{remote_address} disconnected.")
 
 
 async def setup_server(app):

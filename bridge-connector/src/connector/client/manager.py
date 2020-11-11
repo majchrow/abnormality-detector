@@ -17,8 +17,7 @@ from ..config import Config
 #  - exception handling
 #    - failure to fetch token
 #    - HTTP 401 (?) error - refresh token?
-#  - async logging and saving to file
-#  - publishing to Kafka
+#  - async logging
 
 
 # IDEA:
@@ -61,7 +60,7 @@ class ClientManager:
             loop.create_task(self.flush_to_file(self.dump_queue, self.config.dumpfile))
             loop.create_task(self.push_to_kafka())
 
-            # TODO: drop file altogether?
+            # TODO: drop kafka_file altogether?
             if self.config.kafka_file:
                 loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
             else:
@@ -88,7 +87,7 @@ class ClientManager:
                 logging.exception(f'{self.TAG}: run failed!')
                 await asyncio.sleep(backoff_s)
 
-                # Reset so that doesn't stay large all the time
+                # Reset so that backoff doesn't stay large all the time
                 if (backoff_s := backoff_s * self.backoff_factor) > self.max_backoff_s:
                     backoff_s = 1
 
@@ -148,6 +147,9 @@ class ClientManager:
             json.dump(msg_dict, file, indent=4)
             file.write(",\n")
 
+    ################################
+    # Callbacks for Client instances
+    ################################
     async def on_add_call(self, call_name: str, call_id: str, client_endpoint: Client):
         if call_id not in self.calls:
             self.calls[call_id] = Call(manager=self, call_name=call_name, call_id=call_id)

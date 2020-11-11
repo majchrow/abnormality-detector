@@ -106,12 +106,11 @@ class Client:
 
         return msg_dict["message"]["messageId"]
 
-    # What's missing:
-    #  - callListUpdate - only "add" has both name and callId, others only have callId
-    #  - callInfoUpdate - only name
-    #  - rosterUpdate - neither
     async def publish(self, msg_dict: dict, msg_type: str):
         # Add timestamp and missing info (call ID and call name) to the message
+        #  - callListUpdate - only "add" has both name and callId, others only have callId
+        #  - callInfoUpdate - only "add" has name, others have nothing
+        #  - rosterUpdate - have nothing
         msg_dict['date'] = datetime.now().isoformat()
 
         if msg_type == "callListUpdate":
