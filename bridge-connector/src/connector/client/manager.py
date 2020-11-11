@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import json
 import logging
+import os
 import signal
 from aiokafka import AIOKafkaProducer
 from asyncio import Queue
@@ -44,6 +45,10 @@ class ClientManager:
         self.calls = {}
         self.dump_queue = Queue()
         self.publish_queue = Queue()
+        
+        os.makedirs(os.path.dirname(config.dumpfile), exist_ok=True)
+        if config.kafka_file:
+            os.makedirs(os.path.dirname(config.kafka_file), exist_ok=True)
 
     def start(self):
         loop = asyncio.get_event_loop()
