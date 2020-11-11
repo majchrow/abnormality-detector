@@ -41,6 +41,112 @@ services:
       networks:
         - frontend
 
+  cassandra:
+    image: 'docker.io/bitnami/cassandra:3-debian-10'
+    ports:
+      - '7000:7000'
+      - '9042:9042'
+    volumes:
+      - 'cassandra_data:/bitnami'
+    restart: always
+    networks:
+      - preprocessing
+      - backend
+
+  cassandra-load-keyspace:
+    image: 'docker.io/bitnami/cassandra:3-debian-10'
+    restart: always
+    depends_on:
+      - cassandra
+    volumes:
+      - ./logs-preprocessing/cassandra/init/cassandra_schema.cql:/schema.cql 
+    command: /bin/bash -c "sleep 60 && echo loading cassandra keyspace && cqlsh cassandra -u cassandra -p cassandra -f /schema.cql"
+    networks:
+      - preprocessing
+      - backend
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    networks:
+      - backend
+      - preprocessing
+
+  kafka:
+    image: wurstmeister/kafka 
+    restart: always
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.soc
+    depends_on:
+      - zookeeper
+    networks:
+      - backend
+      - preprocessing
+
+  preprocessing-info:
+    build:
+      context: ./logs-preprocessing/app
+    restart: always
+    depends_on:
+      - kafka
+      - zookeeper
+      - cassandra
+      - cassandra-load-keyspace
+    networks:
+      - preprocessing
+
+  preprocessing-roster:
+    build:
+      context: ./logs-preprocessing/app
+      args:
+        UPDATE_TYPE: "roster"
+        FILEPATH: "./main/resources/roster_sample.json"
+        TABLE: "roster_update"
+    restart: always
+    depends_on:
+      - kafka
+      - cassandra
+      - cassandra-load-keyspace
+    networks:
+      - preprocessing
+
+  preprocessing-calls:
+    build:
+      context: ./logs-preprocessing/app
+      args:
+        FILEPATH: "./main/resources/calls_sample.json"
+        UPDATE_TYPE: "calls"
+        TABLE: "calls"
+        OUTPUT_MODE: "update"
+    restart: always
+    depends_on:
+      - kafka
+      - cassandra
+      - cassandra-load-keyspace
+    networks:
+      - preprocessing
+
+  producer:
+    build:
+      context: ./logs-preprocessing/kafka
+    restart: always
+    depends_on:
+      - kafka
+    networks:
+      - preprocessing
+  
+volumes:
+  cassandra_data:
+    driver: local
+
 networks:
   backend:
   frontend:
+  preprocessing:

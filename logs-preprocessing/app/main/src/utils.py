@@ -2,7 +2,7 @@ from pyspark.sql.types import *
 import operator
 from datetime import datetime
 from pyspark.sql.functions import *
-
+import math
 
 class PreprocessorHelper:
     def __init__(self, spark):
@@ -11,50 +11,64 @@ class PreprocessorHelper:
             lambda cols: "".join([x if x is not None else "*" for x in cols]),
             StringType(),
         )
-        spark.udf.register("concat_udf", self.concat_udf)
+        self.get_name_udf = udf(self.get_name, StringType())
+        self.get_last_date_udf = udf(self.get_last_date, TimestampType())
+        udf_func_dict = {
+            "get_name_udf": self.get_name_udf,
+            "get_last_date_udf": self.get_last_date_udf,
+            "concat_udf": self.concat_udf
+        }
+        for udf_func in udf_func_dict:
+            spark.udf.register(udf_func, udf_func_dict[udf_func])
 
     @staticmethod
     def get_last_nonempty_value(values):
-        nonempty_values = [i for i in values if i]
+        nonempty_values = [i for i in values if i and not (type(i) == float and math.isnan(i))]
         return nonempty_values[-1] if nonempty_values else None
+
+    @staticmethod
+    def get_name(names):
+        return PreprocessorHelper.get_last_nonempty_value(names)
+
+    @staticmethod
+    def get_last_date(dates):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
+        date = datetime.strptime(dates[-1], datetime_pattern)
+        return date
 
 
 class CallInfoPreprocessorHelper(PreprocessorHelper):
     def __init__(self, spark):
         PreprocessorHelper.__init__(self, spark)
-        self.get_diff_udf = udf(self.__get_diff, LongType())
-        self.get_last_date_udf = udf(self.__get_last_date, TimestampType())
+        self.get_time_diff_udf = udf(self.__get_time_diff, LongType())
         self.get_if_active_udf = udf(self.__get_if_active, BooleanType())
         self.get_if_locked_udf = udf(self.__get_if_locked, BooleanType())
         self.get_if_adhoc_udf = udf(self.__get_if_adhoc, BooleanType())
         self.get_if_lync_udf = udf(self.__get_if_lync, BooleanType())
         self.get_if_cospace_udf = udf(self.__get_if_cospace, BooleanType())
         self.get_if_forwarding_udf = udf(self.__get_if_forwarding, BooleanType())
+        self.get_max_udf = udf(self.__get_max, IntegerType())
+        self.get_mean_udf = udf(self.__get_mean, DoubleType())
         udf_func_dict = {
-            "get_diff_udf": self.get_diff_udf,
-            "get_last_date_udf": self.get_last_date_udf,
+            "get_time_diff_udf": self.get_time_diff_udf,
             "get_if_active_udf": self.get_if_active_udf,
             "get_if_locked_udf": self.get_if_locked_udf,
             "get_if_adhoc_udf": self.get_if_adhoc_udf,
             "get_if_lync_udf": self.get_if_lync_udf,
             "get_if_forwarding_udf": self.get_if_forwarding_udf,
             "get_if_cospace_udf": self.get_if_cospace_udf,
+            "get_max_udf": self.get_max_udf,
+            "get_mean_udf": self.get_mean_udf
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
 
     @staticmethod
-    def __get_diff(dates):
+    def __get_time_diff(dates):
         datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
         start_date = datetime.strptime(dates[0], datetime_pattern)
         end_date = datetime.strptime(dates[-1], datetime_pattern)
-        return (end_date - start_date).total_seconds()
-
-    @staticmethod
-    def __get_last_date(dates):
-        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
-        date = datetime.strptime(dates[-1], datetime_pattern)
-        return date
+        return int((end_date - start_date).total_seconds())
 
     @staticmethod
     def __get_if_active(values):
@@ -85,6 +99,28 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
     @staticmethod
     def __get_if_cospace(real_type):
         return CallInfoPreprocessorHelper.__get_if_type(real_type, "coSpace")
+
+    @staticmethod
+    def __get_max(values):
+        filtered = CallInfoPreprocessorHelper.__get_nonempty_values(values)
+        max_value = 0
+        for value in filtered:
+            if value > max_value:
+                max_value = value
+        return int(max_value)
+
+    @staticmethod
+    def __get_mean(values):
+        filtered = CallInfoPreprocessorHelper.__get_nonempty_values(values)
+        total = 0
+        for value in filtered:
+            total = total + value
+        size = len(values)
+        return float(total/size) if size else 0.0
+    
+    @staticmethod
+    def __get_nonempty_values(values):
+        return [value for value in values if value and not (type(value) == float and math.isnan(value))]
 
 
 class RosterPreprocessorHelper(PreprocessorHelper):
@@ -195,3 +231,18 @@ class RosterPreprocessorHelper(PreprocessorHelper):
     @staticmethod
     def __count_true_values(values):
         return len([value for value in values if value and value is not None])
+
+
+class CallsPreprocessorHelper(PreprocessorHelper):
+    def __init__(self, spark):
+        PreprocessorHelper.__init__(self, spark)
+        self.get_if_finished_udf = udf(self.__get_if_finished, BooleanType())
+        udf_func_dict = {
+            "get_if_finished_udf": self.get_if_finished_udf
+        }
+        for udf_func in udf_func_dict:
+            spark.udf.register(udf_func, udf_func_dict[udf_func])
+
+    @staticmethod
+    def __get_if_finished(values):
+        return "remove" in values
