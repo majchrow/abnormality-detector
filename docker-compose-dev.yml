@@ -80,10 +80,12 @@ services:
     ports:
       - "9092:9092"
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_BROKER_ID: 1
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER://kafka:29092,LISTENER_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER:PLAINTEXT,LISTENER_HOST:PLAINTEXT
+      KAFKA_LISTENERS: LISTENER_DOCKER://kafka:29092,LISTENER_HOST://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.soc
     depends_on:
       - zookeeper
     networks:
