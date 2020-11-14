@@ -83,6 +83,12 @@ class CallInfoPreprocessor(Preprocessor):
             helper=CallInfoPreprocessorHelper(spark),
         )
 
+    @staticmethod
+    def do_basic_preprocessing(input_stream, schema):
+        return input_stream.withColumn("event", func.from_json("value", schema)).select(
+            "event.date", "event.message"
+        )
+
     def prepare_for_kafka(self, df):
         return df.select(
             func.to_json(
@@ -108,7 +114,7 @@ class CallInfoPreprocessor(Preprocessor):
         )
 
     def prepare_final_df(self):
-        self.df = self.df.select("date", "call", "message.callInfo.name", "message.callInfo")
+        self.df = self.df.select("date", "message.callInfo.call", "message.callInfo.name", "message.callInfo")
         info = self.df.callInfo
 
         selected = self.df.select(
@@ -331,12 +337,13 @@ class CallsPreprocessor(Preprocessor):
 
         preprocessed = (
             grouped.withColumn("call_id", grouped.call)
-            .withColumn("datetime", self.helper.get_last_date_udf(grouped.date_array))
+            .withColumn("start_datetime", self.helper.get_first_date_udf(grouped.date_array))
+            .withColumn("last_update", self.helper.get_last_date_udf(grouped.date_array))
             .withColumn(
                 "finished", self.helper.get_if_finished_udf(grouped.updateType_array)
             )
             .withColumn("name", self.helper.get_name_udf(grouped.name_array))
-            .select("datetime", "call_id", "finished", "name")
+            .select("start_datetime", "last_update", "call_id", "finished", "name")
         )
 
         preprocessed.printSchema()

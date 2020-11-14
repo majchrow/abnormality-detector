@@ -4,3 +4,4 @@
 out/
 venv/
 logs-preprocessing/kafka/resources/
+__pycache__/

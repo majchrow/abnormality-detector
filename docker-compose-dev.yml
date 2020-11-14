@@ -95,6 +95,8 @@ services:
   preprocessing-info:
     build:
       context: ./logs-preprocessing/app
+      args:
+        CORES: "*"
     restart: on-failure
     depends_on:
       - kafka
@@ -110,6 +112,7 @@ services:
         UPDATE_TYPE: "roster"
         FILEPATH: "./main/resources/roster_sample.json"
         TABLE: "roster_update"
+        CORES: "*"
     restart: on-failure
     depends_on:
       - kafka
@@ -126,6 +129,7 @@ services:
         UPDATE_TYPE: "calls"
         TABLE: "calls"
         OUTPUT_MODE: "update"
+        CORES: "*"
     restart: on-failure
     depends_on:
       - kafka

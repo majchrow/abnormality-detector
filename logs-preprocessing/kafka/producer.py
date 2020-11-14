@@ -19,4 +19,4 @@ if __name__ == "__main__":
         topic = str(i["message"]["type"])
         PRODUCER.send(topic=topic, value=i)
         print(i)
-        sleep(5)
+        sleep(3)
