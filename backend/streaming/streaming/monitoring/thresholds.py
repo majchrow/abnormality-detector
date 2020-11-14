@@ -1,105 +1,98 @@
 import asyncio
-import json
 import logging
-import os
-import sys
-import time
-from json import JSONDecodeError
+from asyncio import Queue
+from typing import Literal, Optional
 
-from .protocol import AsyncStreams
+from ..exceptions import UnmonitoredError
 
-worker_dir = os.path.dirname(os.path.realpath(__file__))
+
+class Monitor:
+    def __init__(self):
+        self.criteria = None
+
+    def set_criteria(self, criteria: dict):
+        self.criteria = criteria
+
+    def verify(self, topic: Literal['callInfoUpdate', 'rosterUpdate'], msg: dict):
+        return f'Implement me! {topic} {msg} {self.criteria}'
 
 
 class ThresholdManager:
-    def __init__(self, notification_queues):
-        self.worker = None
-        self.listener = None
-        self.running = False
-        self.notification_q = notification_queues
 
-    async def start(self):
-        self.worker = await asyncio.create_subprocess_exec(
-            'python3',
-            f'{os.path.join(worker_dir, "thresholds.py")}',
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        self.running = True
-        self.listener = asyncio.create_task(self._listen())
+    TAG = 'ThresholdManager'
+    STREAM_FINISHED = 'END STREAM'
 
-    async def _listen(self):
-        while self.running:
-            line = await AsyncStreams.read_str(self.worker.stdout)
+    def __init__(self, event_source):
+        self.event_source = event_source
+        self.monitoring_tasks = {}
 
-            if not line:
-                logging.info('Threshold worker process shutdown!')  # TODO: handle possible errors
-                break
+    def schedule(self, conf_name: Optional[str], criteria):
+        if task := self.monitoring_tasks.get(conf_name, None):
+            task.update_criteria(criteria)
+        else:
+            task = MonitoringTask()
+            self.monitoring_tasks[conf_name] = task
+            task.update_criteria(criteria)
+            self.event_source.subscribe(conf_name, task.input_queue)
+            task.start()
+        logging.info(f'{self.TAG}: scheduled monitoring for {conf_name if conf_name else "ALL"}')
 
-            payload = json.loads(line)
-            conf_id, response = payload['conf_id'], payload['response']
-            await self.notification_q[conf_id].put(response)
+    def get_criteria(self, conf_name: Optional[str]):
+        logging.info(f'{self.TAG}: getting criteria for {conf_name if conf_name else "ALL"}')
+        if task := self.monitoring_tasks.get(conf_name, None):
+            return task.checker.criteria
+        return None
 
-    async def _monitor(self):
-        while self.running:
-            line = await AsyncStreams.read_str(self.worker.stderr)
-            if line:
-                logging.error(f'Error in worker subprocess: {line}')
+    def get_all_criteria(self):
+        return [
+            {
+                "conf_name": conf_name,
+                "criteria": task.checker.criteria
+            } for conf_name, task in self.monitoring_tasks.items()
+        ]
 
-    async def submit(self, conf_id: str, criteria: dict):
-        # TODO:
-        #  - save it to DB
-        #  - on start - check if there are some criteria in DB
-        payload = {'conf_id': conf_id, 'criteria': criteria}
-        await AsyncStreams.send_dict(payload, self.worker.stdin)
+    async def unschedule(self, conf_name: Optional[str]):
+        if task := self.monitoring_tasks.get(conf_name, None):
+            self.event_source.unsubscribe(conf_name, task.input_queue)
+            del self.monitoring_tasks[conf_name]
+            await task.stop()
+            await task.output_queue.put(ThresholdManager.STREAM_FINISHED)
+            logging.info(f'{self.TAG}: unscheduled monitoring for {conf_name if conf_name else "ALL"}')
+        else:
+            logging.warning(f'{self.TAG}: "unschedule" attempt for unmonitored {conf_name if conf_name else "ALL"}')
+            raise UnmonitoredError()
 
     async def shutdown(self):
-        self.running = False
-        await AsyncStreams.send_str('POISON', self.worker.stdin)
-        await self.worker.wait()
-        logging.info('Threshold worker process stopped.')
-
-        self.listener.cancel()
-        await self.listener
-        logging.info('Threshold worker manager task stopped.')
+        await asyncio.gather(*[task.stop() for task in self.monitoring_tasks.values()])
+        logging.info(f'{self.TAG}: stopped')
 
 
-# TODO:
-#  - worker must die properly
+class MonitoringTask:
 
-# TODO: (real behavior)
-#  (threads or coroutines?)
-#  - thread 1:
-#    - listen to Kafka topic for parameter values
-#    - run defined conditions on each, send back (STDOUT) info about detected anomalies
-#  - thread 2:
-#    - listen on STDIN for new condition requests, modify collection of used conditions
+    def __init__(self):
+        self.input_queue = Queue()
+        self.output_queue = Queue()
+        self.checker = Monitor()
 
+        self.task = None
 
-def worker():
-    while True:
-        line = sys.stdin.readline()
-        if line == 'POISON':
-            sys.stdout.write('Received poison pill, farewell\n')
-            sys.stdout.flush()
-            return 0
+    def start(self):
+        self.task = asyncio.create_task(self._run())
 
+    async def stop(self):
+        self.task.cancel()
+        await self.task
+
+    async def _run(self):
+        # TODO: better error handling
         try:
-            payload = json.loads(line)
-        except JSONDecodeError:
-            break  # TODO: send back error response?
+            while True:
+                topic, msg = await self.input_queue.get()
+                result = self.checker.verify(topic, msg)
+                if result:
+                    await self.output_queue.put(result)
+        except asyncio.CancelledError:
+            pass
 
-        conf_id, criteria = payload['conf_id'], payload['criteria']
-
-        # TODO:
-        for _ in range(5):
-            dummy = f"I'm dumb so here're your criteria: {criteria}"
-            response = {'conf_id': conf_id, 'response': dummy}
-            sys.stdout.write(json.dumps(response) + '\n')
-            sys.stdout.flush()
-            time.sleep(1)
-        raise Exception
-
-
-if __name__ == '__main__':
-    worker()
+    def update_criteria(self, criteria):
+        self.checker.set_criteria(criteria)

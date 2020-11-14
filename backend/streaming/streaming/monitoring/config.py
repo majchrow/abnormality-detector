@@ -8,4 +8,4 @@ class Config:
     kafka_topic_map: Dict[str, str]  # input topic name -> standard CMS message type name
 
     def __post_init__(self):
-        assert set(self.kafka_topic_map.values()) == {'callListUpdate', 'callInfoUpdate', 'rosterUpdate'}
+        assert set(self.kafka_topic_map.values()) == {'callInfoUpdate', 'rosterUpdate'}

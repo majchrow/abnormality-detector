@@ -3,11 +3,10 @@ import json
 import logging
 from aiohttp import web
 from aiokafka import AIOKafkaConsumer
-from asyncio import Queue
-from collections import defaultdict
-from typing import Tuple
+from typing import Optional
 
-from .monitor import Monitor
+from ..exceptions import UnmonitoredError
+from .thresholds import ThresholdManager
 
 
 # Workflow:
@@ -20,19 +19,9 @@ from .monitor import Monitor
 #
 # Note: can be scaled up easily by running multiple processes (on whatever machines), also easy
 # to persist these monitoring tasks (in case of failure or user wanting to see them all)
-
-# So responsible for:
-#  - listening to Kafka
-#  - managing threshold tasks end-to-end
-#  - MAYBE (no idea really) will launch some long running machine learning tasks
-#    - maybe a process pool of executors running predictions (...) for multiple calls (process per call seems wasteful)
-#    - child processes - better not
-#    - could use gunicorn for managing child processes actually - would require another service...
-#    - or, instead of a separate service and self-managed process pool - a task queue like Celery (requires broker...)
 class Manager:
 
-    class UnmonitoredError(Exception):
-        pass
+    TAG = 'Manager'
 
     def __init__(self, config):
         self.kafka_manager = KafkaManager(config.kafka_bootstrap_server, config.kafka_topic_map)
@@ -42,88 +31,74 @@ class Manager:
     def start(self):
         self.kafka_manager.start()
 
-    async def schedule(self, monitoring_key: Tuple[str, str], request: dict):
+    async def schedule(self, conf_name: Optional[str], request: dict):
         if request['type'] == 'threshold':
-            self.threshold_manager.schedule(monitoring_key, request['criteria'])
+            self.threshold_manager.schedule(conf_name, request['criteria'])
 
-    async def unschedule(self, conf_name, request):
-        if request['type'] == 'threshold':
+    async def get_criteria(self, conf_name: Optional[str], monitoring_type: str):
+        if monitoring_type == 'threshold':
+            return self.threshold_manager.get_criteria(conf_name)
+
+    async def get_all_criteria(self):
+        criteria = []
+        for manager in [self.threshold_manager]:
+            criteria.extend(manager.get_all_criteria())
+        return criteria
+
+    async def unschedule(self, conf_name: Optional[str], monitoring_type: str):
+        if monitoring_type == 'threshold':
             await self.threshold_manager.unschedule(conf_name)
 
-    async def receive(self, call_name):
+    def receiver(self, call_name):
         if not (task := self.threshold_manager.monitoring_tasks.get(call_name, None)):
-            raise Manager.UnmonitoredError()
+            raise UnmonitoredError()
 
-        while True:
-            msg = await task.output_queue.get()
-            if msg == 'POISON':  # TODO: factor out the magic
-                break
-            yield msg
+        async def _receiver():
+            while True:
+                msg = await task.output_queue.get()
+                if msg == ThresholdManager.STREAM_FINISHED:
+                    break
+                yield msg
+        return _receiver
 
     async def shutdown(self):
         await self.threshold_manager.shutdown()
-        logging.info('Worker manager task shutdown finished.')
-
-
-class ThresholdManager:
-
-    def __init__(self, event_source):
-        self.event_source = event_source
-        self.monitoring_tasks = {}
-
-    def schedule(self, monitoring_key: Tuple[str, str], criteria):
-        if task := self.monitoring_tasks.get(monitoring_key, None):
-            task.update_criteria(criteria)
-        else:
-            task = MonitoringTask()
-            task.update_criteria(criteria)
-            self.event_source.subscribe(monitoring_key, task.input_queue)
-            task.start()
-
-    async def unschedule(self, monitoring_key: Tuple[str, str]):
-        if task := self.monitoring_tasks.get(monitoring_key, None):
-            await task.stop()
-            await task.output_queue.put('POISON')
-
-    async def shutdown(self):
-        await asyncio.gather(*[task.stop() for task in self.monitoring_tasks.values()])
-
-
-class MonitoringTask:
-    def __init__(self):
-        self.input_queue = Queue()
-        self.output_queue = Queue()
-        self.checker = Monitor()
-
-        self.task = None
-
-    def start(self):
-        self.task = asyncio.create_task(self._run())
-
-    async def stop(self):
-        self.task.cancel()
-        await self.task
-
-    async def _run(self):
-        # TODO: error handling
-        while True:
-            msg = await self.input_queue.get()
-            result = self.checker.verify(msg)
-            if result:
-                await self.output_queue.put(result)
-
-    def update_criteria(self, criteria):
-        self.checker.set_criteria(criteria)
+        logging.info(f'{self.TAG}: shutdown finished')
 
 
 class KafkaManager:
 
+    TAG = 'KafkaManager'
+
+    class SubscriptionKey:
+        ALL = 'ALL CONFERENCES'
+
+        def __init__(self, conference_name: Optional[str]):
+            if conference_name is None:
+                self.value = self.ALL
+            else:
+                self.value = ('SINGLE', conference_name)
+
+        def __eq__(self, other):
+            if isinstance(other, KafkaManager.SubscriptionKey):
+                return self.value == other.value
+            elif other == self.value == self.ALL:
+                return True
+
+        def __hash__(self):
+            return hash(self.value)
+
+        def __str__(self):
+            if self.value == self.ALL:
+                return self.value
+            else:
+                return self.value[1]
+
     def __init__(self, bootstrap_server, input_topic_map):
         self.bootstrap_server = bootstrap_server
-        self.consumer = None
         self.task = None
-        self.event_sinks = defaultdict(set)
-        self.input_topics = input_topic_map
+        self.event_sinks = {}
+        self.input_topics = input_topic_map  # preprocessed output topic -> CMS event type
 
     def start(self):
         self.task = asyncio.create_task(self._run())
@@ -132,42 +107,58 @@ class KafkaManager:
         self.task.cancel()
         await self.task
 
+    @property
+    def all_events_sink(self):
+        if sink := self.event_sinks.get(self.SubscriptionKey.ALL, None):
+            return next(iter(sink))
+        return None
+
     async def _run(self):
         topics = list(self.input_topics.keys())
-        self.consumer = AIOKafkaConsumer(*topics, bootstrap_servers=self.bootstrap_server)
+        consumer = AIOKafkaConsumer(*topics, bootstrap_servers=self.bootstrap_server)
 
-        await self.consumer.start()
+        await consumer.start()
         try:
-            async for msg in self.consumer:
+            async for msg in consumer:
                 msg_dict = json.loads(msg.value.decode())
 
-                # TODO: this dispatch must match what's produced during preprocessing!
                 topic = self.input_topics[msg.topic]
-                if topic == 'callListUpdate':
-                    if msg_dict['message']['updates']:
-                        call_name = msg_dict['message']['updates'][0]['name']
-                    else:
-                        continue
-                elif topic == 'callInfoUpdate':
-                    call_name = msg_dict['message']['callInfo']['name']
-                else:
-                    call_name = msg_dict['name']
+                key = self.SubscriptionKey(msg_dict['name'])
 
-                sinks = self.event_sinks[call_name]
-                for queue in sinks | self.event_sinks[('ALL', 'ALL')]:  # TODO: remove dark magic!
-                    # TODO: could also launch a task so as not to block Kafka connector
-                    logging.info(f'PUT: {msg_dict}')
-                    await queue.put(msg_dict)
+                sinks = self.event_sinks.get(key, set())
+                if self.all_events_sink:
+                    sinks = sinks.union({self.all_events_sink})
+
+                if not sinks:
+                    continue
+
+                logging.info(f'push {msg_dict} from topic {topic} to {len(sinks)} monitors')
+                for queue in sinks:
+                    queue.put_nowait((topic, msg_dict))
         finally:
-            await self.consumer.stop()
+            await consumer.stop()
 
-    def subscribe(self, monitoring_key, queue):
-        self.event_sinks[monitoring_key].add(queue)
+    def subscribe(self, conf_name: Optional[str], queue):
+        key = KafkaManager.SubscriptionKey(conf_name)
+        logging.info(f'{self.TAG}: registered subscriber for {key}')
 
-    def unsubscribe(self, monitoring_key, queue):
-        self.event_sinks[monitoring_key].discard(queue)
-        if not self.event_sinks[monitoring_key]:
-            del self.event_sinks[monitoring_key]
+        if (sinks := self.event_sinks.get(key, None)) is None:
+            sinks = set()
+            self.event_sinks[key] = sinks
+        sinks.add(queue)
+
+    def unsubscribe(self, conf_name: Optional[str], queue):
+        key = KafkaManager.SubscriptionKey(conf_name)
+        if not (sinks := self.event_sinks.get(key, None)):
+            logging.warning(f'{self.TAG}: "unsubscribe" attempt for {key} - conference unmonitored!')
+        else:
+            try:
+                sinks.remove(queue)
+                logging.info(f'{self.TAG}: unregistered subscriber for {key}, size {len(sinks)}')
+                if not sinks:
+                    del self.event_sinks[key]
+            except KeyError:
+                logging.warning(f'{self.TAG}: "unsubscribe" attempt for {key} - not a subscriber!')
 
 
 async def start_all(app: web.Application):
