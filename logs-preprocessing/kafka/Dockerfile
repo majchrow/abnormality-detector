@@ -6,7 +6,7 @@ WORKDIR /app/
 
 ENV FILEPATH="./resources/data.json"
 
-ENV KAFKA="kafka:9092"
+ENV KAFKA="kafka:29092"
 
 RUN pip install -r requirements.txt
 

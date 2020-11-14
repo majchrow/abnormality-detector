@@ -17,7 +17,7 @@ ENV KEYSPACE="test"
 ARG TABLE=call_info_update
 ENV TABLE="${TABLE}"
 
-ENV KAFKA="kafka:9092"
+ENV KAFKA="kafka:29092"
 
 ENV CASSANDRA_HOST="cassandra"
 
