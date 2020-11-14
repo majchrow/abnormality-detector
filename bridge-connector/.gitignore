@@ -1,5 +1,5 @@
 .venv/
 logs/
-__init__*
 __pycache__/
-client_log.json
+*.json
+*.egg-info
