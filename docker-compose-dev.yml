@@ -86,6 +86,8 @@ services:
       KAFKA_LISTENERS: LISTENER_DOCKER://kafka:29092,LISTENER_HOST://kafka:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.soc
     depends_on:
       - zookeeper
     networks:
@@ -98,7 +100,6 @@ services:
     restart: always
     depends_on:
       - kafka
-      - zookeeper
       - cassandra
       - cassandra-load-keyspace
     networks:
