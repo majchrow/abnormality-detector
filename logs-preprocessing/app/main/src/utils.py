@@ -4,6 +4,7 @@ from datetime import datetime
 from pyspark.sql.functions import *
 import math
 
+
 class PreprocessorHelper:
     def __init__(self, spark):
         self.datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
@@ -16,19 +17,22 @@ class PreprocessorHelper:
         udf_func_dict = {
             "get_name_udf": self.get_name_udf,
             "get_last_date_udf": self.get_last_date_udf,
-            "concat_udf": self.concat_udf
+            "concat_udf": self.concat_udf,
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
 
     @staticmethod
     def get_last_nonempty_value(values):
-        nonempty_values = [i for i in values if i and not (type(i) == float and math.isnan(i))]
+        nonempty_values = [
+            i for i in values if i and not (type(i) == float and math.isnan(i))
+        ]
         return nonempty_values[-1] if nonempty_values else None
 
     @staticmethod
     def get_name(names):
-        return PreprocessorHelper.get_last_nonempty_value(names)
+        name = PreprocessorHelper.get_last_nonempty_value(names)
+        return name
 
     @staticmethod
     def get_last_date(dates):
@@ -58,7 +62,7 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
             "get_if_forwarding_udf": self.get_if_forwarding_udf,
             "get_if_cospace_udf": self.get_if_cospace_udf,
             "get_max_udf": self.get_max_udf,
-            "get_mean_udf": self.get_mean_udf
+            "get_mean_udf": self.get_mean_udf,
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
@@ -116,11 +120,15 @@ class CallInfoPreprocessorHelper(PreprocessorHelper):
         for value in filtered:
             total = total + value
         size = len(values)
-        return float(total/size) if size else 0.0
-    
+        return float(total / size) if size else 0.0
+
     @staticmethod
     def __get_nonempty_values(values):
-        return [value for value in values if value and not (type(value) == float and math.isnan(value))]
+        return [
+            value
+            for value in values
+            if value and not (type(value) == float and math.isnan(value))
+        ]
 
 
 class RosterPreprocessorHelper(PreprocessorHelper):
@@ -196,7 +204,9 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         final = {field: list() for field in fields}
         for events in grouped:
             for field in fields:
-                current_value = RosterPreprocessorHelper.__get_current_value(events, field)
+                current_value = RosterPreprocessorHelper.__get_current_value(
+                    events, field
+                )
                 if current_value:
                     final[field].append(current_value)
 
@@ -208,8 +218,12 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         for state in final["state"]:
             final[state] = final[state] + 1
 
-        final["presenter_sum"] = RosterPreprocessorHelper.__count_true_values(final["presenter"])
-        final["activeSpeaker_sum"] = RosterPreprocessorHelper.__count_true_values(final["activeSpeaker"])
+        final["presenter_sum"] = RosterPreprocessorHelper.__count_true_values(
+            final["presenter"]
+        )
+        final["activeSpeaker_sum"] = RosterPreprocessorHelper.__count_true_values(
+            final["activeSpeaker"]
+        )
         final["endpointRecording_sum"] = RosterPreprocessorHelper.__count_true_values(
             final["endpointRecording"]
         )
@@ -242,7 +256,7 @@ class CallsPreprocessorHelper(PreprocessorHelper):
         self.get_first_date_udf = udf(self.__get_first_date, TimestampType())
         udf_func_dict = {
             "get_if_finished_udf": self.get_if_finished_udf,
-            "get_first_date_udf": self.get_first_date_udf
+            "get_first_date_udf": self.get_first_date_udf,
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])

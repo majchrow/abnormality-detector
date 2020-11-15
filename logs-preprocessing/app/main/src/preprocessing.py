@@ -353,5 +353,15 @@ class CallsPreprocessor(Preprocessor):
     def do_post_preprocessing(self, preprocessed):
         return preprocessed
 
-    def write_data(self, write_df, epoch_id):
-        self.write_to_cassandra(write_df)
+    def prepare_for_kafka(self, df):
+        return df.select(
+            func.to_json(
+                func.struct(
+                    "start_datetime",
+                    "last_update",
+                    "call_id",
+                    "finished",
+                    "name",
+                )
+            ).alias("value")
+        )
