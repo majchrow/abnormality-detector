@@ -7,7 +7,7 @@ class CassandraDAO:
     def __init__(self):
         self.session = None
         self.calls_table = None
-        self.monitored = set()
+        self.future = set()
 
     def init(self, cluster, keyspace, calls_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
@@ -37,24 +37,28 @@ class CassandraDAO:
             else:
                 current.append(call)
 
-        self.monitored = self.monitored.difference(
+        self.future = self.future.difference(
             set(self.__transform(lambda call: call[0]["name"], current))
         )
-        monitored = self.__transform(
-            lambda call: {"id": -1, "name": call}, list(self.monitored)
+        future = self.__transform(
+            lambda call: {"id": -1, "name": call}, list(self.future)
         )
 
         get_call_data = lambda call: call[0]
         current = self.__transform(get_call_data, current)
         recent = self.__transform(get_call_data, recent)
 
-        return {"current": current, "recent": recent, "monitored": monitored}
+        return {"current": current, "recent": recent, "future": future}
 
-    def add_to_monitored(self, name):
-        self.monitored.add(name)
+    def add_to_future(self, name):
+        self.future.add(name)
 
-    def remove_from_monitored(self, name):
-        self.monitored.remove(name)
+    def is_in_future(self, name):
+        return name in self.future
+
+    def remove_from_future(self, name):
+        if name in self.future:
+            self.future.remove(name)
 
     def conference_details(self, conf_id):
         result = self.session.execute(

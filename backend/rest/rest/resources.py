@@ -15,15 +15,17 @@ class Conferences(Resource):
         if not request.json or "name" not in request.json:
             return {"message": "invalid body"}, 400
         name = request.json["name"]
-        dao.add_to_monitored(name)
+        if dao.is_in_future(name):
+            return {"message": "confrence already added"}, 400
+        dao.add_to_future(name)
         return {"message": f"successfully added {name} to monitored conferences"}, 201
 
     @cross_origin()
     def delete(self):
-        if not request.json or "name" not in request.json:
-            return {"message": "invalid body"}, 400
-        name = request.json["name"]
-        dao.remove_from_monitored(name)
+        name = request.args.get("name", None)
+        if not name:
+            {"message": f"conference to remove is not specified"}, 400
+        dao.remove_from_future(name)
         return {
             "message": f"successfully removed {name} from monitored conferences"
         }, 200
