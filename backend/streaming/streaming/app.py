@@ -1,7 +1,8 @@
 import logging
 from aiohttp import web
 
-from .monitoring import setup_monitoring
+from .monitoring.config import Config
+from .monitoring.manager import setup_monitoring
 from .routes import setup_routes
 
 
@@ -19,7 +20,7 @@ def create_app():
 
     app = web.Application()
     setup_routes(app)
-    setup_monitoring(app)
+    setup_monitoring(app, config)
     return app
 
 

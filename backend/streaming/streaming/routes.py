@@ -12,7 +12,6 @@ def setup_routes(app: web.Application):
             allow_headers="*",
         )
     })
-
     # Get all criteria (defined by all received requests)
     cors.add(app.router.add_get('/monitoring/all', get_all_monitoring))
 
@@ -30,4 +29,3 @@ def setup_routes(app: web.Application):
 
     # Get notifications for criteria defined by a single request (for single conference or for all conferences)
     cors.add(app.router.add_get('/notifications', get_notifications))
-
