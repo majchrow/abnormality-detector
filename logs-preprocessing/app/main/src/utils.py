@@ -196,7 +196,9 @@ class RosterPreprocessorHelper(PreprocessorHelper):
         final = {field: list() for field in fields}
         for events in grouped:
             for field in fields:
-                final[field].append(RosterPreprocessorHelper.__get_current_value(events, field))
+                current_value = RosterPreprocessorHelper.__get_current_value(events, field)
+                if current_value:
+                    final[field].append(current_value)
 
         final["initial"] = 0
         final["connected"] = 0
@@ -237,8 +239,10 @@ class CallsPreprocessorHelper(PreprocessorHelper):
     def __init__(self, spark):
         PreprocessorHelper.__init__(self, spark)
         self.get_if_finished_udf = udf(self.__get_if_finished, BooleanType())
+        self.get_first_date_udf = udf(self.__get_first_date, TimestampType())
         udf_func_dict = {
-            "get_if_finished_udf": self.get_if_finished_udf
+            "get_if_finished_udf": self.get_if_finished_udf,
+            "get_first_date_udf": self.get_first_date_udf
         }
         for udf_func in udf_func_dict:
             spark.udf.register(udf_func, udf_func_dict[udf_func])
@@ -246,3 +250,9 @@ class CallsPreprocessorHelper(PreprocessorHelper):
     @staticmethod
     def __get_if_finished(values):
         return "remove" in values
+
+    @staticmethod
+    def __get_first_date(dates):
+        datetime_pattern = "%Y-%m-%dT%H:%M:%S.%f"
+        date = datetime.strptime(dates[0], datetime_pattern)
+        return date

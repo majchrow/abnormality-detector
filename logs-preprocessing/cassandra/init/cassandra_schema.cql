@@ -31,6 +31,7 @@ week_day_number int,
 name text,
 PRIMARY KEY (call_id, datetime));
 CREATE TABLE calls(call_id text PRIMARY KEY,
-datetime timestamp,
+start_datetime timestamp,
+last_update timestamp,
 name text,
 finished boolean);
