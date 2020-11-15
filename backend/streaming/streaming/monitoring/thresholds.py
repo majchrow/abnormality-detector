@@ -33,7 +33,7 @@ class ThresholdManager:
             task = MonitoringTask()
             self.monitoring_tasks[conf_name] = task
             task.update_criteria(criteria)
-            self.event_source.subscribe(conf_name, task.input_queue)
+            self.event_source.monitoring_subscribe(conf_name, task.input_queue)
             task.start()
         logging.info(f'{self.TAG}: scheduled monitoring for {conf_name if conf_name else "ALL"}')
 
@@ -53,7 +53,7 @@ class ThresholdManager:
 
     async def unschedule(self, conf_name: Optional[str]):
         if task := self.monitoring_tasks.get(conf_name, None):
-            self.event_source.unsubscribe(conf_name, task.input_queue)
+            self.event_source.monitoring_unsubscribe(conf_name, task.input_queue)
             del self.monitoring_tasks[conf_name]
             await task.stop()
             await task.output_queue.put(ThresholdManager.STREAM_FINISHED)
