@@ -8,6 +8,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY rest rest/
 
+ENV CASSANDRA_HOST=cassandra
+ENV CASSANDRA_PORT=9042
+ENV CASSANDRA_PASSWD=cassandra
+ENV CASSANDRA_USER=cassandra
+ENV KEYSPACE=test
+ENV CALLS_TABLE=calls
+
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_APP=rest/app:create_app
 
