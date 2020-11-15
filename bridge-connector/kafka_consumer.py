@@ -3,11 +3,14 @@ from aiokafka import AIOKafkaConsumer
 import asyncio
 import json
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 loop = asyncio.get_event_loop()
 
 async def consume():
     consumer = AIOKafkaConsumer(
-        'callListUpdate', 'callInfoUpdate', 'rosterUpdate',
+        'preprocessed_callListUpdate', 'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
         loop=loop, bootstrap_servers='localhost:9092'
     )
     await consumer.start()
@@ -15,7 +18,7 @@ async def consume():
         # Consume messages
         async for msg in consumer:
             msg = json.loads(msg.value)
-            print(msg)
+            logging.info(msg)
     finally:
         await consumer.stop()
 
