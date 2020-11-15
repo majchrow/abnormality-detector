@@ -14,7 +14,8 @@ def create_app():
         kafka_bootstrap_server='kafka:29092',
         kafka_topic_map={
             'preprocessed_callInfoUpdate': 'callInfoUpdate',
-            'preprocessed_rosterUpdate': 'rosterUpdate'
+            'preprocessed_rosterUpdate': 'rosterUpdate',
+            'preprocessed_callListUpdate': 'callListUpdate'
         }
     )
 
