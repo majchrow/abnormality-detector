@@ -22,6 +22,12 @@ async def send(messages):
         await producer.stop()
 
 messages = {
+    'preprocessed_callListUpdate': [
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": False, "start_datetime": "2020-06-02 07:35:31.701000+0000", 
+         "name": "[UJ] Chemia (GZ-B)", "last_update": "2020-06-02 07:35:31.701000+0000"},
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": True, "start_datetime": "2020-06-02 07:35:31.701000+0000", 
+         "name": "[UJ] Chemia (GZ-B)", "last_update": "2020-06-02 07:35:31.623000+0000"}
+    ],
     'preprocessed_callInfoUpdate': [
         {'time_diff': 123, 'name': 'Fizyka', 'recording': 1}
     ],
