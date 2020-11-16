@@ -4,30 +4,16 @@ from flask import request
 from marshmallow import ValidationError
 
 from .db import dao
-from .exceptions import AlreadyExistsError, NotFoundError
-from .schema import meeting_schema
+from .exceptions import NotFoundError
+from .schema import meeting_schema, meetings_schema
 
 
 class Conferences(Resource):
     @cross_origin()
     def get(self):
-        return dao.get_conferences()
-
-    @cross_origin()
-    def post(self):
-        json_data = request.get_json()
-        if not json_data:
-            return {"message": "No input data provided"}, 400
-        try:
-            data = meeting_schema.load(json_data)
-        except ValidationError as err:
-            return err.messages, 422
-
-        try:
-            dao.add_meeting(data['name'], data['criteria'])
-            return {"message": f"successfully added {data['name']} to monitored conferences"}, 201
-        except AlreadyExistsError:
-            return {"message": "meeting already added"}, 400
+        result = dao.get_conferences()
+        result['created'] = meetings_schema.loads(result['created'])
+        return result
 
     @cross_origin()
     def put(self):

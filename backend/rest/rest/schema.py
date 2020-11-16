@@ -28,3 +28,4 @@ class MeetingSchema(Schema):
 
 
 meeting_schema = MeetingSchema()
+meetings_schema = MeetingSchema(many=True)

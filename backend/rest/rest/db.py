@@ -1,7 +1,7 @@
-import logging
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 import datetime
+from flask import current_app
 
 
 class CassandraDAO:
@@ -16,8 +16,6 @@ class CassandraDAO:
         self.meetings_table = meetings_table
 
     def get_conferences(self):
-        return {"current": [], "recent": [], "future": []}
-
         result = self.session.execute(f"SELECT * FROM {self.calls_table}").all()
 
         calls = self.__transform(
@@ -41,45 +39,21 @@ class CassandraDAO:
             else:
                 current.append(call)
 
-        self.future = self.future.difference(
-            set(self.__transform(lambda call: call[0]["name"], current))
-        )
-        future = self.__transform(
-            lambda call: {"id": -1, "name": call}, list(self.future)
-        )
-
         current = self.__transform(lambda call: call[0], current)
         recent = self.__transform(lambda call: call[0], recent)
 
-        return {"current": current, "recent": recent, "future": future}
-
-    def add_meeting(self, name, criteria):
-        logging.info(f'{name}, {criteria}')
-        return
-        self.meetings[name] = criteria
+        created = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
+        return {"current": current, "recent": recent, "created": created}
 
     def update_meeting(self, name, criteria):
-        logging.info(f'{name}, {criteria}')
-
-        return
-        self.meetings[name] = criteria
+        self.session.execute(f"UPDATE {self.meetings_table} "
+                             f"SET criteria=%s "
+                             f"WHERE meeting_name=%s;", (criteria, name))
 
     def remove_meeting(self, name):
-        logging.info(f'{name}')
-        return
-        del self.meetings[name]
+        self.session.execute(f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,))
 
     # Oldies
-
-    def add_to_future(self, name):
-        self.future.add(name)
-
-    def is_in_future(self, name):
-        return name in self.future
-
-    def remove_from_future(self, name):
-        if name in self.future:
-            self.future.remove(name)
 
     def conference_details(self, conf_id):
         result = self.session.execute(
