@@ -3,6 +3,7 @@ import {Meeting} from '../class/meeting';
 import {MatDialog} from '@angular/material/dialog';
 import {ConfirmationDialogService} from '../../../services/confirmation-dialog.service';
 import {NotificationService} from '../../../services/notification.service';
+import {Options} from '@angular-slider/ngx-slider';
 
 @Component({
   selector: 'app-meeting-setting',
@@ -20,26 +21,40 @@ export class MeetingSettingComponent implements OnInit {
   ) {
   }
 
-  config: Map<string, any>;
+  config: Record<string, any> = {
+    time_diff: {checked: true}
+
+  };
+  value = 0;
+  highValue = 0;
 
   ngOnInit(): void {
-    this.config = new Map(this.meeting.config);
   }
 
 
   save() {
     this.dialogService.openConfirmDialog('Are you sure you want to save changes?')
       .afterClosed().subscribe(res => {
-        if (res) {
-          this.meeting.config = new Map(this.config);
-          this.notificationService.success('Saved successfully');
-          console.log(this.meeting);
-        }
+        console.log(res);
       }
     );
   }
 
-  onChange(key: string) {
-    this.config.set(key, !this.config.get(key));
+  test() {
+    console.log(this.config.time_diff.checked);
+  }
+
+  onChange(key: any) {
+    key.checked = !key.checked;
+  }
+
+  sliderOptions(): Options {
+    return {
+      floor: 0,
+      ceil: 300,
+      step: 5,
+      showTicks: false,
+      disabled: !this.config.time_diff.checked
+    };
   }
 }

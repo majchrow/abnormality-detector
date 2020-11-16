@@ -1,12 +1,12 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
-import {Meeting} from '../class/meeting';
+import {Meeting} from '../../class/meeting';
 
 @Component({
-  selector: 'app-meeting-card',
-  templateUrl: './meeting-card.component.html',
-  styleUrls: ['./meeting-card.component.scss']
+  selector: 'app-meeting-card-current',
+  templateUrl: './meeting-card-current.component.html',
+  styleUrls: ['./meeting-card-current.component.scss']
 })
-export class MeetingCardComponent implements OnInit {
+export class MeetingCardCurrentComponent implements OnInit {
 
   @Input() meeting: Meeting;
   @Output() deleteEmitter = new EventEmitter<Meeting>();
@@ -25,9 +25,4 @@ export class MeetingCardComponent implements OnInit {
   edit(event: MouseEvent) {
     console.log('edit');
   }
-
-  delete(event: MouseEvent) {
-    this.deleteEmitter.emit(this.meeting);
-  }
-
 }

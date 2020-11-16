@@ -1,13 +1,13 @@
 version: '3.7'
 services:
   backend-rest:
-    build: 
+    build:
       context: ./backend/rest
-    volumes: 
+    volumes:
       - ./backend/rest:/flask
     environment:
       FLASK_DEBUG: 1
-    ports: 
+    ports:
       - 5000:5000
     networks:
       - backend
@@ -24,22 +24,25 @@ services:
     networks:
       - backend
       - frontend
-    command: adev runserver -v -p 5000 streaming/app.py    
-    
+    command: adev runserver -v -p 5000 streaming/app.py
+
   frontend:
-      build:
-        context: ./frontend
-      volumes: 
-        - ./frontend/src:/angular/src
-        - ./frontend/package.json:/angular/package.json
-        - ./frontend/package-lock.json:/angular/package-lock.json
-      command: npm run dev
-      ports:
-        - 4200:4200
-      depends_on:
-        - backend-rest
-      networks:
-        - frontend
+    build:
+      context: ./frontend
+    volumes:
+      - ./frontend/src:/angular/src
+      - ./frontend/package.json:/angular/package.json
+      - ./frontend/package-lock.json:/angular/package-lock.json
+    command: npm run dev
+    ports:
+      - 4200:4200
+    depends_on:
+      - backend-rest
+    networks:
+      - frontend
+    links:
+      - "backend-streaming:bs"
+      - "backend-rest:br"
 
   cassandra:
     image: 'docker.io/bitnami/cassandra:3-debian-10'
@@ -59,7 +62,7 @@ services:
     depends_on:
       - cassandra
     volumes:
-      - ./logs-preprocessing/cassandra/init/cassandra_schema.cql:/schema.cql 
+      - ./logs-preprocessing/cassandra/init/cassandra_schema.cql:/schema.cql
     command: /bin/bash -c "sleep 60 && echo loading cassandra keyspace && cqlsh cassandra -u cassandra -p cassandra -f /schema.cql"
     networks:
       - preprocessing
@@ -75,7 +78,7 @@ services:
       - preprocessing
 
   kafka:
-    image: wurstmeister/kafka 
+    image: wurstmeister/kafka
     restart: on-failure
     ports:
       - "9092:9092"
@@ -146,7 +149,7 @@ services:
       - kafka
     networks:
       - preprocessing
-  
+
 volumes:
   cassandra_data:
     driver: local

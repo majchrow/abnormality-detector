@@ -1,19 +1,24 @@
 <mat-card [ngStyle]="{'width':'400' + 'px'}">
-  <mat-card-header style="justify-content: center;">
+  <mat-card-header style="justify-content: left">
     <mat-card-title>
-      {{ meeting.title }}
+      <div>
+        ID: {{ meeting.id }}
+      </div>
+      <div>
+        Name: {{ meeting.name }}
+      </div>
     </mat-card-title>
   </mat-card-header>
   <mat-card-content>
     <ul *ngFor="let content of meeting.content">
-        <li>
-          {{ content }}
-        </li>
+      <li>
+        {{ content }}
+      </li>
     </ul>
   </mat-card-content>
   <mat-card-actions fxLayout="row" fxLayoutAlign="end center">
     <i class="app-icon fa fa-cog" (click)="settings($event)"></i>
-    <i class="app-icon fa fa-pencil" (click)="edit($event)"></i>
+    <i class="app-icon fa fa-history"></i>
     <i class="app-icon fa fa-trash" (click)="delete($event)"></i>
   </mat-card-actions>
 </mat-card>

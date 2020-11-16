@@ -10,7 +10,8 @@ export class HeaderComponent implements OnInit {
 
   public href = '';
 
-  constructor(private router: Router) {
+  constructor(
+    private router: Router) {
   }
 
   ngOnInit(): void {
@@ -18,7 +19,6 @@ export class HeaderComponent implements OnInit {
   }
 
   navigate(value) {
-    console.log();
     this.router.navigate([`/${value}`]);
   }
 

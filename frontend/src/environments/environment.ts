@@ -3,7 +3,19 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
-  production: false
+  production: false,
+  backend: {
+    rest: {
+      url: 'http://172.19.0.3:5000', // TODO, how to pass linked service name without nginx
+      meetings: 'conferences',
+    },
+    sse: {
+      url: 'http://172.19.0.2:5001', // TODO
+      notification: 'notifications?conf_name=',
+      monitoring: 'monitoring',
+      all: 'notifications?conf_name=Fizyka' // TODO
+    }
+  }
 };
 
 /*

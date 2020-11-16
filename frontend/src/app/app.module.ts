@@ -3,7 +3,7 @@ import {NgModule} from '@angular/core';
 
 import {AppRoutingModule} from './app-routing.module';
 import {AppComponent} from './app.component';
-import {HeaderComponent} from './components/header/header.component';
+import {HeaderComponent} from './components/shared/header/header.component';
 import {HomeComponent} from './components/home/home.component';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatButtonModule} from '@angular/material/button';
@@ -16,9 +16,9 @@ import {SettingsComponent} from './components/settings/settings.component';
 import {FlexLayoutModule} from '@angular/flex-layout';
 import {MatPaginatorModule} from '@angular/material/paginator';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
-import {MeetingCardComponent} from './components/meetings/meeting-card/meeting-card.component';
+import {MeetingCardCurrentComponent} from './components/meetings/meeting-card/meeting-card-current/meeting-card-current.component';
 import {MatListModule} from '@angular/material/list';
-import {MatConfirmDialogComponent} from './components/mat-confirm-dialog/mat-confirm-dialog.component';
+import {MatConfirmDialogComponent} from './components/shared/mat-confirm-dialog/mat-confirm-dialog.component';
 import {MatDialogModule} from '@angular/material/dialog';
 import {MatSnackBarModule} from '@angular/material/snack-bar';
 import {MatSlideToggleModule} from '@angular/material/slide-toggle';
@@ -31,6 +31,13 @@ import {MeetingSettingComponent} from './components/meetings/meeting-setting/mee
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {HttpClientModule} from '@angular/common/http';
+import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {ProgressBarComponent} from './components/shared/progress-bar/progress-bar.component';
+import {NotificationComponent} from './components/shared/notification/notification.component';
+import {MeetingCardRecentComponent} from './components/meetings/meeting-card/meeting-card-recent/meeting-card-recent.component';
+import {MeetingCardFutureComponent} from './components/meetings/meeting-card/meeting-card-future/meeting-card-future.component';
+import {NgxSliderModule} from '@angular-slider/ngx-slider';
+import {MatCheckboxModule} from '@angular/material/checkbox';
 
 @NgModule({
   declarations: [
@@ -40,14 +47,18 @@ import {HttpClientModule} from '@angular/common/http';
     MeetingsComponent,
     LogsComponent,
     SettingsComponent,
-    MeetingCardComponent,
+    MeetingCardCurrentComponent,
     MatConfirmDialogComponent,
     LogComponent,
     PlotComponent,
     FirstCardComponent,
     SecondCardComponent,
     ThirdCardComponent,
-    MeetingSettingComponent
+    MeetingSettingComponent,
+    ProgressBarComponent,
+    NotificationComponent,
+    MeetingCardRecentComponent,
+    MeetingCardFutureComponent
   ],
   imports: [
     BrowserModule,
@@ -66,7 +77,10 @@ import {HttpClientModule} from '@angular/common/http';
     MatSnackBarModule,
     MatSlideToggleModule,
     MatFormFieldModule,
-    MatInputModule
+    MatInputModule,
+    MatProgressSpinnerModule,
+    NgxSliderModule,
+    MatCheckboxModule
   ],
   providers: [],
   bootstrap: [AppComponent]

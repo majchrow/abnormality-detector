@@ -1,17 +1,11 @@
 export class Meeting {
-  constructor(title: string, content: Array<string>) {
-    this.title = title;
-    this.content = content;
+  constructor(id: number, name: string) {
+    this.id = id;
+    this.name = name;
   }
 
-  title: string;
-  content: Array<string>;
-
-  config: Map<string, boolean> = new Map([
-    ['recording allowed', true],
-    ['streaming allowed', true],
-    ['one active speaker', false]
-  ]);
-
-
+  id: number;
+  name: string;
+  content: string[] = [];
+  config: Map<string, any> = new Map();
 }
