@@ -14,8 +14,9 @@ def create_app():
     passwd = os.environ["CASSANDRA_PASSWD"]
     keyspace = os.environ["KEYSPACE"]
     calls_table = os.environ["CALLS_TABLE"]
+    meetings_table = os.environ["MEETINGS_TABLE"]
     setup_resources(app)
-    setup_db(host, port, user, passwd, keyspace, calls_table)
+    setup_db(host, port, user, passwd, keyspace, calls_table, meetings_table)
     CORS(app)
     return app
 

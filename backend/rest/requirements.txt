@@ -3,3 +3,4 @@ Flask-RESTful==0.3.8
 Flask-CORS==3.0.9
 Flask-Cassandra==0.14
 cassandra-driver==3.24.0
+marshmallow==3.9.1

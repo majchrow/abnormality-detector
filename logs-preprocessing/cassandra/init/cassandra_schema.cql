@@ -35,3 +35,4 @@ start_datetime timestamp,
 last_update timestamp,
 name text,
 finished boolean);
+CREATE TABLE meetings(meeting_name text PRIMARY KEY, criteria text);

@@ -1,17 +1,19 @@
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 import datetime
+from flask import current_app
 
 
 class CassandraDAO:
     def __init__(self):
         self.session = None
         self.calls_table = None
-        self.future = set()
+        self.meetings_table = None
 
-    def init(self, cluster, keyspace, calls_table):
+    def init(self, cluster, keyspace, calls_table, meetings_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
         self.calls_table = calls_table
+        self.meetings_table = meetings_table
 
     def get_conferences(self):
         result = self.session.execute(f"SELECT * FROM {self.calls_table}").all()
@@ -37,28 +39,21 @@ class CassandraDAO:
             else:
                 current.append(call)
 
-        self.future = self.future.difference(
-            set(self.__transform(lambda call: call[0]["name"], current))
-        )
-        future = self.__transform(
-            lambda call: {"id": -1, "name": call}, list(self.future)
-        )
+        current = self.__transform(lambda call: call[0], current)
+        recent = self.__transform(lambda call: call[0], recent)
 
-        get_call_data = lambda call: call[0]
-        current = self.__transform(get_call_data, current)
-        recent = self.__transform(get_call_data, recent)
+        created = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
+        return {"current": current, "recent": recent, "created": created}
 
-        return {"current": current, "recent": recent, "future": future}
+    def update_meeting(self, name, criteria):
+        self.session.execute(f"UPDATE {self.meetings_table} "
+                             f"SET criteria=%s "
+                             f"WHERE meeting_name=%s;", (criteria, name))
 
-    def add_to_future(self, name):
-        self.future.add(name)
+    def remove_meeting(self, name):
+        self.session.execute(f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,))
 
-    def is_in_future(self, name):
-        return name in self.future
-
-    def remove_from_future(self, name):
-        if name in self.future:
-            self.future.remove(name)
+    # Oldies
 
     def conference_details(self, conf_id):
         result = self.session.execute(
@@ -91,7 +86,7 @@ class CassandraDAO:
 dao = CassandraDAO()
 
 
-def setup_db(host, port, user, passwd, keyspace, calls_table):
+def setup_db(host, port, user, passwd, keyspace, calls_table, meetings_table):
     auth_provider = PlainTextAuthProvider(username=user, password=passwd)
     cassandra = Cluster([host], port=port, auth_provider=auth_provider)
-    dao.init(cassandra, keyspace, calls_table)
+    dao.init(cassandra, keyspace, calls_table, meetings_table)
