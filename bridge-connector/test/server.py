@@ -11,7 +11,7 @@ from itertools import cycle
 from pprint import pformat
 from typing import Dict, List
 
-MSG_INTERVAL_S = 2
+MSG_INTERVAL_S = 1
 
 # Notes:
 #  - acknowledgements and subscriptionUpdates are ignored and not sent at all

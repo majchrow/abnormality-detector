@@ -86,11 +86,8 @@ class Client:
 
         msg_type = msg_dict["message"]["type"]
         if msg_type == "callListUpdate":
-            updates = msg_dict["message"]["updates"]
-            for update in updates:
-                await self.on_calls_update(update)
-                await self.call_manager.dump(msg_dict)
-                await self.publish(msg_dict, msg_type)
+            await self.call_manager.dump(msg_dict)
+            await self.on_calls_update(msg_dict)
         elif msg_type == "callInfoUpdate" or msg_type == "rosterUpdate":
             index = msg_dict["message"]["subscriptionIndex"]
             if index in self.subscriptions:
@@ -139,29 +136,45 @@ class Client:
 
         await self.call_manager.publish(msg_dict)
 
-    async def on_calls_update(self, update):
-        update_type = update["updateType"]
-        call_id = update["call"]
+    async def on_calls_update(self, msg_dict):
+        updates = msg_dict["message"]["updates"]
+        published = False
 
-        if update_type == 'add':
-            call_name = update["name"]
-            await self.call_manager.on_add_call(call_name, call_id, self)
-        elif update_type == 'update':
-            await self.call_manager.on_update_call(call_id, self)
-        elif update_type == 'remove':
-            if call_id in self.call_ids:
-                call = self.call_ids[call_id]
-                s_ind = call.ci_subscription_index
+        for update in updates:
+            update_type = update["updateType"]
+            call_id = update["call"]
 
-                del self.subscriptions[s_ind]
-                del self.subscriptions[s_ind + 1]
-                del self.call_ids[call_id]
+            if update_type == 'add':
+                call_name = update["name"]
+                await self.call_manager.on_add_call(call_name, call_id, self)
 
-                # TODO: should we subscribe again immediately?
-                await self.call_manager.on_remove_call(call_id, self)
-                logging.info(f'{self.TAG}: removed call {call.name} with ID {call_id}')
-        else:
-            logging.warning(f'{self.TAG}: received calls update of type {update_type}')
+                if not published and call_id in self.call_ids:
+                    await self.publish(msg_dict, 'callListUpdate')
+                    published = True
+            elif update_type == 'update':
+                await self.call_manager.on_update_call(call_id, self)
+
+                if not published and call_id in self.call_ids:
+                    await self.publish(msg_dict, 'callListUpdate')
+                    published = True
+            elif update_type == 'remove':
+                if call_id in self.call_ids:
+                    if not published:
+                        await self.publish(msg_dict, 'callListUpdate')
+                        published = True
+
+                    call = self.call_ids[call_id]
+                    s_ind = call.ci_subscription_index
+
+                    del self.subscriptions[s_ind]
+                    del self.subscriptions[s_ind + 1]
+                    del self.call_ids[call_id]
+
+                    # TODO: should we subscribe again immediately?
+                    await self.call_manager.on_remove_call(call_id, self)
+                    logging.info(f'{self.TAG}: removed call {call.name} with ID {call_id}')
+            else:
+                logging.warning(f'{self.TAG}: received calls update of type {update_type}')
 
     async def on_connect_to(self, call_name, call_id):
         # Setup subscription indexes for call info and roster info
@@ -188,4 +201,3 @@ class Client:
         request = subscription_request(subscriptions, self.message_id)
         await self.ws.send(json.dumps(request))
         self.message_id += 1
-
