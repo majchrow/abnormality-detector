@@ -1,6 +1,5 @@
 from datetime import datetime
 
-
 param_types = {
     "time_diff": {"min": int, "max": int},
     "max_participants": int,
@@ -37,7 +36,7 @@ def validate_elem_of_days_list(elem):
         msg = "Wrong type value: {} in \"days\" ---> {}  is not {}".format(
             str(elem), type_of(type_class=type(elem)), type_of(type_class=param_types["days"][0])
         )
-        wrong_constraints.append({"parameter": "days", "type": "value","message": msg})
+        wrong_constraints.append({"parameter": "days", "type": "value", "message": msg})
     else:
         if len(elem) > 0:
             wrong_flag = False
@@ -62,6 +61,13 @@ def validate_elem_of_days_list(elem):
                                 type_of(type_class=param_types["week_day_number"])
                             )
                             wrong_constraints.append({"parameter": "days", "type": "value", "message": msg})
+
+                        if isinstance(elem["day"], int):
+                            if elem["day"] < 1 or elem["day"] > 7:
+                                wrong_constraints.append({"parameter": "days", "type": "value",
+                                                          "message": "Wrong type value: " + str(
+                                                              elem["day"]) + " ---> " + str(
+                                                              elem["day"]) + " is not from 1 to 7"})
         else:
             wrong_constraints.append({"parameter": "days", "type": "value",
                                       "message": "Wrong value: {}  in \"days\" ---> is empty".format(str(elem))})
@@ -182,6 +188,10 @@ def validate(criteria):
                 wrong_constraints.append({"parameter": p, "type": "value",
                                           "message": "Wrong type value: " + str(c) + " ---> " + type_of(
                                               type_class=type(c)) + " is not " + type_of(type_class=param_types[p])})
+            if isinstance(c, int):
+                if c < 0:
+                    wrong_constraints.append({"parameter": p, "type": "value",
+                                              "message": "Wrong type value: " + str(c) + " ---> " + str(c) + " <0"})
         else:
             wrong_constraints.append({"parameter": p, "type": "parameter",
                                       "message": "Wrong parameter name: " + str(p) + " ---> \"" + str(
