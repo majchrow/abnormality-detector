@@ -44,9 +44,10 @@ class ClientManager:
         self.calls = {}
         self.dump_queue = Queue()
         self.publish_queue = Queue()
-        
-        os.makedirs(os.path.dirname(config.dumpfile), exist_ok=True)
-        if config.kafka_file:
+
+        if os.path.dirname(config.dumpfile):        
+            os.makedirs(os.path.dirname(config.dumpfile), exist_ok=True)
+        if config.kafka_file and os.path.dirname(config.kafka_file):
             os.makedirs(os.path.dirname(config.kafka_file), exist_ok=True)
 
     def start(self):
