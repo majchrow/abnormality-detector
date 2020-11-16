@@ -54,7 +54,7 @@ def check_roster(data_roster, criteria):
                                 datetime.strptime(max_hour, '%H:%M:%S') < datetime.strptime(curr_hour, '%H:%M:%S')):
                             anomalies.append(("days", curr_hour))
 
-    return (1, anomalies) if len(anomalies) > 0 else (0, [("", "")])
+    return anomalies
 
 
 def check_call_info(data_call_info, criteria):
@@ -125,77 +125,4 @@ def check_call_info(data_call_info, criteria):
                                 datetime.strptime(max_hour, '%H:%M:%S') < datetime.strptime(curr_hour, '%H:%M:%S')):
                             anomalies.append(("days", curr_hour))
 
-    return (1, anomalies) if len(anomalies) > 0 else (0, [("", "")])
-
-
-admin_constraints = [
-    {
-        "parameter": "time_diff",
-        "conditions": {
-            "min": 0,
-            "max": 42,
-        }
-    },
-    {
-        "parameter": "max_participants",
-        "conditions": 2
-    },
-    {
-        "parameter": "active_speaker",
-        "conditions": 2
-    },
-    {
-        "parameter": "days",
-        "conditions": [
-            {
-                "day": 2,
-                "min_hour": "06:00",
-                "max_hour": "06:11",
-            },
-            {
-                "day": 1,
-                "min_hour": "05:00",
-                "max_hour": "20:30"
-            }
-        ]
-    }
-]
-
-
-data_roster = {
-    "datetime": "2020-06-08 06:11:24.794+0000",
-    "call_id": "id121212",
-    "initial": 0,
-    "ringing": 1,
-    "connected": 10,
-    "onhold": 2,
-    "active_speaker": 10,
-    "presenter": 2,
-    "endpoint_recording": 3,
-    "hour": 10,
-    "week_day_number": 3,
-    "name": "name1"
-}
-
-data_call_info = {
-    "adhoc": False,
-    "call_id": "id12312e",
-    "cospace": False,
-    "current_participants": 10,
-    "datetime": "2020-06-08 06:11:24.794+0000",
-    "forwarding": True,
-    "hour": 10,
-    "locked": False,
-    "lync_conferencing": True,
-    "max_participants": 20,
-    "mean_participants": 10.5,
-    "recording": False,
-    "streaming": True,
-    "time_diff": 20000,
-    "week_day_number": 4,
-    "name": "name"
-}
-
-
-#print(check_roster(data_roster=data_roster, criteria=admin_constraints))
-#print(check_call_info(data_call_info=data_call_info, criteria=admin_constraints))
+    return anomalies

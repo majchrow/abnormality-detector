@@ -21,8 +21,11 @@ async def schedule_monitoring(request):
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
 
     manager = request.app['monitoring']
-    await manager.schedule(conf_name, payload)
-    return web.Response()
+    try:
+        await manager.schedule(conf_name, payload)
+        return web.Response()
+    except ValueError as e:
+        return web.HTTPBadRequest(reason=str(e))
 
 
 async def cancel_monitoring(request):

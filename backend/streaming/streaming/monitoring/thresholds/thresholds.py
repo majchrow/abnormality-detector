@@ -59,8 +59,6 @@ class MonitoringTask:
         self.task.cancel()
         await self.task
 
-    # TODO:
-    #  2 things - what's returned on no anomalies + stitch together both validations
     async def _run(self):
         # TODO: better error handling
         try:
