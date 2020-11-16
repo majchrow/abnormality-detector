@@ -6,7 +6,7 @@ from aiokafka import AIOKafkaConsumer
 from asyncio import Queue
 from contextlib import contextmanager
 
-from ..exceptions import UnmonitoredError
+from ..exceptions import MonitoringNotSupportedError, UnmonitoredError
 from .thresholds import ThresholdManager
 
 
@@ -34,29 +34,42 @@ class Manager:
     def calls_receiver(self):
         queue = Queue()
 
-        async def _receiver():
+        async def _listen():
             self.kafka_manager.call_event_subscribe(queue)
             while True:
                 msg = await queue.get()
                 yield msg
 
         try:
-            yield _receiver
+            yield _listen
         finally:
             self.kafka_manager.call_event_unsubscribe(queue)
 
     def monitoring_receiver(self, call_name, monitoring_type: str):
-        if monitoring_type == 'threshold':
-            if not (task := self.threshold_manager.monitoring_tasks.get(call_name, None)):
-                raise UnmonitoredError()
+        task = self.threshold_manager.monitoring_tasks.get(call_name, None)
+        if not task:
+            raise UnmonitoredError()
+        if monitoring_type != 'threshold':
+            raise MonitoringNotSupportedError()
 
-            async def _receiver():
+        @contextmanager
+        def _listen_manager():
+            queue = Queue()
+
+            async def _listen():
+                task.subscribe(queue)
                 while True:
-                    msg = await task.output_queue.get()
+                    msg = await queue.get()
                     if msg == ThresholdManager.STREAM_FINISHED:
                         break
                     yield msg
-            return _receiver
+
+            try:
+                yield _listen
+            finally:
+                task.unsubscribe(queue)
+
+        return _listen_manager
 
     async def shutdown(self):
         await self.threshold_manager.shutdown()
@@ -110,7 +123,7 @@ class KafkaManager:
                 if not (sinks := self.monitoring_event_sinks.get(msg_dict['name'], set())):
                     continue
 
-                logging.info(f'pushing {msg_dict} from topic {topic} to {len(sinks)} monitors')
+                logging.info(f'{self.TAG}: pushing {msg_dict} from topic {topic} to {len(sinks)} monitors')
                 for queue in sinks:
                     queue.put_nowait((topic, msg_dict))
         finally:
@@ -122,7 +135,7 @@ class KafkaManager:
 
     def call_event_unsubscribe(self, queue):
         if queue in self.call_event_sinks:
-            self.call_event_sinks.discard(queue)
+            self.call_event_sinks.remove(queue)
             logging.info(f'{self.TAG}: unregistered call event subscriber')
         else:
             logging.info(f'{self.TAG}: "unsubscribe call events" attempt - subscriber not found')
@@ -141,7 +154,7 @@ class KafkaManager:
         else:
             try:
                 sinks.remove(queue)
-                logging.info(f'{self.TAG}: unregistered subscriber for {conf_name}, size {len(sinks)}')
+                logging.info(f'{self.TAG}: unregistered subscriber for {conf_name}')
                 if not sinks:
                     del self.monitoring_event_sinks[conf_name]
             except KeyError:
