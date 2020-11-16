@@ -5,14 +5,14 @@ from marshmallow import ValidationError
 
 from .db import dao
 from .exceptions import NotFoundError
-from .schema import meeting_schema, meetings_schema
+from .schema import meeting_schema
 
 
 class Conferences(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
-        result['created'] = meetings_schema.loads(result['created'])
+        result['created'] = [meeting_schema.dump(meeting) for meeting in result['created']]
         return result
 
     @cross_origin()
