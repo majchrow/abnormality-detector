@@ -1,20 +1,11 @@
 import asyncio
 import logging
 from asyncio import Queue
-from typing import Literal, Optional
+from typing import Dict, List, Literal, Optional
 
-from ..exceptions import UnmonitoredError
-
-
-class Monitor:
-    def __init__(self):
-        self.criteria = None
-
-    def set_criteria(self, criteria: dict):
-        self.criteria = criteria
-
-    def verify(self, topic: Literal['callInfoUpdate', 'rosterUpdate'], msg: dict):
-        return f'Implement me! {topic} {msg} {self.criteria}'
+from ...exceptions import UnmonitoredError
+from .check import check_call_info, check_roster
+from .validation import validate
 
 
 class ThresholdManager:
@@ -31,25 +22,11 @@ class ThresholdManager:
             task.update_criteria(criteria)
         else:
             task = MonitoringTask()
-            self.monitoring_tasks[conf_name] = task
             task.update_criteria(criteria)
+            self.monitoring_tasks[conf_name] = task
             self.event_source.monitoring_subscribe(conf_name, task.input_queue)
             task.start()
         logging.info(f'{self.TAG}: scheduled monitoring for {conf_name if conf_name else "ALL"}')
-
-    def get_criteria(self, conf_name: Optional[str]):
-        logging.info(f'{self.TAG}: getting criteria for {conf_name if conf_name else "ALL"}')
-        if task := self.monitoring_tasks.get(conf_name, None):
-            return task.checker.criteria
-        return None
-
-    def get_all_criteria(self):
-        return [
-            {
-                "conf_name": conf_name,
-                "criteria": task.checker.criteria
-            } for conf_name, task in self.monitoring_tasks.items()
-        ]
 
     async def unschedule(self, conf_name: Optional[str]):
         if task := self.monitoring_tasks.get(conf_name, None):
@@ -96,3 +73,16 @@ class MonitoringTask:
 
     def update_criteria(self, criteria):
         self.checker.set_criteria(criteria)
+
+
+class Monitor:
+    def __init__(self):
+        self.criteria = None
+
+    def set_criteria(self, criteria: List[Dict]):
+
+        self.criteria = criteria
+
+    def verify(self, topic: Literal['callInfoUpdate', 'rosterUpdate'], msg: dict):
+        return f'Implement me! {topic} {msg} {self.criteria}'
+

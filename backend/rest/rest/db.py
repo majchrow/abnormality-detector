@@ -44,9 +44,8 @@ class CassandraDAO:
             lambda call: {"id": -1, "name": call}, list(self.future)
         )
 
-        get_call_data = lambda call: call[0]
-        current = self.__transform(get_call_data, current)
-        recent = self.__transform(get_call_data, recent)
+        current = self.__transform(lambda call: call[0], current)
+        recent = self.__transform(lambda call: call[0], recent)
 
         return {"current": current, "recent": recent, "future": future}
 

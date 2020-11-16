@@ -1,6 +1,6 @@
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
-from flask import current_app, request
+from flask import request
 
 from .db import dao
 
@@ -16,7 +16,7 @@ class Conferences(Resource):
             return {"message": "invalid body"}, 400
         name = request.json["name"]
         if dao.is_in_future(name):
-            return {"message": "confrence already added"}, 400
+            return {"message": "conference already added"}, 400
         dao.add_to_future(name)
         return {"message": f"successfully added {name} to monitored conferences"}, 201
 
@@ -24,7 +24,7 @@ class Conferences(Resource):
     def delete(self):
         name = request.args.get("name", None)
         if not name:
-            {"message": f"conference to remove is not specified"}, 400
+            return {"message": f"conference to remove is not specified"}, 400
         dao.remove_from_future(name)
         return {
             "message": f"successfully removed {name} from monitored conferences"
