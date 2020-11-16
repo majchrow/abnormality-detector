@@ -1,50 +1,41 @@
 from datetime import datetime
 
 
-data_templates = [
-    ('data_roster_template', {
-        "datetime": type(str()),
-        "active_speaker": type(int()),
-        "week_day_number": type(int()),
-        "days": [type(dict())]
-    }),
-    ('data_call_info_template', {
-        "time_diff": {"min": type(int()), "max": type(int())},
-        "max_participants": type(int()),
-        "recording": type(bool()),
-        "streaming": type(bool()),
-        "datetime": type(str()),
-        "week_day_number": type(int()),
-        "days": [type(dict())]
-    })
-]
+param_types = {
+    "time_diff": {"min": int, "max": int},
+    "max_participants": int,
+    "recording": bool,
+    "streaming": bool,
+    "active_speaker": int,
+    "datetime": str,
+    "week_day_number": int,
+    "days": [dict]
+}
 
 
 def valid_time(date_text):
-    if len(date_text) == 8:
-        try:
-            datetime.strptime(date_text, '%H:%M:%S')
-        except ValueError:
+    try:
+        if len(date_text) == 8:
+            fmt = '%H:%M:%S'
+        elif len(date_text) == 5:
+            fmt = '%H:%M'
+        else:
             return False
-    elif len(date_text) == 5:
-        try:
-            datetime.strptime(date_text, '%H:%M')
-        except ValueError:
-            return False
-    else:
+        datetime.strptime(date_text, fmt)
+        return True
+    except ValueError:
         return False
-    return True
 
 
 def type_of(type_class):
     return str(type_class).split(" ")[1][1:-2]
 
 
-def validate_elem_of_days_list(elem, data_template):
+def validate_elem_of_days_list(elem):
     wrong_constraints = []
-    if type(elem) != data_template["days"][0]:
-        msg = "Wrong type value: %s in \"days\" ---> %s  is not %s".format(
-            str(elem), type_of(type_class=type(elem)), type_of(type_class=data_template["days"][0])
+    if type(elem) != param_types["days"][0]:
+        msg = "Wrong type value: {} in \"days\" ---> {}  is not {}".format(
+            str(elem), type_of(type_class=type(elem)), type_of(type_class=param_types["days"][0])
         )
         wrong_constraints.append({"parameter": "days", "type": "value","message": msg})
     else:
@@ -53,7 +44,7 @@ def validate_elem_of_days_list(elem, data_template):
             for x in elem.keys():
                 if x not in ["min_hour", "max_hour", "day"]:
                     wrong_flag = True
-                    msg = ('Wrong value: %s in "days" ---> right value is: '
+                    msg = ('Wrong value: {} in "days" ---> right value is: '
                            '{"day": x, "min_hour": y, "max_hour": z} with '
                            'min_hour, max_hour optional').format(str(x))
                     wrong_constraints.append({"parameter": "days", "type": "value", "message": msg})
@@ -65,19 +56,19 @@ def validate_elem_of_days_list(elem, data_template):
                                    '{} is neither "%H:%M:%S" nor "%H:%M"').format(y, elem[y])
                             wrong_constraints.append({"parameter": "days", "type": "value", "message": msg})
                     else:
-                        if type(elem["day"]) != data_template["week_day_number"]:
+                        if type(elem["day"]) != param_types["week_day_number"]:
                             msg = 'Wrong type value: {} in "days" ---> {} is not {}'.format(
                                 elem["day"], type_of(type_class=type(elem["day"])),
-                                type_of(type_class=data_template["week_day_number"])
+                                type_of(type_class=param_types["week_day_number"])
                             )
                             wrong_constraints.append({"parameter": "days", "type": "value", "message": msg})
         else:
             wrong_constraints.append({"parameter": "days", "type": "value",
-                                      "message": "Wrong value: %s  in \"days\" ---> is empty".format(str(elem))})
+                                      "message": "Wrong value: {}  in \"days\" ---> is empty".format(str(elem))})
     return wrong_constraints
 
 
-def days_form(cond_list, data_template):
+def days_form(cond_list):
     wrong_constraints = []
     day_list = []
     if len(cond_list) == 0:
@@ -85,13 +76,13 @@ def days_form(cond_list, data_template):
                                   "message": "Wrong type value: \"days\" is empty"})
 
     if len(cond_list) == 1:
-        wrong_constraints.extend(validate_elem_of_days_list(elem=cond_list[0], data_template=data_template))
+        wrong_constraints.extend(validate_elem_of_days_list(elem=cond_list[0]))
 
     else:
         for e in cond_list:
             if "day" in e.keys():
                 day_list.append(e["day"])
-                wrong_constraints.extend(validate_elem_of_days_list(elem=e, data_template=data_template))
+                wrong_constraints.extend(validate_elem_of_days_list(elem=e))
             else:
                 wrong_constraints.append({
                     "parameter": "days",
@@ -107,19 +98,19 @@ def days_form(cond_list, data_template):
     return wrong_constraints
 
 
-def validate_with_template(data_template, criteria, template_name):
+def validate(criteria):
     wrong_constraints = []
-    keys_template = list(data_template.keys())
+    params = list(param_types.keys())
 
     for e in criteria:
         p = e["parameter"]
-        if template_name == "call_info" and p == "time_diff":
+        if p == "time_diff":
             c = e["conditions"]
-            if type(c) != type(data_template[p]):
+            if not isinstance(c, type(param_types[p])):
                 wrong_constraints.append({"parameter": p, "type": "value",
                                           "message": f"Wrong type value: {c} ---> " + type_of(
                                               type_class=type(c)) + " is not " + type_of(
-                                              type_class=type(data_template[p]))})
+                                              type_class=type(param_types[p]))})
             else:
                 mi = -1
                 ma = -1
@@ -153,12 +144,12 @@ def validate_with_template(data_template, criteria, template_name):
                 if len(right_param) == 2:
                     OK = 0
                     for mima in right_param:
-                        if type(c[mima]) != data_template["time_diff"][mima]:
+                        if type(c[mima]) != param_types["time_diff"][mima]:
                             wrong_constraints.append({"parameter": p, "type": "value",
                                                       "message": "Wrong type value: " + mima + " in " + str(
                                                           c) + " ---> " + type_of(type_class=
                                                                                   type(c[mima])) + " is not " + type_of(
-                                                          type_class=data_template["time_diff"][mima])})
+                                                          type_class=param_types["time_diff"][mima])})
                         else:
                             OK = OK + 1
                     if OK == 2:
@@ -178,63 +169,24 @@ def validate_with_template(data_template, criteria, template_name):
                                                       c[right_param[0]]) + " ---> " + right_param[0] + " >= 0"})
         elif p == "days":
             c = e["conditions"]
-            if type(c) != type(data_template[p]):
+            if type(c) != type(param_types[p]):
                 wrong_constraints.append({"parameter": p, "type": "value",
                                           "message": "Wrong type value: " + str(c) + " ---> " + type_of(
                                               type_class=type(c)) + " is not " + type_of(
-                                              type_class=type(data_template[p]))})
+                                              type_class=type(param_types[p]))})
             else:
-                wrong_constraints.extend(days_form(cond_list=c, data_template=data_template))
-        elif p in keys_template:
+                wrong_constraints.extend(days_form(cond_list=c))
+        elif p in params:
             c = e["conditions"]
-            if type(c) != data_template[p]:
+            if type(c) != param_types[p]:
                 wrong_constraints.append({"parameter": p, "type": "value",
                                           "message": "Wrong type value: " + str(c) + " ---> " + type_of(
-                                              type_class=type(c)) + " is not " + type_of(type_class=data_template[p])})
+                                              type_class=type(c)) + " is not " + type_of(type_class=param_types[p])})
         else:
             wrong_constraints.append({"parameter": p, "type": "parameter",
                                       "message": "Wrong parameter name: " + str(p) + " ---> \"" + str(
-                                          p) + "\" not exist in " + template_name})
+                                          p) + "\" not handled"})
 
     if wrong_constraints:
         raise ValueError(wrong_constraints)
     return True
-
-
-admin_constraints = [
-    {
-        "parameter": "time_diff",
-        "conditions": {
-            "min": 0,
-            "max": 42,
-        }
-    },
-    {
-        "parameter": "max_participants",
-        "conditions": 2
-    },
-    {
-        "parameter": "days",
-        "conditions": [
-            {
-                "day": 2,
-                "min_hour": "06:00",
-                "max_hour": "06:11",
-            },
-            {
-                "day": 1,
-                "min_hour": "05:00",
-                "max_hour": "20:30"
-            }
-        ]
-    }
-]
-
-
-def validate(criteria):
-    for name, template in data_templates:
-        validate_with_template(template, criteria, name)
-
-
-#print(validate(data_template=data_call_info_template, criteria=admin_constraints, template_name="call_info"))
-#print(validate(data_template=data_roster_template, criteria=admin_constraints, template_name="roster"))

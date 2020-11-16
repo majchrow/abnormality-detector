@@ -49,8 +49,7 @@ class MonitoringTask:
     def __init__(self):
         self.input_queue = Queue()
         self.output_queue = Queue()
-        self.checker = Monitor()
-
+        self.criteria = None
         self.task = None
 
     def start(self):
@@ -60,29 +59,25 @@ class MonitoringTask:
         self.task.cancel()
         await self.task
 
+    # TODO:
+    #  2 things - what's returned on no anomalies + stitch together both validations
     async def _run(self):
         # TODO: better error handling
         try:
             while True:
                 topic, msg = await self.input_queue.get()
-                result = self.checker.verify(topic, msg)
+                if topic == 'callInfoUpdate':
+                    result = check_call_info(msg, self.criteria)
+                elif topic == 'rosterUpdate':
+                    result = check_roster(msg, self.criteria)
+                else:
+                    result = None
+
                 if result:
                     await self.output_queue.put(result)
         except asyncio.CancelledError:
             pass
 
     def update_criteria(self, criteria):
-        self.checker.set_criteria(criteria)
-
-
-class Monitor:
-    def __init__(self):
-        self.criteria = None
-
-    def set_criteria(self, criteria: List[Dict]):
-
+        validate(criteria)  # throws ValueError
         self.criteria = criteria
-
-    def verify(self, topic: Literal['callInfoUpdate', 'rosterUpdate'], msg: dict):
-        return f'Implement me! {topic} {msg} {self.criteria}'
-
