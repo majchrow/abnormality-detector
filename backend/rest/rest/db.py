@@ -1,3 +1,4 @@
+import logging
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 import datetime
@@ -7,13 +8,16 @@ class CassandraDAO:
     def __init__(self):
         self.session = None
         self.calls_table = None
-        self.future = set()
+        self.meetings_table = None
 
-    def init(self, cluster, keyspace, calls_table):
+    def init(self, cluster, keyspace, calls_table, meetings_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
         self.calls_table = calls_table
+        self.meetings_table = meetings_table
 
     def get_conferences(self):
+        return {"current": [], "recent": [], "future": []}
+
         result = self.session.execute(f"SELECT * FROM {self.calls_table}").all()
 
         calls = self.__transform(
@@ -48,6 +52,24 @@ class CassandraDAO:
         recent = self.__transform(lambda call: call[0], recent)
 
         return {"current": current, "recent": recent, "future": future}
+
+    def add_meeting(self, name, criteria):
+        logging.info(f'{name}, {criteria}')
+        return
+        self.meetings[name] = criteria
+
+    def update_meeting(self, name, criteria):
+        logging.info(f'{name}, {criteria}')
+
+        return
+        self.meetings[name] = criteria
+
+    def remove_meeting(self, name):
+        logging.info(f'{name}')
+        return
+        del self.meetings[name]
+
+    # Oldies
 
     def add_to_future(self, name):
         self.future.add(name)
@@ -90,7 +112,7 @@ class CassandraDAO:
 dao = CassandraDAO()
 
 
-def setup_db(host, port, user, passwd, keyspace, calls_table):
+def setup_db(host, port, user, passwd, keyspace, calls_table, meetings_table):
     auth_provider = PlainTextAuthProvider(username=user, password=passwd)
     cassandra = Cluster([host], port=port, auth_provider=auth_provider)
-    dao.init(cassandra, keyspace, calls_table)
+    dao.init(cassandra, keyspace, calls_table, meetings_table)
