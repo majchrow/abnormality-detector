@@ -5,7 +5,10 @@ from aiohttp_sse import sse_response
 
 from .exceptions import MonitoringNotSupportedError, UnmonitoredError
 
-__all__ = ['schedule_monitoring', 'cancel_monitoring', 'get_call_info_notifications', 'get_monitoring_notifications']
+__all__ = [
+    'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored', 'get_call_info_notifications',
+    'get_monitoring_notifications'
+]
 
 
 # TODO:
@@ -43,6 +46,19 @@ async def cancel_monitoring(request):
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
     except MonitoringNotSupportedError:
         raise web.HTTPBadRequest(reason=f'{monitoring_type} is not supported!')
+
+
+async def get_all_monitoring(request):
+    manager = request.app['monitoring']
+    return web.json_response({'monitored': manager.get_all_monitored()})
+
+
+async def is_monitored(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='No conference name given')
+
+    manager = request.app['monitoring']
+    return web.json_response({'monitored': manager.is_monitored(conf_name)})
 
 
 async def get_monitoring_notifications(request):
