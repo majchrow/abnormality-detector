@@ -16,15 +16,20 @@ export class MeetingsService {
   constructor(private http: HttpClient) {
   }
 
+
   put_meeting(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.meetings}`;
-    console.log(meeting);
     return this.http.put(url, meeting);
   }
 
-  fetch_criteria(name: string): Observable<any> {
+  delete_meeting(meeting: Meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.meetings}?name=${meeting.name}`;
+    return this.http.delete(url);
+  }
+
+  fetch_meeting(name: string): Observable<Meeting> {
     const url = `${this.backend.url}/${this.backend.meetings}/${name}`;
-    return this.http.get<any>(url);
+    return this.http.get<Meeting>(url);
   }
 
   fetch_meetings(): Observable<AllMeetings> {

@@ -4,6 +4,6 @@ export class Meeting {
     this.criteria = criteria;
   }
 
-  criteria: any = {};
+  criteria: Array<any>;
   name: string;
 }

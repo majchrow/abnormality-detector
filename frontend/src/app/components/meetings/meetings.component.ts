@@ -88,13 +88,15 @@ export class MeetingsComponent implements OnInit {
     this.dialogService.openConfirmDialog('Are you sure you want to delete this meeting?')
       .afterClosed().subscribe(res => {
       if (res) {
-        const index: number = this.allMeetings.current.indexOf(meeting);
-        if (index !== -1) {
-          this.allMeetings.current.splice(index, 1);
-          this.notificationService.success('Deleted successfully');
-        } else {
-          this.notificationService.warn('Failed to delete meeting');
-        }
+        this.meetingsService.delete_meeting(meeting).subscribe(
+          () => {
+            this.notificationService.success('Deleted successfully');
+            this.allMeetings = null;
+            this.subscribeRest();
+          }, error => {
+            this.notificationService.warn('Failed to delete meeting');
+          }
+        );
       }
     });
   }
