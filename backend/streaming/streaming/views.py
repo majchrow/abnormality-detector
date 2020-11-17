@@ -2,6 +2,7 @@ import json
 from json import JSONDecodeError
 from aiohttp import web
 from aiohttp_sse import sse_response
+from pydantic import ValidationError
 
 from .exceptions import MonitoringNotSupportedError, UnmonitoredError
 
@@ -28,7 +29,7 @@ async def schedule_monitoring(request):
     try:
         await manager.schedule(conf_name, payload)
         return web.Response()
-    except ValueError as e:
+    except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
 
 

@@ -100,5 +100,5 @@ class MonitoringTask:
             pass
 
     def update_criteria(self, criteria):
-        validate(criteria)  # throws ValueError
+        validate(criteria)  # throws ValidatedError
         self.criteria = criteria
