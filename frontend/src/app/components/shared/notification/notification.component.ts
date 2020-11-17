@@ -27,8 +27,8 @@ export class NotificationComponent implements OnInit {
     this.meetingSSEService.getServerSentEvents().subscribe(
       next => {
         this.count += 1;
-        console.log(this.count);
         this.notifications.push(next.message);
+        // console.log(next);
       },
       error => {
         this.notificationService.warn(error.message);

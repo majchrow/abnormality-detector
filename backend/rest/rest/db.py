@@ -21,9 +21,9 @@ class CassandraDAO:
 
         calls = self.__transform(
             lambda call: (
-                {"id": call.call_id, "name": call.name},
-                call.finished,
-                call.start_datetime,
+                {"id": call["call_id"], "name": call["name"]},
+                call["finished"],
+                call["start_datetime"],
             ),
             result,
         )
@@ -43,20 +43,30 @@ class CassandraDAO:
         current = self.__transform(lambda call: call[0], current)
         recent = self.__transform(lambda call: call[0], recent)
 
-        created = self.session.execute(f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}").all()
+        created = self.session.execute(
+            f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}"
+        ).all()
         return {"current": current, "recent": recent, "created": created}
 
     def update_meeting(self, name, criteria):
-        self.session.execute(f"INSERT INTO {self.meetings_table} (meeting_name, criteria) "
-                             f"VALUES (%s, %s);", (name, criteria))
+        self.session.execute(
+            f"INSERT INTO {self.meetings_table} (meeting_name, criteria) "
+            f"VALUES (%s, %s);",
+            (name, criteria),
+        )
 
     def remove_meeting(self, name):
-        self.session.execute(f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,))
+        self.session.execute(
+            f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,)
+        )
 
     def meeting_details(self, name):
-        results = self.session.execute(f"SELECT meeting_name AS name, criteria FROM {self.meetings_table} "
-                                       f"WHERE meeting_name = %s "
-                                       f"LIMIT 1", (name,))
+        results = self.session.execute(
+            f"SELECT meeting_name AS name, criteria FROM {self.meetings_table} "
+            f"WHERE meeting_name = %s "
+            f"LIMIT 1",
+            (name,),
+        )
         meetings = list(results)
         if meetings:
             return meetings[0]
@@ -73,7 +83,7 @@ class CassandraDAO:
 
         return (
             self.__create_conf_details_dict(
-                call.call_id, call.name, str(call.start_datetime)
+                call["call_id"], call["name"], str(call["start_datetime"])
             )
             if call
             else self.__create_conf_details_dict(conf_id, "unknown", "unknown")

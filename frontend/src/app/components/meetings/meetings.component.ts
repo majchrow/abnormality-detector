@@ -6,6 +6,7 @@ import {NotificationService} from '../../services/notification.service';
 import {MeetingsService} from '../../services/meetings.service';
 import {MeetingSSEService} from '../../services/meeting-sse.service';
 import {AllMeetings} from './class/all-meetings';
+import {NewMeetingDialogComponent} from './new-meeting-dialog/new-meeting-dialog.component';
 
 @Component({
   selector: 'app-meetings',
@@ -52,10 +53,10 @@ export class MeetingsComponent implements OnInit {
       },
       error => {
         this.notificationService.warn(error.message);
+        this.allMeetings = new AllMeetings(
+          [new Meeting('x', [])], [new Meeting('x', [])], [new Meeting('x', [])]
+        );
       }
-    );
-    this.allMeetings = new AllMeetings(
-      [new Meeting(1, 'x')], [new Meeting(1, 'x')], [new Meeting(1, 'x')]
     );
   }
 
@@ -72,7 +73,6 @@ export class MeetingsComponent implements OnInit {
   subscribe_sse(name: string) {
     this.meetingSSEService.getServerSentEvent(name).subscribe(
       next => {
-        console.log(next);
         this.notificationService.success(
           `Meeting ${name}: ${next.data}`);
       },
@@ -99,13 +99,15 @@ export class MeetingsComponent implements OnInit {
     });
   }
 
-  addMeeting() {
-    this.allMeetings.current.push(
-      new Meeting(0, 'Unknown')
-    );
+  newMeetingDialog(): void {
+    const dialogRef = this.dialog.open(NewMeetingDialogComponent, {
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(() => {
+      this.allMeetings = null;
+      this.subscribeRest();
+    });
   }
 
-  back() {
-    this.settingMeeting = null;
-  }
 }

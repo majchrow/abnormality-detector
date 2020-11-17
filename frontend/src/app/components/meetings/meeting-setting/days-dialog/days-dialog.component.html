@@ -1,0 +1,55 @@
+<div>
+  <mat-card class="setting-card">
+    <div fxLayout="row">
+      <span class="app-spacer"></span>
+      <i id="close-icon" class="app-icon fa fa-times-circle" (click)="onExitClick()"></i>
+    </div>
+    <mat-card-header style="justify-content: center">
+      <mat-card-title style="text-align: center;">
+        <h2>Days of the week</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="card-deck-container mat-elevation-z4">
+
+      <div *ngFor="let day of ['day0','day1','day2','day3','day4','day5','day6']"
+           class="row" fxLayout="row" fxLayoutAlign="center center">
+        <div class="checkbox" fxFlex="20%">
+          <mat-checkbox class="example-margin" [checked]="this.data[day].checked"
+                        (change)="onChange(this.data[day])"></mat-checkbox>
+        </div>
+        <div fxFlex="20%" fxLayoutAlign="center center">
+          {{ translateDay(day) }}
+        </div>
+        <div fxFlex="60%" fxLayoutAlign="center center">
+          <div class="custom-slider">
+            <ngx-slider [(value)]="this.data[day].conditions.min_hour"
+                        [(highValue)]="this.data[day].conditions.max_hour"
+                        [options]="sliderOptions(day)"></ngx-slider>
+          </div>
+        </div>
+      </div>
+
+
+      <mat-card-actions>
+        <div fxLayout="row" fxLayoutAlign="center center">
+          <div fxFlex="50%" fxLayoutAlign="center center">
+            <button class="save-button"
+                    mat-flat-button
+                    color="warn"
+                    (click)="onRestoreClick()">
+              Restore Default <i class="app-icon-medium fa fa-trash fa-2x"></i>
+            </button>
+          </div>
+          <div fxFlex="50%" fxLayoutAlign="center center">
+            <button class="save-button"
+                    mat-flat-button
+                    color="primary"
+                    (click)="onSaveClick()">
+              Save changes <i class="app-icon-medium fa fa-save fa-2x"></i>
+            </button>
+          </div>
+        </div>
+      </mat-card-actions>
+    </mat-card-content>
+  </mat-card>
+</div>

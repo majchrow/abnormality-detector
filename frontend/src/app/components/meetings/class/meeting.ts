@@ -1,11 +1,9 @@
 export class Meeting {
-  constructor(id: number, name: string) {
-    this.id = id;
+  constructor(name: string, criteria: Array<any>) {
     this.name = name;
+    this.criteria = criteria;
   }
 
-  id: number;
+  criteria: any = {};
   name: string;
-  content: string[] = [];
-  config: Map<string, any> = new Map();
 }
