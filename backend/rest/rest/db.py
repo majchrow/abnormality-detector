@@ -1,7 +1,7 @@
 from cassandra.cluster import Cluster
+from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
-from flask import current_app
 
 
 class CassandraDAO:
@@ -12,6 +12,7 @@ class CassandraDAO:
 
     def init(self, cluster, keyspace, calls_table, meetings_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
+        self.session.row_factory = dict_factory
         self.calls_table = calls_table
         self.meetings_table = meetings_table
 
@@ -42,16 +43,24 @@ class CassandraDAO:
         current = self.__transform(lambda call: call[0], current)
         recent = self.__transform(lambda call: call[0], recent)
 
-        created = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
+        created = self.session.execute(f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}").all()
         return {"current": current, "recent": recent, "created": created}
 
     def update_meeting(self, name, criteria):
-        self.session.execute(f"UPDATE {self.meetings_table} "
-                             f"SET criteria=%s "
-                             f"WHERE meeting_name=%s;", (criteria, name))
+        self.session.execute(f"INSERT INTO {self.meetings_table} (meeting_name, criteria) "
+                             f"VALUES (%s, %s);", (name, criteria))
 
     def remove_meeting(self, name):
         self.session.execute(f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,))
+
+    def meeting_details(self, name):
+        results = self.session.execute(f"SELECT meeting_name AS name, criteria FROM {self.meetings_table} "
+                                       f"WHERE meeting_name = %s "
+                                       f"LIMIT 1", (name,))
+        meetings = list(results)
+        if meetings:
+            return meetings[0]
+        return {}
 
     # Oldies
 
