@@ -28,12 +28,7 @@ export class DaysDialogComponent implements OnInit {
 
 
   onExitClick(): void {
-    this.dialogService.openConfirmDialog('Are you sure you want to exit? Changes you made will not be saved.')
-      .afterClosed().subscribe(res => {
-        this.dialogRef.close(this.dataCopy);
-      }
-    );
-
+    this.dialogRef.close(this.dataCopy);
   }
 
   onRestoreClick(): void {

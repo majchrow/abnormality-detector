@@ -6,6 +6,7 @@ import {NotificationService} from '../../../services/notification.service';
 import {LabelType, Options} from '@angular-slider/ngx-slider';
 import {DaysDialogComponent} from './days-dialog/days-dialog.component';
 import {MeetingsService} from '../../../services/meetings.service';
+import {MeetingSSEService} from '../../../services/meeting-sse.service';
 
 @Component({
   selector: 'app-meeting-setting',
@@ -19,6 +20,7 @@ export class MeetingSettingComponent implements OnInit {
     private dialogService: ConfirmationDialogService,
     private meetingsService: MeetingsService,
     private notificationService: NotificationService,
+    private meetingSSEService: MeetingSSEService
   ) {
   }
 
@@ -101,9 +103,7 @@ export class MeetingSettingComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.fetchConfig();
-    this.config = this.getDefaultConfig();
-    console.log(this.config);
+    this.fetchConfig(this.meeting);
   }
 
   getDefaultConfig(): Record<string, any> {
@@ -138,10 +138,15 @@ export class MeetingSettingComponent implements OnInit {
     };
   }
 
-  fetchConfig() {
-    this.meetingsService.fetch_criteria('Spotkanie').subscribe(
-      next => console.log(next.criteria),
-      err => console.log(err)
+  fetchConfig(meeting: Meeting) {
+    this.meetingsService.fetch_meeting(meeting.name).subscribe(
+      next => {
+        this.config = this.parsePayload(next.criteria);
+      },
+      err => {
+        console.log(err);
+        this.config = this.getDefaultConfig();
+      }
     );
   }
 
@@ -160,7 +165,6 @@ export class MeetingSettingComponent implements OnInit {
     this.dialogService.openConfirmDialog('Are you sure you want to restore changes? Changes you made will not be saved.')
       .afterClosed().subscribe(res => {
         this.config = this.getDefaultConfig();
-        console.log(this.config);
       }
     );
   }
@@ -168,7 +172,17 @@ export class MeetingSettingComponent implements OnInit {
   save() {
     this.dialogService.openConfirmDialog('Are you sure you want to save changes?')
       .afterClosed().subscribe(res => {
-        console.log(this.preparePost());
+        this.meetingsService.put_meeting(new Meeting(
+          this.meeting.name,
+          this.preparePayload()
+        )).subscribe(
+          () => {
+            this.notificationService.success('Updates successfully');
+          },
+          () => {
+            this.notificationService.warn('Update failed');
+          }
+        );
       }
     );
   }
@@ -193,6 +207,18 @@ export class MeetingSettingComponent implements OnInit {
     }[key];
   }
 
+  revertDays(key: number): number {
+    return {
+      1: 'day0',
+      2: 'day1',
+      3: 'day2',
+      4: 'day3',
+      5: 'day4',
+      6: 'day5',
+      7: 'day6'
+    }[key];
+  }
+
   translate(value: number) {
     let hour = `${Math.floor(value / 60)}`;
     let min = `${value % 60}`;
@@ -207,6 +233,14 @@ export class MeetingSettingComponent implements OnInit {
     return `${hour}:${min}`;
   }
 
+
+  revertTranslate(date: string) {
+    const tmp = date.split(':');
+    const hour: number = +tmp[0];
+    const min: number = +tmp[1];
+    return hour * 60 + min;
+  }
+
   translateCondition(condition: any): any {
     return {
       min_hour: this.translate(condition.min_hour),
@@ -214,8 +248,31 @@ export class MeetingSettingComponent implements OnInit {
     };
   }
 
+  parsePayload(data: Array<any>) {
+    const config = this.getDefaultConfig();
+    for (const record of data) {
+      if (record.parameter === 'days') {
+        const daysConfig = MeetingSettingComponent.getDefaultDaysConfig();
+        for (const day of record.conditions) {
+          const dayKey = this.revertDays(day.day);
+          daysConfig[dayKey].conditions = {
+            min_hour: this.revertTranslate(day.min_hour),
+            max_hour: this.revertTranslate(day.max_hour)
+          };
+          daysConfig[dayKey].checked = true;
+        }
+        config[record.parameter].conditions = daysConfig;
+      } else {
+        config[record.parameter].conditions = record.conditions;
+      }
+      config[record.parameter].checked = true;
+    }
 
-  preparePost() {
+    return config;
+  }
+
+
+  preparePayload() {
     const result: Array<any> = [];
 
     for (const [key, value] of Object.entries(this.config)) {
@@ -248,7 +305,6 @@ export class MeetingSettingComponent implements OnInit {
 
       }
     }
-    console.log(result);
     return result;
 
   }

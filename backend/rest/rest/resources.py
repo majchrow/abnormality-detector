@@ -38,13 +38,16 @@ class Meetings(Resource):
             dao.remove_meeting(name)
             return {"message": f"successfully removed {name} from monitored conferences"}, 200
         except NotFoundError:
-            return {"message": f"no meeting {name}"}, 400
+            return {"message": f"no meeting {name}"}, 404
 
 
 class MeetingDetails(Resource):
     @cross_origin()
     def get(self, conf_name):
-        return dao.meeting_details(conf_name)
+        if meeting := dao.meeting_details(conf_name):
+            return meeting_schema.dump(meeting)
+        else:
+            return {"message": f"no meeting {conf_name}"}, 404
 
 
 def setup_resources(app):

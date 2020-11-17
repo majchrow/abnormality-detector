@@ -30,6 +30,16 @@ class Manager:
         if monitoring_type == 'threshold':
             await self.threshold_manager.unschedule(conf_name)
 
+    def get_all_monitored(self):
+        conferences = []
+        for manager in [self.threshold_manager]:
+            conferences.extend(manager.get_all_monitored())
+        return conferences
+
+    def is_monitored(self, conf_name: str):
+        # TODO: monitoring type
+        return self.threshold_manager.is_monitored(conf_name)
+
     @contextmanager
     def calls_receiver(self):
         queue = Queue()

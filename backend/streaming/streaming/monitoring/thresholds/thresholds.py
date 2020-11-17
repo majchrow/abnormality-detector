@@ -38,6 +38,12 @@ class ThresholdManager:
             logging.warning(f'{self.TAG}: "unschedule" attempt for unmonitored {conf_name if conf_name else "ALL"}')
             raise UnmonitoredError()
 
+    def get_all_monitored(self):
+        return list(self.monitoring_tasks.keys())
+
+    def is_monitored(self, conf_name: str):
+        return conf_name in self.monitoring_tasks
+
     async def shutdown(self):
         await asyncio.gather(*[task.stop() for task in self.monitoring_tasks.values()])
         logging.info(f'{self.TAG}: stopped')
