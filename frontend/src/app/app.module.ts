@@ -35,9 +35,13 @@ import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {ProgressBarComponent} from './components/shared/progress-bar/progress-bar.component';
 import {NotificationComponent} from './components/shared/notification/notification.component';
 import {MeetingCardRecentComponent} from './components/meetings/meeting-card/meeting-card-recent/meeting-card-recent.component';
-import {MeetingCardFutureComponent} from './components/meetings/meeting-card/meeting-card-future/meeting-card-future.component';
+import {MeetingCardCreatedComponent} from './components/meetings/meeting-card/meeting-card-created/meeting-card-created.component';
 import {NgxSliderModule} from '@angular-slider/ngx-slider';
 import {MatCheckboxModule} from '@angular/material/checkbox';
+import {FormsModule} from "@angular/forms";
+import {MatSliderModule} from "@angular/material/slider";
+import { DaysDialogComponent } from './components/meetings/meeting-setting/days-dialog/days-dialog.component';
+import { NewMeetingDialogComponent } from './components/meetings/new-meeting-dialog/new-meeting-dialog.component';
 
 @NgModule({
   declarations: [
@@ -58,7 +62,9 @@ import {MatCheckboxModule} from '@angular/material/checkbox';
     ProgressBarComponent,
     NotificationComponent,
     MeetingCardRecentComponent,
-    MeetingCardFutureComponent
+    MeetingCardCreatedComponent,
+    DaysDialogComponent,
+    NewMeetingDialogComponent
   ],
   imports: [
     BrowserModule,
@@ -80,7 +86,9 @@ import {MatCheckboxModule} from '@angular/material/checkbox';
     MatInputModule,
     MatProgressSpinnerModule,
     NgxSliderModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    FormsModule,
+    MatSliderModule
   ],
   providers: [],
   bootstrap: [AppComponent]

@@ -1,0 +1,40 @@
+<div>
+  <mat-card class="setting-card">
+    <div fxLayout="row">
+      <span class="app-spacer"></span>
+      <i id="close-icon" class="app-icon fa fa-times-circle" (click)="onExitClick()"></i>
+    </div>
+    <mat-card-header style="justify-content: center">
+      <mat-card-title style="text-align: center;">
+        <h2>Create new meeting</h2>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="entire">
+      <mat-form-field>
+        <mat-label>Meeting name</mat-label>
+        <input matInput [(ngModel)]="this.name" required>
+      </mat-form-field>
+    </mat-card-content>
+    <mat-card-actions>
+      <div fxLayout="row" fxLayoutAlign="center center">
+        <div fxFlex="50%" fxLayoutAlign="center center">
+          <button class="save-button"
+                  mat-flat-button
+                  color="warn"
+                  (click)="onRestoreClick()">
+            Restore Default <i class="app-icon-medium fa fa-trash fa-2x"></i>
+          </button>
+        </div>
+        <div fxFlex="50%" fxLayoutAlign="center center">
+          <button class="save-button"
+                  mat-flat-button
+                  color="primary"
+                  [disabled]="this.name.length === 0"
+                  (click)="onSaveClick()">
+            Save changes <i class="app-icon-medium fa fa-save fa-2x"></i>
+          </button>
+        </div>
+      </div>
+    </mat-card-actions>
+  </mat-card>
+</div>

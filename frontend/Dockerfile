@@ -4,7 +4,7 @@ WORKDIR /angular
 
 COPY package*.json ./
 
-RUN npm i
+RUN npm install
 
 COPY . .
 
