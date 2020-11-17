@@ -12,7 +12,7 @@ class Meetings(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
-        result['created'] = [meeting_schema.dump(meeting) for meeting in result['created']]
+        result['created'] = [meeting['name'] for meeting in result['created']]
         return result
 
     @cross_origin()
