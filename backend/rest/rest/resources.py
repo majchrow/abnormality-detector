@@ -8,7 +8,7 @@ from .exceptions import NotFoundError
 from .schema import meeting_schema
 
 
-class Conferences(Resource):
+class Meetings(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
@@ -41,13 +41,13 @@ class Conferences(Resource):
             return {"message": f"no meeting {name}"}, 400
 
 
-class ConferenceDetails(Resource):
+class MeetingDetails(Resource):
     @cross_origin()
     def get(self, conf_name):
-        return dao.conference_details(conf_name)
+        return dao.meeting_details(conf_name)
 
 
 def setup_resources(app):
     api = Api(app)
-    api.add_resource(Conferences, "/conferences")
-    api.add_resource(ConferenceDetails, "/conferences/<string:conf_name>")
+    api.add_resource(Meetings, "/conferences")
+    api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
