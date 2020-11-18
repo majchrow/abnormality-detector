@@ -29,7 +29,7 @@ class CassandraDAO:
         future = self.session.execute_async(
             f'UPDATE {table} '
             f'SET anomaly=true '
-            f'WHERE call_id=%s AND datetime=%s;',
+            f'WHERE call_id=%s AND datetime=%s IF EXISTS;',
         (call_id, datetime))
 
         future.add_callbacks(
