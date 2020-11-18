@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
@@ -5,8 +6,12 @@ from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 
 from .config import Config
+from .exceptions import DBFailureError
 
 
+# TODO:
+#  - once we have more than just "threshold" monitoring we'll need to update methods below
+#
 class CassandraDAO:
 
     TAG = 'CassandraDAO'
@@ -23,7 +28,7 @@ class CassandraDAO:
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    async def set_anomaly(self, call_id, datetime, topic):
+    def set_anomaly(self, call_id: str, datetime: str, topic):
         table = self.call_info_table if topic == 'callInfoUpdate' else self.roster_table
         future = self.session.execute_async(
             f'UPDATE {table} '
@@ -35,6 +40,51 @@ class CassandraDAO:
             lambda _: logging.info(f'{self.TAG}: set anomaly status for call {call_id} at {datetime}'),
             lambda e: logging.error(f'{self.TAG}: set anomaly status for {call_id} at {datetime} failed with {e}')
         )
+
+    def get_monitored_meetings(self):
+        result = self.session.execute_async(
+            f'SELECT meeting_name as name, criteria FROM {self.meetings_table} '
+            f'WHERE monitored=true ALLOW FILTERING;'
+        )
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(meetings):
+            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings'),
+            future.set_result(meetings)
+
+        def on_error(e):
+            logging.error(f'{self.TAG}: "get monitored meetings" failed with {e}'),
+            future.set_exception(
+                DBFailureError(f'"get monitored meetings" failed with {e}')
+            )
+
+        result.add_callbacks(on_success, on_error)
+        return future
+
+    def set_monitoring_status(self, call_name: str, monitored: bool):
+        result = self.session.execute_async(
+            f'UPDATE {self.meetings_table} '
+            f'SET monitored=%s '
+            f'WHERE meeting_name=%s IF EXISTS;',
+        (monitored, call_name))
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(_):
+            logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}'),
+            future.set_result(None)
+
+        def on_error(e):
+            logging.error(f'{self.TAG}: "set monitoring status" for call {call_name} failed with {e}'),
+            future.set_exception(
+                DBFailureError(f'"set monitoring status" for {call_name} failed with {e}')
+            )
+
+        result.add_callbacks(on_success, on_error)
+        return future
 
     async def shutdown(self):
         logging.info(f'{self.TAG}: connection shutdown.')

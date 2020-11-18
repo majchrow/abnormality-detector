@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from asyncio import Queue
-from typing import Optional
 
 from ...exceptions import UnmonitoredError
 from .criteria import check, validate, MsgType
@@ -17,7 +16,7 @@ class ThresholdManager:
         self.dao = dao
         self.monitoring_tasks = {}
 
-    def schedule(self, conf_name: Optional[str], criteria):
+    def schedule(self, conf_name: str, criteria: dict):
         if task := self.monitoring_tasks.get(conf_name, None):
             task.update_criteria(criteria)
         else:
@@ -28,7 +27,7 @@ class ThresholdManager:
             task.start()
         logging.info(f'{self.TAG}: scheduled monitoring for {conf_name if conf_name else "ALL"}')
 
-    async def unschedule(self, conf_name: Optional[str]):
+    async def unschedule(self, conf_name: str):
         if task := self.monitoring_tasks.get(conf_name, None):
             self.event_source.monitoring_unsubscribe(conf_name, task.input_queue)
             del self.monitoring_tasks[conf_name]
@@ -93,8 +92,7 @@ class MonitoringTask:
                     logging.info(f'{self.TAG}: detected {len(anomalies)} anomalies for {self.conf_name}')
                     for queue in self.output_queues:
                         queue.put_nowait(anomalies)
-                    # TODO: launch task instead
-                    await self.dao.set_anomaly(msg['call_id'], msg['datetime'], topic)
+                    self.dao.set_anomaly(msg['call_id'], msg['datetime'], topic)
         except asyncio.CancelledError:
             pass
 

@@ -4,7 +4,7 @@ from aiohttp import web
 from aiohttp_sse import sse_response
 from pydantic import ValidationError
 
-from .exceptions import MonitoringNotSupportedError, UnmonitoredError
+from .exceptions import DBFailureError, MonitoringNotSupportedError, UnmonitoredError
 
 __all__ = [
     'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored', 'get_call_info_notifications',
@@ -22,15 +22,23 @@ async def schedule_monitoring(request):
 
     try:
         payload = await request.json()
+        monitoring_type = payload['type']
+        criteria = payload['criteria']
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
+    except KeyError:
+        raise web.HTTPBadRequest(reason='keys "type" and "criteria" are mandatory')
 
     manager = request.app['monitoring']
     try:
-        await manager.schedule(conf_name, payload)
+        await manager.schedule(conf_name, criteria, monitoring_type)
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
+    except MonitoringNotSupportedError:
+        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
+    except DBFailureError:
+        return web.HTTPInternalServerError(reason='DB operation failed')
 
 
 async def cancel_monitoring(request):
@@ -46,7 +54,9 @@ async def cancel_monitoring(request):
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
     except MonitoringNotSupportedError:
-        raise web.HTTPBadRequest(reason=f'{monitoring_type} is not supported!')
+        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
+    except DBFailureError:
+        return web.HTTPInternalServerError(reason='DB operation failed')
 
 
 async def get_all_monitoring(request):
@@ -75,10 +85,13 @@ async def get_monitoring_notifications(request):
         async with sse_response(request) as resp:
             with monitoring_receiver() as receiver:
                 async for anomalies in receiver():
-                    await resp.send(json.dumps(anomalies))
+                    await resp.send(json.dumps([a.dict() for a in anomalies]))
         return resp
+
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
+    except MonitoringNotSupportedError:
+        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
 
 
 async def get_call_info_notifications(request: web.Request):
