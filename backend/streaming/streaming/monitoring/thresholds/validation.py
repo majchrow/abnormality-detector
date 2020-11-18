@@ -1,6 +1,14 @@
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from dateutil.parser import isoparse
 from pydantic import BaseModel, parse_obj_as, root_validator, validator
 from typing import Dict, List, Literal, Optional, Union
+
+
+@dataclass
+class Anomaly:
+    parameter: str
+    value: Union[bool, float, str]
 
 
 class Model(BaseModel):
@@ -12,10 +20,16 @@ class BooleanCriterion(Model):
     parameter: Literal['recording', 'streaming']
     conditions: bool
 
+    def verify(self, message, msg_type):
+        if msg_type != 'callInfoUpdate':
+            return
+        if (value := message[self.parameter]) != self.conditions:
+            return Anomaly(self.parameter, value)
+
 
 class ThresholdCondition(Model):
-    min: Optional[int]
-    max: Optional[int]
+    min: Optional[float]
+    max: Optional[float]
 
     @root_validator
     def non_empty(cls, values):
@@ -35,28 +49,52 @@ class ThresholdCondition(Model):
             assert mn <= mx, '"min" value must be <= "max" value'
         return values
 
+    def satisfies(self, value):
+        if self.min is not None and value < self.min:
+            return False
+        if self.max is not None and value > self.max:
+            return False
+        return True
+
 
 class NumericCriterion(Model):
     parameter: Literal['time_diff', 'max_participants', 'active_speaker']
-    conditions: Union[ThresholdCondition, int]
+    conditions: Union[ThresholdCondition, float]
 
     @validator('conditions')
     def non_negative(cls, v):
-        if isinstance(v, int):
+        if isinstance(v, float):
             assert v >= 0, 'condition value cannot be negative'
         return v
 
+    msg_params = {
+        'callInfoUpdate': {'time_diff', 'max_participants'},
+        'rosterUpdate': {'active_speaker'}
+    }
+
+    def verify(self, message, msg_type):
+        if self.parameter not in self.msg_params[msg_type]:
+            return
+        value = message[self.parameter]
+        if isinstance(self.conditions, ThresholdCondition):
+            if not self.conditions.satisfies(value):
+                return Anomaly(self.parameter, value)
+        elif value != self.conditions:
+            return Anomaly(self.parameter, value)
+
 
 def validate_time(time_str):
+    if time_str is None:
+        return
     if len(time_str) == 8:
-        return datetime.strptime(time_str, '%H:%M:%S')
+        return datetime.strptime(time_str, '%H:%M:%S').replace(tzinfo=timezone.utc).time()
     elif len(time_str) == 5:
-        return datetime.strptime(time_str, '%H:%M')
+        return datetime.strptime(time_str, '%H:%M').replace(tzinfo=timezone.utc).time()
     else:
         raise ValueError('only "%H:%M:%S" and "%H:%M" time format allowed')
 
 
-class DayCriterion(Model):
+class DayCondition(Model):
     day: int
     min_hour: Optional[str]
     max_hour: Optional[str]
@@ -65,13 +103,6 @@ class DayCriterion(Model):
     def in_range(cls, v):
         assert 1 <= v <= 7, 'days must be from 1 to 7, {} passed'.format(v)
         return v
-
-    # TODO: to decide
-    # @root_validator
-    # def non_empty(cls, values):
-    #     min_h, max_h = values.get('min_hour'), values.get('max_hour')
-    #     assert min_h is not None or max_h is not None, '"day" condition cannot be empty'
-    #     return values
 
     _min_hour_valid = validator('min_hour', allow_reuse=True)(validate_time)
     _max_hour_valid = validator('max_hour', allow_reuse=True)(validate_time)
@@ -83,10 +114,17 @@ class DayCriterion(Model):
             assert min_h <= max_h, '"min_hour" value must be <= "max_hour" value'
         return values
 
+    def satisfies(self, date_time):
+        if self.min_hour is not None and date_time < self.min_hour:
+            return False
+        if self.max_hour is not None and date_time > self.max_hour:
+            return False
+        return True
+
 
 class DaysCriterion(Model):
     parameter: Literal['days']
-    conditions: List[DayCriterion]
+    conditions: List[DayCondition]
 
     @validator('conditions')
     def non_empty(cls, v):
@@ -97,6 +135,17 @@ class DaysCriterion(Model):
     def unique(cls, v):
         assert len(v) == len({d.day for d in v}), '"days" cannot contain duplicate day values'
         return v
+
+    def verify(self, message, _):
+        week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
+
+        for c in self.conditions:
+            if week_day == c.day:
+                if not c.satisfies(date_time):
+                    return Anomaly('datetime', str(date_time))
+                break
+        else:
+            return Anomaly('day', week_day)
 
 
 param_types = {
@@ -122,38 +171,94 @@ def validate(criteria: List[Dict]):
     return validated
 
 
-###
-test_criteria = [
-    {
-        "parameter": "time_diff",
-        "conditions": {
-            "min": 0,
-            "max": 42,
-        }
-    },
-    {
-        "parameter": "max_participants",
-        "conditions": 2
-    },
-    {
-        "parameter": "active_speaker",
-        "conditions": 2
-    },
-    {
-        "parameter": "days",
-        "conditions": [
-            {
-                "day": 1,
-                "min_hour": "06:00",
-                "max_hour": "06:11",
-            },
-            {
-                "day": 2,
-                "min_hour": "05:00:00",
-                "max_hour": "20:30"
-            }
-        ]
-    }
-]
+# TODO:
+#  time_diff criterion in seconds doesn't make sense
 
-pydantic_validate(test_criteria)
+def check(message: dict, msg_type: str, criteria: List[Union[DaysCriterion, NumericCriterion, BooleanCriterion]]):
+    anomalies = []
+    for c in criteria:
+        if (anomaly := c.verify(message, msg_type)) is not None:
+            anomalies.append(anomaly)
+    return anomalies
+
+
+# TODO: an idea for validation
+class TaggedUnion:
+    tag: str
+    # parse_obj_as function should check tag value and use it to distinguish
+    # between types contained in Union[...]
+
+
+data_roster = {
+    "datetime": "2020-06-08 06:11:24.794+0000",
+    "call_id": "id121212",
+    "initial": 0,
+    "ringing": 1,
+    "connected": 10,
+    "onhold": 2,
+    "active_speaker": 10,
+    "presenter": 2,
+    "endpoint_recording": 3,
+    "hour": 10,
+    "week_day_number": 3,
+    "name": "name1"
+}
+
+data_call_info = {
+    "adhoc": False,
+    "call_id": "id12312e",
+    "cospace": False,
+    "current_participants": 10,
+    "datetime": "2020-06-08 06:11:24.794+0000",
+    "forwarding": True,
+    "hour": 10,
+    "locked": False,
+    "lync_conferencing": True,
+    "max_participants": 20,
+    "mean_participants": 10.5,
+    "recording": False,
+    "streaming": True,
+    "time_diff": 20000,
+    "week_day_number": 4,
+    "name": "name"}
+
+
+admin_constraints = {
+    "type": "threshold",
+    "criteria": [
+        {
+            "parameter": "time_diff",
+            "conditions": {
+                "min": 0,
+                "max": 42,
+            }
+        },
+        {
+            "parameter": "max_participants",
+            "conditions": 2
+        },
+        {
+            "parameter": "active_speaker",
+            "conditions": 2
+        },
+        {
+            "parameter": "days",
+            "conditions": [
+                {
+                    "day": 2,
+                    "min_hour": "06:00",
+                    "max_hour": "06:12",
+                },
+                {
+                    "day": 3,
+                    "min_hour": "07:00",
+                    "max_hour": "20:30"
+                }
+            ]
+        }
+    ]
+}
+
+criteria = validate(admin_constraints['criteria'])
+print(check(data_call_info, 'callInfoUpdate', criteria))
+print(check(data_roster, 'rosterUpdate', criteria))

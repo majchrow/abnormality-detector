@@ -3,51 +3,51 @@ from datetime import datetime
 
 def check_roster(data_roster, criteria):
     anomalies = []
-    for a in criteria:
-        if a["parameter"] == "active_speaker":
-            if data_roster["active_speaker"] > a["conditions"]:
+    for criterion in criteria:
+        if criterion["parameter"] == "active_speaker":
+            if data_roster["active_speaker"] > criterion["conditions"]:
                 anomalies.append(("active_speaker", data_roster["active_speaker"]))
-        if a["parameter"] == "days":
-            if len(a["conditions"]) == 1:
+        if criterion["parameter"] == "days":
+            if len(criterion["conditions"]) == 1:
                 min_hour = "00:00:00"
                 max_hour = "23:59:59"
                 curr_hour = datetime.strptime(data_roster["datetime"], '%Y-%m-%d %H:%M:%S.%f%z')
                 curr_hour = str(curr_hour.hour) + ":" + str(curr_hour.minute) + ":" + str(curr_hour.second)
-                if "min_hour" in a["conditions"][0].keys():
-                    min_hour = a["conditions"][0]["min_hour"]
+                if "min_hour" in criterion["conditions"][0].keys():
+                    min_hour = criterion["conditions"][0]["min_hour"]
                     if len(min_hour) == 5:
                         min_hour = min_hour + ":00"
-                if "max_hour" in a["conditions"][0].keys():
-                    max_hour = a["conditions"][0]["max_hour"]
+                if "max_hour" in criterion["conditions"][0].keys():
+                    max_hour = criterion["conditions"][0]["max_hour"]
                     if len(max_hour) == 5:
                         max_hour = max_hour + ":00"
 
-                if "day" not in a["conditions"][0].keys():
+                if "day" not in criterion["conditions"][0].keys():
                     if (datetime.strptime(min_hour, '%H:%M:%S') > datetime.strptime(curr_hour, '%H:%M:%S')) or (
                             datetime.strptime(max_hour, '%H:%M:%S') < datetime.strptime(curr_hour, '%H:%M:%S')):
                         anomalies.append(("days", curr_hour))
 
                 else:
-                    week_day_number = a["conditions"][0]["day"]
+                    week_day_number = criterion["conditions"][0]["day"]
                     if data_roster["week_day_number"] == week_day_number:
                         if (datetime.strptime(min_hour, '%H:%M:%S') > datetime.strptime(curr_hour, '%H:%M:%S')) or (
                                 datetime.strptime(max_hour, '%H:%M:%S') < datetime.strptime(curr_hour, '%H:%M:%S')):
                             anomalies.append(("days", curr_hour))
 
-            if len(a["conditions"]) > 1:
-                for b in a["conditions"]:
+            if len(criterion["conditions"]) > 1:
+                for b in criterion["conditions"]:
                     week_day_number = b["day"]
                     if data_roster["week_day_number"] == week_day_number:
                         min_hour = "00:00:00"
                         max_hour = "23:59:59"
                         curr_hour = datetime.strptime(data_roster["datetime"], '%Y-%m-%d %H:%M:%S.%f%z')
                         curr_hour = str(curr_hour.hour) + ":" + str(curr_hour.minute) + ":" + str(curr_hour.second)
-                        if "min_hour" in a["conditions"][0].keys():
-                            min_hour = a["conditions"][0]["min_hour"]
+                        if "min_hour" in criterion["conditions"][0].keys():
+                            min_hour = criterion["conditions"][0]["min_hour"]
                             if len(min_hour) == 5:
                                 min_hour = min_hour + ":00"
-                        if "max_hour" in a["conditions"][0].keys():
-                            max_hour = a["conditions"][0]["max_hour"]
+                        if "max_hour" in criterion["conditions"][0].keys():
+                            max_hour = criterion["conditions"][0]["max_hour"]
                             if len(max_hour) == 5:
                                 max_hour = max_hour + ":00"
                         if (datetime.strptime(min_hour, '%H:%M:%S') > datetime.strptime(curr_hour, '%H:%M:%S')) or (
