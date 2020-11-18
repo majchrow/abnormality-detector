@@ -1,8 +1,23 @@
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from dateutil.parser import isoparse
+from enum import Enum
 from pydantic import BaseModel, parse_obj_as, root_validator, validator
 from typing import Dict, List, Literal, Optional, Union
+
+
+############
+# Base types
+############
+class StrictModel(BaseModel):
+    class Config:
+        extra = 'forbid'
+
+
+class MsgType(Enum):
+    CALL_INFO = 'callInfoUpdate'
+    ROSTER = 'rosterUpdate'
 
 
 @dataclass
@@ -11,23 +26,33 @@ class Anomaly:
     value: Union[bool, float, str]
 
 
-class Model(BaseModel):
-    class Config:
-        extra = 'forbid'
+class Criterion(ABC):
+    @abstractmethod
+    def verify(self, message: dict, msg_type: MsgType) -> Optional[Anomaly]:
+        pass
 
 
-class BooleanCriterion(Model):
+class Condition(ABC):
+    @abstractmethod
+    def satisfies(self, value: Union[bool, str, float]) -> bool:
+        pass
+
+
+##########
+# Criteria
+##########
+class BooleanCriterion(StrictModel, Criterion):
     parameter: Literal['recording', 'streaming']
     conditions: bool
 
     def verify(self, message, msg_type):
-        if msg_type != 'callInfoUpdate':
+        if msg_type != MsgType.CALL_INFO:
             return
         if (value := message[self.parameter]) != self.conditions:
             return Anomaly(self.parameter, value)
 
 
-class ThresholdCondition(Model):
+class ThresholdCondition(StrictModel, Condition):
     min: Optional[float]
     max: Optional[float]
 
@@ -57,7 +82,7 @@ class ThresholdCondition(Model):
         return True
 
 
-class NumericCriterion(Model):
+class NumericCriterion(StrictModel, Criterion):
     parameter: Literal['time_diff', 'max_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, float]
 
@@ -68,8 +93,8 @@ class NumericCriterion(Model):
         return v
 
     msg_params = {
-        'callInfoUpdate': {'time_diff', 'max_participants'},
-        'rosterUpdate': {'active_speaker'}
+        MsgType.CALL_INFO: {'time_diff', 'max_participants'},
+        MsgType.ROSTER: {'active_speaker'}
     }
 
     def verify(self, message, msg_type):
@@ -94,7 +119,7 @@ def validate_time(time_str):
         raise ValueError('only "%H:%M:%S" and "%H:%M" time format allowed')
 
 
-class DayCondition(Model):
+class DayCondition(StrictModel, Condition):
     day: int
     min_hour: Optional[str]
     max_hour: Optional[str]
@@ -122,7 +147,7 @@ class DayCondition(Model):
         return True
 
 
-class DaysCriterion(Model):
+class DaysCriterion(StrictModel, Criterion):
     parameter: Literal['days']
     conditions: List[DayCondition]
 
@@ -158,12 +183,15 @@ param_types = {
 }
 
 
+##################
+# Module interface
+##################
 def validate(criteria: List[Dict]):
     validated = []
     for criterion in criteria:
         # note: using this instead of Union type because error messages SUCK otherwise
         if 'parameter' not in criterion:
-            raise ValueError('single criterion must have valid "parameter" field')
+            raise ValueError('each criterion must have valid "parameter" field')
         if criterion['parameter'] not in param_types:
             raise ValueError(f'unknown parameter {criterion["parameter"]}')
         param_type = param_types[criterion['parameter']]
@@ -171,22 +199,12 @@ def validate(criteria: List[Dict]):
     return validated
 
 
-# TODO:
-#  time_diff criterion in seconds doesn't make sense
-
-def check(message: dict, msg_type: str, criteria: List[Union[DaysCriterion, NumericCriterion, BooleanCriterion]]):
+def check(message: dict, msg_type: MsgType, criteria: List[Criterion]):
     anomalies = []
     for c in criteria:
         if (anomaly := c.verify(message, msg_type)) is not None:
             anomalies.append(anomaly)
     return anomalies
-
-
-# TODO: an idea for validation
-class TaggedUnion:
-    tag: str
-    # parse_obj_as function should check tag value and use it to distinguish
-    # between types contained in Union[...]
 
 
 data_roster = {
@@ -242,6 +260,10 @@ admin_constraints = {
             "conditions": 2
         },
         {
+            "parameter": "recording",
+            "conditions": True
+        },
+        {
             "parameter": "days",
             "conditions": [
                 {
@@ -260,5 +282,5 @@ admin_constraints = {
 }
 
 criteria = validate(admin_constraints['criteria'])
-print(check(data_call_info, 'callInfoUpdate', criteria))
-print(check(data_roster, 'rosterUpdate', criteria))
+print(check(data_call_info, MsgType.CALL_INFO, criteria))
+print(check(data_roster, MsgType.ROSTER, criteria))
