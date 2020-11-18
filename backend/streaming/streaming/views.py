@@ -89,4 +89,3 @@ async def get_call_info_notifications(request: web.Request):
             async for data in receiver():
                 await resp.send(json.dumps(data))
     return resp
-

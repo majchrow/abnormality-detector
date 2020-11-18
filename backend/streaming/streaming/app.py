@@ -1,7 +1,8 @@
 import logging
 from aiohttp import web
 
-from .monitoring.config import Config
+from .config import Config
+from .db import setup_db
 from .monitoring.manager import setup_monitoring
 from .routes import setup_routes
 
@@ -11,7 +12,6 @@ def create_app():
 
     # TODO: config file/cmd line
     config = Config(
-        kafka_bootstrap_server='kafka:29092',
         kafka_topic_map={
             'preprocessed_callInfoUpdate': 'callInfoUpdate',
             'preprocessed_rosterUpdate': 'rosterUpdate',
@@ -21,6 +21,7 @@ def create_app():
 
     app = web.Application()
     setup_routes(app)
+    setup_db(app, config)
     setup_monitoring(app, config)
     return app
 

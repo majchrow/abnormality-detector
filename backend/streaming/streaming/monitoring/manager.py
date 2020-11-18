@@ -14,9 +14,10 @@ class Manager:
 
     TAG = 'Manager'
 
-    def __init__(self, config):
+    def __init__(self, dao, config):
+        self.dao = dao
         self.kafka_manager = KafkaManager(config.kafka_bootstrap_server, config.kafka_topic_map)
-        self.threshold_manager = ThresholdManager(self.kafka_manager)
+        self.threshold_manager = ThresholdManager(self.kafka_manager, self.dao)
         # TODO: other managers for e.g. running ML predictions, retraining model etc.
 
     def start(self):
@@ -92,10 +93,11 @@ class KafkaManager:
 
     def __init__(self, bootstrap_server, input_topic_map):
         self.bootstrap_server = bootstrap_server
-        self.task = None
+        self.input_topics = input_topic_map  # preprocessed output topic -> CMS event type
         self.call_event_sinks = set()
         self.monitoring_event_sinks = {}
-        self.input_topics = input_topic_map  # preprocessed output topic -> CMS event type
+
+        self.task = None
 
     def start(self):
         self.task = asyncio.create_task(self._run())
@@ -180,7 +182,8 @@ async def cancel_all(app: web.Application):
 
 
 def setup_monitoring(app: web.Application, config):
-    manager = Manager(config)
+    dao = app['db']
+    manager = Manager(dao, config)
     app['monitoring'] = manager
     app.on_startup.append(start_all)
     app.on_cleanup.append(cancel_all)
