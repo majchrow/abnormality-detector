@@ -40,7 +40,7 @@ class Preprocessor:
     def do_post_preprocessing(self, preprocessed):
         return preprocessed.withColumn("hour", func.hour("datetime")).withColumn(
             "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
-        )
+        ).withColumn("anomaly", func.lit(False).cast(BooleanType()))
 
     def write_data(self, write_df, epoch_id):
         write_df.persist()

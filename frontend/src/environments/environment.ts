@@ -6,14 +6,14 @@ export const environment = {
   production: false,
   backend: {
     rest: {
-      url: 'http://localhost:5000', // TODO, how to pass linked service name without nginx
+      url: 'http://localhost:5000',
       meetings: 'conferences'
     },
     sse: {
-      url: 'http://localhost:5001', // TODO
-      notification: 'notifications?conf_name=',
+      url: 'http://localhost:5001',
+      notification: 'notifications',
       monitoring: 'monitoring',
-      all: 'notifications' // TODO
+      all: 'notifications'
     }
   }
 };
