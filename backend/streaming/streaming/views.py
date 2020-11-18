@@ -75,8 +75,9 @@ async def get_monitoring_notifications(request):
         async with sse_response(request) as resp:
             with monitoring_receiver() as receiver:
                 async for anomalies in receiver():
-                    await resp.send(json.dumps(anomalies))
+                    await resp.send(json.dumps([a.dict() for a in anomalies]))
         return resp
+
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
 

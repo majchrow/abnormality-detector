@@ -23,18 +23,23 @@ class CassandraDAO:
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    async def set_anomaly(self, call_id, datetime, topic):
+    # TODO: is it inserted as datetime?
+    async def set_anomaly(self, call_id: str, datetime: str, topic):
         table = self.call_info_table if topic == 'callInfoUpdate' else self.roster_table
         future = self.session.execute_async(
             f'UPDATE {table} '
             f'SET anomaly=true '
-            f'WHERE call_id=%s AND datetime=%s IF EXISTS;',
+            f'WHERE call_id=%s AND datetime=%s;',
         (call_id, datetime))
 
         future.add_callbacks(
             lambda _: logging.info(f'{self.TAG}: set anomaly status for call {call_id} at {datetime}'),
             lambda e: logging.error(f'{self.TAG}: set anomaly status for {call_id} at {datetime} failed with {e}')
         )
+
+    async def set_monitoring_status(self, call_name: str,):
+        # TODO
+        pass
 
     async def shutdown(self):
         logging.info(f'{self.TAG}: connection shutdown.')

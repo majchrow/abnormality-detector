@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABC
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from dateutil.parser import isoparse
 from enum import Enum
@@ -20,8 +19,7 @@ class MsgType(Enum):
     ROSTER = 'rosterUpdate'
 
 
-@dataclass
-class Anomaly:
+class Anomaly(BaseModel):
     parameter: str
     value: Union[bool, float, str]
 
@@ -49,7 +47,7 @@ class BooleanCriterion(StrictModel, Criterion):
         if msg_type != MsgType.CALL_INFO:
             return
         if (value := message[self.parameter]) != self.conditions:
-            return Anomaly(self.parameter, value)
+            return Anomaly(parameter=self.parameter, value=value)
 
 
 class ThresholdCondition(StrictModel, Condition):
@@ -103,9 +101,9 @@ class NumericCriterion(StrictModel, Criterion):
         value = message[self.parameter]
         if isinstance(self.conditions, ThresholdCondition):
             if not self.conditions.satisfies(value):
-                return Anomaly(self.parameter, value)
+                return Anomaly(parameter=self.parameter, value=value)
         elif value != self.conditions:
-            return Anomaly(self.parameter, value)
+            return Anomaly(parameter=self.parameter, value=value)
 
 
 def validate_time(time_str):
@@ -167,10 +165,10 @@ class DaysCriterion(StrictModel, Criterion):
         for c in self.conditions:
             if week_day == c.day:
                 if not c.satisfies(date_time):
-                    return Anomaly('datetime', str(date_time))
+                    return Anomaly(parameter='datetime', value=str(date_time))
                 break
         else:
-            return Anomaly('day', week_day)
+            return Anomaly(parameter='day', value=week_day)
 
 
 param_types = {
