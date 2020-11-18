@@ -4,7 +4,7 @@ from asyncio import Queue
 from typing import Optional
 
 from ...exceptions import UnmonitoredError
-from .validation import check, validate, MsgType
+from .criteria import check, validate, MsgType
 
 
 class ThresholdManager:
