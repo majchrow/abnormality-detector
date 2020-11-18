@@ -5,3 +5,4 @@ aiohttp-cors==0.7.0
 aiokafka==0.7.0
 python-dateutil==2.8.1  # for RFC 3339 strings from Spark
 cassandra-driver==3.24.0
+pydantic==1.7.2

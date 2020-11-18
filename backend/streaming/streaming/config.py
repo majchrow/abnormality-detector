@@ -5,7 +5,7 @@ from typing import Dict
 
 @dataclass
 class Config:
-    kafka_bootstrap_server = os.environ["KAFKA_BOOTSTRAP"]
+    kafka_bootstrap_server = os.environ["KAFKA"]
     kafka_topic_map: Dict[str, str]  # input topic name -> standard CMS message type name
 
     cassandra_host = os.environ["CASSANDRA_HOST"]

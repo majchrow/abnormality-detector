@@ -8,6 +8,9 @@ from .config import Config
 
 
 class CassandraDAO:
+
+    TAG = 'CassandraDAO'
+
     def __init__(self, cluster, keyspace, call_info_table, roster_table, meetings_table):
         self.cluster = cluster
         self.keyspace = keyspace
@@ -16,15 +19,25 @@ class CassandraDAO:
         self.meetings_table = meetings_table
         self.session = None
 
-    async def start(self):
+    def start(self):
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    async def set_anomaly(self, call_id, datetime):
-        logging.info(f'Saved anomaly for call {call_id} at {datetime}')
+    async def set_anomaly(self, call_id, datetime, topic):
+        table = self.call_info_table if topic == 'callInfoUpdate' else self.roster_table
+        future = self.session.execute_async(
+            f'UPDATE {table} '
+            f'SET anomaly=true '
+            f'WHERE call_id=%s AND datetime=%s IF EXISTS;',
+        (call_id, datetime))
+
+        future.add_callbacks(
+            lambda _: logging.info(f'{self.TAG}: set anomaly status for call {call_id} at {datetime}'),
+            lambda e: logging.error(f'{self.TAG}: set anomaly status for {call_id} at {datetime} failed with {e}')
+        )
 
     async def shutdown(self):
-        logging.info('Cassandra connection shutdown.')
+        logging.info(f'{self.TAG}: connection shutdown.')
 
 
 async def start_db(app: web.Application):

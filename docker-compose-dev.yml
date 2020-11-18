@@ -78,7 +78,7 @@ services:
       - cassandra
     volumes:
       - ./logs-preprocessing/cassandra/init/cassandra_schema.cql:/schema.cql
-    command: /bin/bash -c "sleep 60 && echo loading cassandra keyspace && cqlsh cassandra -u cassandra -p cassandra -f /schema.cql"
+    command: /bin/bash -c "sleep 3 && echo loading cassandra keyspace && cqlsh cassandra -u cassandra -p cassandra -f /schema.cql"
     networks:
       - preprocessing
       - backend

@@ -94,7 +94,7 @@ class MonitoringTask:
                     for queue in self.output_queues:
                         queue.put_nowait(anomalies)
                     # TODO: launch task instead
-                    await self.dao.set_anomaly(msg['call_id'], msg['datetime'])
+                    await self.dao.set_anomaly(msg['call_id'], msg['datetime'], topic)
         except asyncio.CancelledError:
             pass
 
