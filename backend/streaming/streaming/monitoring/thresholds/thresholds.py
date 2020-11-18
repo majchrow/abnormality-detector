@@ -1,11 +1,9 @@
 import asyncio
 import logging
 from asyncio import Queue
-from typing import Optional
 
 from ...exceptions import UnmonitoredError
-from .check import check_call_info, check_roster
-from .validation import validate
+from .criteria import check, validate, MsgType
 
 
 class ThresholdManager:
@@ -13,22 +11,23 @@ class ThresholdManager:
     TAG = 'ThresholdManager'
     STREAM_FINISHED = 'END STREAM'
 
-    def __init__(self, event_source):
+    def __init__(self, event_source, dao):
         self.event_source = event_source
+        self.dao = dao
         self.monitoring_tasks = {}
 
-    def schedule(self, conf_name: Optional[str], criteria):
+    def schedule(self, conf_name: str, criteria: dict):
         if task := self.monitoring_tasks.get(conf_name, None):
             task.update_criteria(criteria)
         else:
-            task = MonitoringTask(conf_name)
+            task = MonitoringTask(conf_name, self.dao)
             task.update_criteria(criteria)
             self.monitoring_tasks[conf_name] = task
             self.event_source.monitoring_subscribe(conf_name, task.input_queue)
             task.start()
         logging.info(f'{self.TAG}: scheduled monitoring for {conf_name if conf_name else "ALL"}')
 
-    async def unschedule(self, conf_name: Optional[str]):
+    async def unschedule(self, conf_name: str):
         if task := self.monitoring_tasks.get(conf_name, None):
             self.event_source.monitoring_unsubscribe(conf_name, task.input_queue)
             del self.monitoring_tasks[conf_name]
@@ -53,8 +52,9 @@ class MonitoringTask:
 
     TAG = 'MonitoringTask'
 
-    def __init__(self, conf_name):
+    def __init__(self, conf_name, dao):
         self.conf_name = conf_name
+        self.dao = dao
         self.input_queue = Queue()
         self.output_queues = set()
         self.criteria = None
@@ -85,20 +85,16 @@ class MonitoringTask:
         try:
             while True:
                 topic, msg = await self.input_queue.get()
-                if topic == 'callInfoUpdate':
-                    result = check_call_info(msg, self.criteria)
-                elif topic == 'rosterUpdate':
-                    result = check_roster(msg, self.criteria)
-                else:
-                    result = None
+                msg_type = MsgType(topic)
+                anomalies = check(msg, msg_type, self.criteria)
 
-                if result:
-                    logging.info(f'{self.TAG}: detected {len(result)} anomalies for {self.conf_name}')
+                if anomalies:
+                    logging.info(f'{self.TAG}: detected {len(anomalies)} anomalies for {self.conf_name}')
                     for queue in self.output_queues:
-                        queue.put_nowait(result)
+                        queue.put_nowait(anomalies)
+                    self.dao.set_anomaly(msg['call_id'], msg['datetime'], topic)
         except asyncio.CancelledError:
             pass
 
     def update_criteria(self, criteria):
-        validate(criteria)  # throws ValueError
-        self.criteria = criteria
+        self.criteria = validate(criteria)  # throws ValidatedError

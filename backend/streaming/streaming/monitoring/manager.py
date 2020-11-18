@@ -6,6 +6,8 @@ from aiokafka import AIOKafkaConsumer
 from asyncio import Queue
 from contextlib import contextmanager
 
+from ..config import Config
+from ..db import CassandraDAO
 from ..exceptions import MonitoringNotSupportedError, UnmonitoredError
 from .thresholds import ThresholdManager
 
@@ -14,21 +16,37 @@ class Manager:
 
     TAG = 'Manager'
 
-    def __init__(self, config):
+    def __init__(self, dao: CassandraDAO, config: Config):
+        self.dao: CassandraDAO = dao
         self.kafka_manager = KafkaManager(config.kafka_bootstrap_server, config.kafka_topic_map)
-        self.threshold_manager = ThresholdManager(self.kafka_manager)
+        self.threshold_manager = ThresholdManager(self.kafka_manager, self.dao)
         # TODO: other managers for e.g. running ML predictions, retraining model etc.
 
     def start(self):
         self.kafka_manager.start()
+        asyncio.create_task(self._bootstrap())
 
-    async def schedule(self, conf_name: str, request: dict):
-        if request['type'] == 'threshold':
-            self.threshold_manager.schedule(conf_name, request['criteria'])
+    async def _bootstrap(self):
+        # TODO: retry on failure
+        monitored = await self.dao.get_monitored_meetings()
+        for meeting in monitored:
+            criteria = json.loads(meeting['criteria'])
+            self.threshold_manager.schedule(meeting['name'], criteria)
+        logging.info(f'{self.TAG}: bootstrapped from {len(monitored)} meetings')
+
+    async def schedule(self, conf_name: str, criteria: dict, monitoring_type: str):
+        if monitoring_type == 'threshold':
+            await self.dao.set_monitoring_status(conf_name, monitored=True)
+            self.threshold_manager.schedule(conf_name, criteria)
+        else:
+            raise MonitoringNotSupportedError()
 
     async def unschedule(self, conf_name: str, monitoring_type: str):
         if monitoring_type == 'threshold':
+            await self.dao.set_monitoring_status(conf_name, monitored=False)
             await self.threshold_manager.unschedule(conf_name)
+        else:
+            raise MonitoringNotSupportedError()
 
     def get_all_monitored(self):
         conferences = []
@@ -92,10 +110,11 @@ class KafkaManager:
 
     def __init__(self, bootstrap_server, input_topic_map):
         self.bootstrap_server = bootstrap_server
-        self.task = None
+        self.input_topics = input_topic_map  # preprocessed output topic -> CMS event type
         self.call_event_sinks = set()
         self.monitoring_event_sinks = {}
-        self.input_topics = input_topic_map  # preprocessed output topic -> CMS event type
+
+        self.task = None
 
     def start(self):
         self.task = asyncio.create_task(self._run())
@@ -180,7 +199,8 @@ async def cancel_all(app: web.Application):
 
 
 def setup_monitoring(app: web.Application, config):
-    manager = Manager(config)
+    dao = app['db']
+    manager = Manager(dao, config)
     app['monitoring'] = manager
     app.on_startup.append(start_all)
     app.on_cleanup.append(cancel_all)
