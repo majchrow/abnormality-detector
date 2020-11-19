@@ -43,6 +43,11 @@ class BooleanCriterion(StrictModel, Criterion):
     parameter: Literal['recording', 'streaming']
     conditions: bool
 
+    @validator('conditions', pre=True)
+    def is_bool(cls, v):
+        assert isinstance(v, bool), f'value {v} is not a bool'
+        return v
+
     def verify(self, message, msg_type):
         if msg_type != MsgType.CALL_INFO:
             return
@@ -51,8 +56,15 @@ class BooleanCriterion(StrictModel, Criterion):
 
 
 class ThresholdCondition(StrictModel, Condition):
-    min: Optional[float]
-    max: Optional[float]
+    min: Optional[int]
+    max: Optional[int]
+
+    @validator('min', 'max', pre=True)
+    def is_int(cls, v):
+        if v is not None:
+            assert not isinstance(v, bool), f'value {v} is not an integer'
+            assert isinstance(v, int), f'value {v} is not integer'
+        return v
 
     @root_validator
     def non_empty(cls, values):
@@ -82,11 +94,18 @@ class ThresholdCondition(StrictModel, Condition):
 
 class NumericCriterion(StrictModel, Criterion):
     parameter: Literal['time_diff', 'max_participants', 'active_speaker']
-    conditions: Union[ThresholdCondition, float]
+    conditions: Union[ThresholdCondition, int]
+
+    @validator('conditions', pre=True)
+    def is_int(cls, v):
+        if not isinstance(v, dict):
+            assert not isinstance(v, bool), f'value {v} is not an integer'
+            assert isinstance(v, int), f'value {v} is not an integer'
+        return v
 
     @validator('conditions')
     def non_negative(cls, v):
-        if isinstance(v, float):
+        if isinstance(v, int):
             assert v >= 0, 'condition value cannot be negative'
         return v
 
@@ -121,6 +140,12 @@ class DayCondition(StrictModel, Condition):
     day: int
     min_hour: Optional[str]
     max_hour: Optional[str]
+
+    @validator('day', pre=True)
+    def is_int(cls, v):
+        assert not isinstance(v, bool), f'value {v} is not an integer'
+        assert isinstance(v, int), f'value {v} is not an integer'
+        return v
 
     @validator('day')
     def in_range(cls, v):
