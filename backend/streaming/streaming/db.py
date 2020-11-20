@@ -1,12 +1,15 @@
 import asyncio
+import json
 import logging
 from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
+from typing import List
 
 from .config import Config
 from .exceptions import DBFailureError
+from .monitoring.thresholds.criteria import Anomaly
 
 
 # TODO:
@@ -28,13 +31,14 @@ class CassandraDAO:
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    def set_anomaly(self, call_id: str, datetime: str, topic):
+    def set_anomaly(self, call_id: str, datetime: str, anomalies: List[Anomaly], topic):
         table = self.call_info_table if topic == 'callInfoUpdate' else self.roster_table
+        reason = json.dumps([a.dict() for a in anomalies])
         future = self.session.execute_async(
             f'UPDATE {table} '
-            f'SET anomaly=true '
+            f'SET anomaly=true, reason=%s '
             f'WHERE call_id=%s AND datetime=%s IF EXISTS;',
-        (call_id, datetime))
+        (reason, call_id, datetime))
 
         future.add_callbacks(
             lambda _: logging.info(f'{self.TAG}: set anomaly status for call {call_id} at {datetime}'),

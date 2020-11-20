@@ -13,6 +13,7 @@ hour int,
 week_day_number int,
 name text, 
 anomaly boolean,
+reason text
 PRIMARY KEY (call_id, datetime)); 
 CREATE TABLE call_info_update(adhoc boolean, 
 call_id text, 
@@ -31,6 +32,7 @@ time_diff bigint,
 week_day_number int, 
 name text,
 anomaly boolean,
+reason text
 PRIMARY KEY (call_id, datetime));
 CREATE TABLE calls(call_id text PRIMARY KEY,
 start_datetime timestamp,

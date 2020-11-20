@@ -5,11 +5,11 @@ from .validation import validate
 
 
 class JSONString(fields.Field):
-    # valid string to output dict
+    # a dict to JSON string (really - dict is the serialized form)
     def _deserialize(self, value, attr, obj, **kwargs):
         return json.dumps(value)
 
-    # input dict to valid string
+    # a JSON string to dict
     def _serialize(self, value, attr, obj, **kwargs):
         return json.loads(value)
 
@@ -27,4 +27,13 @@ class MeetingSchema(Schema):
     criteria = JSONString(validate=validate_criteria)  # TODO: no better idea for now for a JSON field
 
 
+class AnomalySchema(Schema):
+    id = fields.Int(dump_only=True)
+    meeting_name = fields.Str()
+    call_id = fields.Str()
+    datetime = fields.DateTime()
+    reason = fields.Str()
+
+
+anomaly_schema = AnomalySchema()
 meeting_schema = MeetingSchema()

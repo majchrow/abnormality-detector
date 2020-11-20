@@ -5,14 +5,14 @@ from marshmallow import ValidationError
 
 from .db import dao
 from .exceptions import NotFoundError
-from .schema import meeting_schema
+from .schema import anomaly_schema, meeting_schema
 
 
 class Meetings(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
-        result['created'] = [meeting_schema.dump(meeting) for meeting in result['created']]
+        result['created'] = list(map(meeting_schema.dump, result['created']))
         return result
 
     @cross_origin()
@@ -47,6 +47,16 @@ class MeetingDetails(Resource):
         if meeting := dao.meeting_details(conf_name):
             return meeting_schema.dump(meeting)
         else:
+            return {"message": f"no meeting {conf_name}"}, 404
+
+
+class Anomalies(Resource):
+    @cross_origin()
+    def get(self, conf_name, count):
+        try:
+            anomalies = dao.get_anomalies(conf_name, count)
+            return {'anomalies': list(map(anomaly_schema.dump, anomalies))}
+        except NotFoundError:
             return {"message": f"no meeting {conf_name}"}, 404
 
 
