@@ -11,8 +11,6 @@ from itertools import cycle
 from pprint import pformat
 from typing import Dict, List
 
-MSG_INTERVAL_S = 1
-
 # Notes:
 #  - acknowledgements and subscriptionUpdates are ignored and not sent at all
 #  - if subscribed to "calls", clients get all "calls" events from log in order
@@ -27,14 +25,20 @@ MSG_INTERVAL_S = 1
 
 
 @dataclass
+class DetailSubscription:
+    index: int
+    call_id: str
+
+
+@dataclass
 class Client:
     ip_address: str
     ws: web.WebSocketResponse
 
     # lists of subscription indexes
     calls: List[int] = field(default_factory=list)
-    call_info: List[int] = field(default_factory=list)
-    roster_info: List[int] = field(default_factory=list)
+    call_info: List[DetailSubscription] = field(default_factory=list)
+    roster_info: List[DetailSubscription] = field(default_factory=list)
 
     def clear(self):
         self.calls = []
@@ -43,9 +47,10 @@ class Client:
 
 
 class Server:
-    def __init__(self, username: str, password: str, dumpfile: str) -> None:
+    def __init__(self, username: str, password: str, dumpfile: str, msg_interval_s: int) -> None:
         self.credentials = (username, password)
         self.dumpfile = dumpfile
+        self.msg_interval_s = msg_interval_s
         self.auth_token = 'Token-of-eternal-prosperity'
         self.loop = None
 
@@ -124,9 +129,11 @@ class Server:
                 if subscription['type'] == 'calls':
                     client.calls.append(subscription['index'])
                 elif subscription['type'] == "callRoster":
-                    client.roster_info.append(subscription['index'])
+                    sub = DetailSubscription(subscription['index'], subscription['call'])
+                    client.roster_info.append(sub)
                 elif subscription['type'] == "callInfo":
-                    client.call_info.append(subscription['index'])
+                    sub = DetailSubscription(subscription['index'], subscription['call'])
+                    client.call_info.append(sub)
 
             # Only start streaming once we have some subscription
             if remote_address not in self.streams:
@@ -136,26 +143,27 @@ class Server:
         try:
             for message in cycle(self.messages):
                 if message['message']['type'] == "callListUpdate":
-                    subscriptions = client.calls
+                    for s_ind in client.calls:
+                        message['message']['subscriptionIndex'] = s_ind
+                        await client.ws.send_json(message)
                 elif message['message']['type'] == "callInfoUpdate":
-                    subscriptions = client.call_info
+                    call_id = message['message']['callInfo']['call']
+                    for subscription in client.call_info:
+                        if subscription.call_id == call_id:
+                            message['message']['subscriptionIndex'] = subscription.index
+                            await client.ws.send_json(message)
                 elif message['message']['type'] == "rosterUpdate":
-                    subscriptions = client.roster_info
+                    for subscription in client.roster_info:
+                        if subscription.call_id == message['call']:
+                            message['message']['subscriptionIndex'] = subscription.index
+                            await client.ws.send_json(message)
                 else:
                     logging.error(f'Unhandled message type in provided log file: {pformat(message)}')
                     continue
 
-                # TODO:
-                #  when we decide to send data from a single real call to single subscription
-                #  instead of mixed (like now) then this is the place to change - we need to
-                #  filter subscriptions list based on the message to find ones relevant to
-                #  this message (based on call ID maybe? for rosterInfo it's more difficult)
+                logging.info(f'SENT:\n{pformat(message)}')
+                await asyncio.sleep(self.msg_interval_s)
 
-                await asyncio.sleep(MSG_INTERVAL_S)
-                for s_ind in subscriptions:
-                    message['message']['subscriptionIndex'] = s_ind
-                    await client.ws.send_json(message)
-                    logging.info(f'SENT:\n{pformat(message)}')
         except asyncio.CancelledError:
             logging.info(f'Event stream for {client.ip_address} stopped.')
 
@@ -173,11 +181,11 @@ async def setup_server(app):
     app['server'].loop = asyncio.get_running_loop()
 
 
-def main(host, port, username, password, dumpfile):
+def main(host, port, username, password, dumpfile, msg_interval_s):
     logging.basicConfig(level=logging.DEBUG)
 
     app = web.Application()
-    server = Server(username, password, dumpfile)
+    server = Server(username, password, dumpfile, msg_interval_s)
     app['server'] = server
 
     app.on_startup.append(setup_server)
@@ -200,6 +208,10 @@ def parse_args():
                         type=str,
                         default='test/full_log.json',
                         help='JSON file with raw server messages')
+    parser.add_argument('--interval_s',
+                        type=float,
+                        default=1,
+                        help='interval between  sent messages [s]')
     return parser.parse_args()
 
 
@@ -211,4 +223,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     args = parse_args()
-    main(args.host, args.port, login, password, args.dumpfile)
+    main(args.host, args.port, login, password, args.dumpfile, args.interval_s)
