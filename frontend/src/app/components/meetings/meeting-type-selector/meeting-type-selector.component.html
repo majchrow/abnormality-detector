@@ -1,0 +1,8 @@
+<mat-form-field appearance="fill">
+  <mat-label>Select meeting type</mat-label>
+  <mat-select>
+    <mat-option *ngFor="let meeting of meetings" [value]="meeting.value">
+      {{meeting.viewValue}}
+    </mat-option>
+  </mat-select>
+</mat-form-field>

@@ -17,7 +17,7 @@ export class AppComponent {
   // test msg to communicate with backend
   test() {
     this.http.get(
-      'http://172.18.0.1:5000/'
+      'http://localhost:5000/'
     ).subscribe(res => console.log(res));
   }
 

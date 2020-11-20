@@ -7,6 +7,7 @@ import {MeetingsService} from '../../services/meetings.service';
 import {MeetingSSEService} from '../../services/meeting-sse.service';
 import {AllMeetings} from './class/all-meetings';
 import {NewMeetingDialogComponent} from './new-meeting-dialog/new-meeting-dialog.component';
+import {SelectMeetingType} from './meeting-type-selector/meeting-type-selector.component';
 
 @Component({
   selector: 'app-meetings',

@@ -14,6 +14,8 @@
         *ngIf="allMeetings; then spinnerOff; else spinner">
       </ng-container>
       <ng-template #spinnerOff>
+        <app-meeting-type-selector>
+        </app-meeting-type-selector>
         <mat-card-content>
           <div fxLayout="row wrap" fxFlex.md="50" class="card-deck-container mat-elevation-z4">
 
