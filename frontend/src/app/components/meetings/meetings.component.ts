@@ -1,13 +1,13 @@
-import {Component, OnInit} from '@angular/core';
-import {Meeting} from './class/meeting';
-import {MatDialog} from '@angular/material/dialog';
-import {ConfirmationDialogService} from '../../services/confirmation-dialog.service';
-import {NotificationService} from '../../services/notification.service';
-import {MeetingsService} from '../../services/meetings.service';
-import {MeetingSSEService} from '../../services/meeting-sse.service';
-import {AllMeetings} from './class/all-meetings';
-import {NewMeetingDialogComponent} from './new-meeting-dialog/new-meeting-dialog.component';
-import {SelectMeetingType} from './meeting-type-selector/meeting-type-selector.component';
+import { Component, OnInit } from '@angular/core';
+import { Meeting } from './class/meeting';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialogService } from '../../services/confirmation-dialog.service';
+import { NotificationService } from '../../services/notification.service';
+import { MeetingsService } from '../../services/meetings.service';
+import { MeetingSSEService } from '../../services/meeting-sse.service';
+import { AllMeetings } from './class/all-meetings';
+import { NewMeetingDialogComponent } from './new-meeting-dialog/new-meeting-dialog.component';
+import { SelectMeetingType } from './meeting-type-select/meeting-type-select.component';
 
 @Component({
   selector: 'app-meetings',
@@ -30,6 +30,8 @@ export class MeetingsComponent implements OnInit {
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
   allMeetings: AllMeetings;
+  selectedMeetings: AllMeetings;
+  meetingType: string;
 
 
   updateMeetingsDisplayedInPage(event) {
@@ -50,6 +52,7 @@ export class MeetingsComponent implements OnInit {
     this.meetingsService.fetch_meetings().subscribe(
       next => {
         this.allMeetings = next;
+        this.filterMeetings();
         this.subscribeAllSSE();
       },
       error => {
@@ -59,6 +62,36 @@ export class MeetingsComponent implements OnInit {
         );
       }
     );
+  }
+
+  changeMeetingType(selected: string) {
+    this.meetingType = selected;
+    console.log("Selected:", this.meetingType);
+    this.filterMeetings();
+  }
+
+  filterMeetings() {
+    console.log("Filtering");
+    switch (this.meetingType) {
+      case 'created': {
+        console.log("created");
+        this.selectedMeetings = new AllMeetings([], [], [...this.allMeetings.created]);
+        break;
+      }
+      case 'current': {
+        console.log("current");
+        this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [], []);
+        break;
+      }
+      case 'recent': {
+        console.log("recent");
+        this.selectedMeetings = new AllMeetings([], [...this.allMeetings.recent], []);
+        break;
+      }
+      default: {
+        this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [...this.allMeetings.recent], [...this.allMeetings.created]);
+      }
+    }
   }
 
   subscribeAllSSE() {
@@ -88,18 +121,18 @@ export class MeetingsComponent implements OnInit {
   delete(meeting: Meeting) {
     this.dialogService.openConfirmDialog('Are you sure you want to delete this meeting?')
       .afterClosed().subscribe(res => {
-      if (res) {
-        this.meetingsService.delete_meeting(meeting).subscribe(
-          () => {
-            this.notificationService.success('Deleted successfully');
-            this.allMeetings = null;
-            this.subscribeRest();
-          }, error => {
-            this.notificationService.warn('Failed to delete meeting');
-          }
-        );
-      }
-    });
+        if (res) {
+          this.meetingsService.delete_meeting(meeting).subscribe(
+            () => {
+              this.notificationService.success('Deleted successfully');
+              this.allMeetings = null;
+              this.subscribeRest();
+            }, error => {
+              this.notificationService.warn('Failed to delete meeting');
+            }
+          );
+        }
+      });
   }
 
   newMeetingDialog(): void {

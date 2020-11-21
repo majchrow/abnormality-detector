@@ -42,7 +42,7 @@ import { FormsModule } from "@angular/forms";
 import { MatSliderModule } from "@angular/material/slider";
 import { DaysDialogComponent } from './components/meetings/meeting-setting/days-dialog/days-dialog.component';
 import { NewMeetingDialogComponent } from './components/meetings/new-meeting-dialog/new-meeting-dialog.component';
-import { SelectMeetingType } from './components/meetings/meeting-type-selector/meeting-type-selector.component';
+import { SelectMeetingType } from './components/meetings/meeting-type-select/meeting-type-select.component';
 import {MatSelectModule} from '@angular/material/select';
 
 @NgModule({
