@@ -10,14 +10,16 @@ class CassandraDAO:
     def __init__(self):
         self.session = None
         self.calls_table = None
-        self.anomalies_table = None
+        self.call_info_table = None
+        self.roster_table = None
         self.meetings_table = None
 
-    def init(self, cluster, keyspace, calls_table, anomalies_table, meetings_table):
+    def init(self, cluster, keyspace, calls_table, call_info_table, roster_table, meetings_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
         self.session.row_factory = dict_factory
         self.calls_table = calls_table
-        self.anomalies_table = anomalies_table
+        self.call_info_table = call_info_table
+        self.roster_table = roster_table
         self.meetings_table = meetings_table
 
     def get_conferences(self):
@@ -77,15 +79,23 @@ class CassandraDAO:
         return {}
 
     def get_anomalies(self, name, count):
-        results = self.session.execute(
-            f"SELECT meeting_name, datetime, reason FROM {self.anomalies_table} "
-            f"WHERE meeting_name = %s "
+        ci_results = self.session.execute(
+            f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
+            f"WHERE meeting_name = %s AND anomaly=true "
             f"ORDER BY datetime DESC "
-            f"LIMIT %s;",
+            f"LIMIT %s ALLOW FILTERING;",
             (name, count),
         ).all()
 
-        return {'anomalies': results}
+        roster_results = self.session.execute(
+            f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
+            f"WHERE meeting_name = %s AND anomaly=true "
+            f"ORDER BY datetime DESC "
+            f"LIMIT %s ALLOW FILTERING;",
+            (name, count),
+        ).all()
+
+        return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])[-count:]}
 
     # Oldies
 
@@ -127,6 +137,7 @@ def setup_db(config: Config):
         cassandra,
         config.keyspace,
         config.calls_table,
-        config.anomalies_table,
+        config.call_info_table,
+        config.roster_table,
         config.meetings_table
     )

@@ -8,5 +8,6 @@ class Config:
     passwd = os.environ["CASSANDRA_PASSWD"]
     keyspace = os.environ["KEYSPACE"]
     calls_table = os.environ["CALLS_TABLE"]
-    anomalies_table = os.environ["ANOMALIES_TABLE"]
+    call_info_table = os.environ["CALL_INFO_TABLE"]
+    roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
