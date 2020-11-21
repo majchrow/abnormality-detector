@@ -1,1 +1,3 @@
-from .thresholds import ThresholdManager
+from .criteria import validate
+
+STREAM_FINISHED = 'END STREAM'

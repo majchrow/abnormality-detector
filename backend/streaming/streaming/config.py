@@ -1,12 +1,12 @@
 import os
 from dataclasses import dataclass
-from typing import Dict
 
 
 @dataclass
 class Config:
     kafka_bootstrap_server = os.environ["KAFKA"]
-    kafka_topic_map: Dict[str, str]  # input topic name -> standard CMS message type name
+    kafka_call_list_topic = 'preprocessed_callListUpdate'
+    num_workers = 6
 
     cassandra_host = os.environ["CASSANDRA_HOST"]
     cassandra_port = os.environ["CASSANDRA_PORT"]
@@ -16,6 +16,3 @@ class Config:
     call_info_table = os.environ["CALL_INFO_TABLE"]
     roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
-
-    def __post_init__(self):
-        assert set(self.kafka_topic_map.values()) == {'callListUpdate', 'callInfoUpdate', 'rosterUpdate'}

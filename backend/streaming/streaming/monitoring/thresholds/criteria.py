@@ -92,6 +92,12 @@ class ThresholdCondition(StrictModel, Condition):
         return True
 
 
+nc_msg_params = {
+    MsgType.CALL_INFO: {'time_diff', 'max_participants'},
+    MsgType.ROSTER: {'active_speaker'}
+}
+
+
 class NumericCriterion(StrictModel, Criterion):
     parameter: Literal['time_diff', 'max_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, int]
@@ -109,13 +115,9 @@ class NumericCriterion(StrictModel, Criterion):
             assert v >= 0, 'condition value cannot be negative'
         return v
 
-    msg_params = {
-        MsgType.CALL_INFO: {'time_diff', 'max_participants'},
-        MsgType.ROSTER: {'active_speaker'}
-    }
-
     def verify(self, message, msg_type):
-        if self.parameter not in self.msg_params[msg_type]:
+
+        if self.parameter not in nc_msg_params[msg_type]:
             return
         value = message[self.parameter]
         if isinstance(self.conditions, ThresholdCondition):

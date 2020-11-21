@@ -2,11 +2,11 @@ FROM python:3.8
 
 WORKDIR /aiohttp
 
+COPY streaming src/
+COPY setup.py setup.py
 COPY requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY streaming src/
 
 ENV KAFKA="kafka:29092"
 ENV CASSANDRA_HOST="cassandra"
