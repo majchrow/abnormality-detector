@@ -1,8 +1,6 @@
 import os
-from dataclasses import dataclass
 
 
-@dataclass
 class Config:
     host = os.environ["CASSANDRA_HOST"]
     port = os.environ["CASSANDRA_PORT"]
