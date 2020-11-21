@@ -42,7 +42,7 @@ PRIMARY KEY (meeting_name, datetime));
 CREATE TABLE calls(call_id text PRIMARY KEY,
 start_datetime timestamp,
 last_update timestamp,
-name text,
+meeting_name text,
 finished boolean);
 
 CREATE TABLE meetings(
