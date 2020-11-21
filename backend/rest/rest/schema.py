@@ -1,5 +1,6 @@
 import json
-from marshmallow import Schema, fields, ValidationError
+from marshmallow import fields, Schema, ValidationError
+from marshmallow.validate import Range
 
 from .validation import validate
 
@@ -23,17 +24,23 @@ def validate_criteria(data):
 
 class MeetingSchema(Schema):
     id = fields.Int(dump_only=True)
-    name = fields.Str()
-    criteria = JSONString(validate=validate_criteria)  # TODO: no better idea for now for a JSON field
+    name = fields.Str(required=True)
+    criteria = JSONString(required=True, validate=validate_criteria)  # TODO: no better idea for now for a JSON field
 
 
 class AnomalySchema(Schema):
     id = fields.Int(dump_only=True)
-    meeting_name = fields.Str()
-    call_id = fields.Str()
-    datetime = fields.DateTime()
-    reason = fields.Str()
+    meeting_name = fields.Str(required=True)
+    datetime = fields.DateTime(required=True)
+    reason = JSONString(required=True)
+
+
+class AnomalyRequestSchema(Schema):
+    name = fields.Str(required=True)
+    count = fields.Int(required=True, validate=Range(min=1, error='count must be positive'))
 
 
 anomaly_schema = AnomalySchema()
 meeting_schema = MeetingSchema()
+
+anomaly_request_schema = AnomalyRequestSchema()
