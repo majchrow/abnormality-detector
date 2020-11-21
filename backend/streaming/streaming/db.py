@@ -19,27 +19,34 @@ class CassandraDAO:
 
     TAG = 'CassandraDAO'
 
-    def __init__(self, cluster, keyspace, meetings_table, anomalies_table):
+    def __init__(self, cluster, keyspace, meetings_table, call_info_table, roster_table):
         self.cluster = cluster
         self.keyspace = keyspace
         self.meetings_table = meetings_table
-        self.anomalies_table = anomalies_table
+        self.call_info_table = call_info_table
+        self.roster_table = roster_table
         self.session = None
 
     def start(self):
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    def add_anomaly(self, meeting_name: str, datetime: str, anomalies: List[Anomaly]):
+    def set_anomaly(self, meeting_name: str, datetime: str, topic: str, anomalies: List[Anomaly]):
+        if topic == 'callInfoUpdate':
+            table = self.call_info_table
+        else:
+            table = self.roster_table
+
         reason = json.dumps([a.dict() for a in anomalies])
         future = self.session.execute_async(
-            f'INSERT INTO {self.anomalies_table} (meeting_name, datetime, reason) '
-            f'VALUES (%s, %s, %s);',
-        (meeting_name, datetime, reason))
+            f'UPDATE {table} '
+            f'SET anomaly=true, anomaly_reason=%s '
+            f'WHERE meeting_name=%s AND datetime=%s;',
+        (reason, meeting_name, datetime))
 
         future.add_callbacks(
-            lambda _: logging.info(f'{self.TAG}: added anomaly for call {meeting_name} at {datetime}'),
-            lambda e: logging.error(f'{self.TAG}: "add anomaly" for {meeting_name} at {datetime} failed with {e}')
+            lambda _: logging.info(f'{self.TAG}: set anomaly status for call {meeting_name} at {datetime}'),
+            lambda e: logging.error(f'{self.TAG}: "set anomaly" for {meeting_name} at {datetime} failed with {e}')
         )
 
     def get_monitored_meetings(self):
@@ -102,7 +109,7 @@ async def cancel_db(app: web.Application):
 def setup_db(app, config: Config):
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
-    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table, config.anomalies_table)
+    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table, config.call_info_table, config.roster_table)
     app['db'] = dao
     app.on_startup.append(start_db)
     app.on_cleanup.append(cancel_db)

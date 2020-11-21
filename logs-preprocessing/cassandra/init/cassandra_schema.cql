@@ -1,8 +1,10 @@
 CREATE KEYSPACE test WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}; 
 USE test; 
 
-CREATE TABLE roster_update(datetime timestamp, 
-call_id text, 
+CREATE TABLE roster_update(
+meeting_name text,
+datetime timestamp,
+call_id text,
 initial int, 
 ringing int, 
 connected int, 
@@ -12,14 +14,17 @@ presenter int,
 endpoint_recording int, 
 hour int, 
 week_day_number int,
-name text, 
-PRIMARY KEY (call_id, datetime)); 
+anomaly boolean,
+anomaly_reason text, 
+PRIMARY KEY (meeting_name, datetime)); 
 
-CREATE TABLE call_info_update(adhoc boolean, 
-call_id text, 
+CREATE TABLE call_info_update(
+meeting_name text,
+datetime timestamp,
+call_id text,
+adhoc boolean, 
 cospace boolean, 
 current_participants int, 
-datetime timestamp, 
 forwarding boolean, 
 hour int, 
 locked boolean, 
@@ -29,9 +34,10 @@ mean_participants double,
 recording boolean, 
 streaming boolean, 
 time_diff bigint, 
-week_day_number int, 
-name text,
-PRIMARY KEY (call_id, datetime));
+week_day_number int,
+anomaly boolean,
+anomaly_reason text, 
+PRIMARY KEY (meeting_name, datetime));
 
 CREATE TABLE calls(call_id text PRIMARY KEY,
 start_datetime timestamp,
@@ -44,8 +50,3 @@ meeting_name text PRIMARY KEY,
 criteria text,
 monitored boolean);
 
-CREATE TABLE anomalies(
-meeting_name text,
-datetime timestamp,
-reason text,
-PRIMARY KEY (meeting_name, datetime));
