@@ -3,17 +3,21 @@ from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
 
+from .config import Config
+
 
 class CassandraDAO:
     def __init__(self):
         self.session = None
         self.calls_table = None
+        self.anomalies_table = None
         self.meetings_table = None
 
-    def init(self, cluster, keyspace, calls_table, meetings_table):
+    def init(self, cluster, keyspace, calls_table, anomalies_table, meetings_table):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
         self.session.row_factory = dict_factory
         self.calls_table = calls_table
+        self.anomalies_table = anomalies_table
         self.meetings_table = meetings_table
 
     def get_conferences(self):
@@ -28,17 +32,17 @@ class CassandraDAO:
             result,
         )
 
-        current = []
-        recent = []
+        current = set()
+        recent = set()
 
         interval = 604800  # one week in seconds
         current_datetime = datetime.datetime.now()
 
         for call in calls:
             if call[1] and self.__check_if_recent(interval, current_datetime, call[2]):
-                recent.append(call)
+                recent.add(call)
             else:
-                current.append(call)
+                current.add(call)
 
         current = self.__transform(lambda call: call[0], current)
         recent = self.__transform(lambda call: call[0], recent)
@@ -71,6 +75,17 @@ class CassandraDAO:
         if meetings:
             return meetings[0]
         return {}
+
+    def get_anomalies(self, name, count):
+        results = self.session.execute(
+            f"SELECT meeting_name, datetime, reason FROM {self.anomalies_table} "
+            f"WHERE meeting_name = %s "
+            f"ORDER BY datetime DESC "
+            f"LIMIT %s;",
+            (name, count),
+        ).all()
+
+        return {'anomalies': results}
 
     # Oldies
 
@@ -105,7 +120,13 @@ class CassandraDAO:
 dao = CassandraDAO()
 
 
-def setup_db(host, port, user, passwd, keyspace, calls_table, meetings_table):
-    auth_provider = PlainTextAuthProvider(username=user, password=passwd)
-    cassandra = Cluster([host], port=port, auth_provider=auth_provider)
-    dao.init(cassandra, keyspace, calls_table, meetings_table)
+def setup_db(config: Config):
+    auth_provider = PlainTextAuthProvider(username=config.user, password=config.passwd)
+    cassandra = Cluster([config.host], port=config.port, auth_provider=auth_provider)
+    dao.init(
+        cassandra,
+        config.keyspace,
+        config.calls_table,
+        config.anomalies_table,
+        config.meetings_table
+    )

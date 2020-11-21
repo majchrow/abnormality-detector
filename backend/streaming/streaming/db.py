@@ -1,12 +1,15 @@
 import asyncio
+import json
 import logging
 from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
+from typing import List
 
 from .config import Config
 from .exceptions import DBFailureError
+from .monitoring.thresholds.criteria import Anomaly
 
 
 # TODO:
@@ -16,29 +19,27 @@ class CassandraDAO:
 
     TAG = 'CassandraDAO'
 
-    def __init__(self, cluster, keyspace, call_info_table, roster_table, meetings_table):
+    def __init__(self, cluster, keyspace, meetings_table, anomalies_table):
         self.cluster = cluster
         self.keyspace = keyspace
-        self.call_info_table = call_info_table
-        self.roster_table = roster_table
         self.meetings_table = meetings_table
+        self.anomalies_table = anomalies_table
         self.session = None
 
     def start(self):
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    def set_anomaly(self, call_id: str, datetime: str, topic):
-        table = self.call_info_table if topic == 'callInfoUpdate' else self.roster_table
+    def add_anomaly(self, meeting_name: str, datetime: str, anomalies: List[Anomaly]):
+        reason = json.dumps([a.dict() for a in anomalies])
         future = self.session.execute_async(
-            f'UPDATE {table} '
-            f'SET anomaly=true '
-            f'WHERE call_id=%s AND datetime=%s IF EXISTS;',
-        (call_id, datetime))
+            f'INSERT INTO {self.anomalies_table} (meeting_name, datetime, reason) '
+            f'VALUES (%s, %s, %s);',
+        (meeting_name, datetime, reason))
 
         future.add_callbacks(
-            lambda _: logging.info(f'{self.TAG}: set anomaly status for call {call_id} at {datetime}'),
-            lambda e: logging.error(f'{self.TAG}: set anomaly status for {call_id} at {datetime} failed with {e}')
+            lambda _: logging.info(f'{self.TAG}: added anomaly for call {meeting_name} at {datetime}'),
+            lambda e: logging.error(f'{self.TAG}: "add anomaly" for {meeting_name} at {datetime} failed with {e}')
         )
 
     def get_monitored_meetings(self):
@@ -101,7 +102,7 @@ async def cancel_db(app: web.Application):
 def setup_db(app, config: Config):
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
-    dao = CassandraDAO(cassandra, config.keyspace, config.call_info_table, config.roster_table, config.meetings_table)
+    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table, config.anomalies_table)
     app['db'] = dao
     app.on_startup.append(start_db)
     app.on_cleanup.append(cancel_db)

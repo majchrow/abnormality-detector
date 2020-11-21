@@ -13,9 +13,8 @@ class Config:
     cassandra_user = os.environ["CASSANDRA_USER"]
     cassandra_passwd = os.environ["CASSANDRA_PASSWD"]
     keyspace = os.environ["KEYSPACE"]
-    call_info_table = os.environ["CALL_INFO_TABLE"]
-    roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
+    anomalies_table = os.environ["ANOMALIES_TABLE"]
 
     def __post_init__(self):
         assert set(self.kafka_topic_map.values()) == {'callListUpdate', 'callInfoUpdate', 'rosterUpdate'}

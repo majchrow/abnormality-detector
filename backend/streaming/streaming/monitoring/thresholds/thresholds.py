@@ -92,7 +92,8 @@ class MonitoringTask:
                     logging.info(f'{self.TAG}: detected {len(anomalies)} anomalies for {self.conf_name}')
                     for queue in self.output_queues:
                         queue.put_nowait(anomalies)
-                    self.dao.set_anomaly(msg['call_id'], msg['datetime'], topic)
+
+                    self.dao.add_anomaly(msg['name'], msg['datetime'], anomalies)
         except asyncio.CancelledError:
             pass
 

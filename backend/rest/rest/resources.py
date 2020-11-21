@@ -5,14 +5,14 @@ from marshmallow import ValidationError
 
 from .db import dao
 from .exceptions import NotFoundError
-from .schema import meeting_schema
+from .schema import anomaly_schema, anomaly_request_schema, meeting_schema
 
 
 class Meetings(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
-        result['created'] = [meeting_schema.dump(meeting) for meeting in result['created']]
+        result['created'] = list(map(meeting_schema.dump, result['created']))
         return result
 
     @cross_origin()
@@ -50,7 +50,23 @@ class MeetingDetails(Resource):
             return {"message": f"no meeting {conf_name}"}, 404
 
 
+class Anomalies(Resource):
+    @cross_origin()
+    def get(self):
+        try:
+            if errors := anomaly_request_schema.validate(request.args.to_dict()):
+                return {"message": f'invalid request: {errors}'}, 400
+
+            conf_name, count = request.args['name'], int(request.args['count'])
+            result = dao.get_anomalies(conf_name, count)
+            result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
+            return result
+        except NotFoundError:
+            return {"message": f"no meeting {conf_name}"}, 404
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Meetings, "/conferences")
     api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
+    api.add_resource(Anomalies, "/anomalies")
