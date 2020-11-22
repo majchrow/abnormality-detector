@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
@@ -36,7 +37,9 @@ class CassandraDAO:
         future = loop.create_future()
 
         def on_success(meetings):
-            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings'),
+            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings')
+            for m in meetings:
+                m['criteria'] = json.loads(m['criteria'])
             future.set_result(meetings)
 
         def on_error(e):

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import sys
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRebalanceListener
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 
@@ -14,9 +14,6 @@ def report(stuff: str):
     sys.stdout.flush()
 
 
-# TODO:
-#  for the _cleanup to work properly with rebalance we'd have to set key=call_name
-#  on callInfoUpdate and rosterUpdate messages
 class Worker:
 
     def __init__(
@@ -30,49 +27,28 @@ class Worker:
         self.config_consumer = config_consumer
         self.kafka_producer = producer
         self.monitoring_criteria = {}
-        self.monitoring_last = {}
 
-        self.rebalance_in_progress = False
         self.loop = None
 
     async def start(self):
         self.loop = asyncio.get_event_loop()
-        await asyncio.gather(self._cleanup(), self.process_config(), self.process_data())
-
-    # necessary due to Kafka consumer group re-balancing
-    async def _cleanup(self):
-        while True:
-            await asyncio.sleep(60)
-            now = self.loop.time()
-
-            stale = []
-            for meeting_name, last_update in self.monitoring_last.items():
-                if now - last_update > 60:
-                    stale.append(meeting_name)
-
-            for name in stale:
-                del self.monitoring_criteria[name]
-                del self.monitoring_last[name]
-            if stale:
-                report(f'cleaned up stale monitoring tasks for {stale}')
+        await asyncio.gather(self.process_config(), self.process_data(), return_exceptions=True)
 
     async def process_config(self):
         async for msg in self.config_consumer:
             msg_dict = json.loads(msg.value)
-            config_type = msg_dict['config_type']
 
-            report(f'received configuration: {msg_dict}')
+            meeting_name = msg_dict['meeting_name']
+            config_type = msg_dict['type']
+            report(f'received configuration {config_type} for {meeting_name}')
 
             if config_type == 'update':
-                meeting_name, criteria = msg.key.decode(), validate(msg_dict['criteria'])
+                criteria = validate(msg_dict['criteria'])
                 self.monitoring_criteria[meeting_name] = criteria
-                self.monitoring_last[meeting_name] = self.loop.time()
             elif config_type == 'delete':
-                meeting_name = msg.key.decode()
                 if self.monitoring_criteria.pop(meeting_name, None):
-                    del self.monitoring_last[meeting_name]
                     payload = json.dumps({'meeting': meeting_name, 'anomalies': STREAM_FINISHED})
-                    await self.kafka_producer.send_and_wait("monitoring-anomalies", payload.encode())
+                    await self.kafka_producer.send_and_wait('monitoring-anomalies', payload.encode())
             else:
                 # TODO: log unknown?
                 pass
@@ -85,8 +61,6 @@ class Worker:
             if not (criteria := self.monitoring_criteria.get(meeting_name, None)):
                 continue
 
-            self.monitoring_last[meeting_name] = self.loop.time()
-
             msg_type = MsgType(msg.topic[len('preprocessed_'):])
             anomalies = check(msg_dict, msg_type, criteria)
 
@@ -95,6 +69,7 @@ class Worker:
                 # TODO: create task?
                 await self.kafka_producer.send("monitoring-anomalies", payload.encode())
                 self.set_anomaly(msg_dict['name'], msg_dict['datetime'], msg.topic, anomalies)
+                report(f'detected {len(anomalies)} anomalies')
 
     def set_anomaly(self, meeting_name, datetime, topic, anomalies):
         if topic == 'callInfoUpdate':
@@ -121,12 +96,11 @@ async def run():
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate', bootstrap_servers='kafka:29092'
+        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate', bootstrap_servers='kafka:29092',
+        group_id='monitoring-workers'
     )
 
-    config_consumer = AIOKafkaConsumer(
-        'monitoring-config', bootstrap_servers='kafka:29092', group_id='monitoring-workers'
-    )
+    config_consumer = AIOKafkaConsumer('monitoring-config', bootstrap_servers='kafka:29092')
 
     await data_consumer.start()
     await config_consumer.start()

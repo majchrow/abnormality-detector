@@ -211,7 +211,7 @@ param_types = {
 ##################
 # Module interface
 ##################
-def validate(criteria: List[Dict]):
+def validate(criteria: List[Dict]) -> List[Criterion]:
     validated = []
     for criterion in criteria:
         # note: using this instead of Union type because error messages SUCK otherwise
@@ -224,7 +224,7 @@ def validate(criteria: List[Dict]):
     return validated
 
 
-def check(message: dict, msg_type: MsgType, criteria: List[Criterion]):
+def check(message: dict, msg_type: MsgType, criteria: List[Criterion]) -> List[Anomaly]:
     anomalies = []
     for c in criteria:
         if (anomaly := c.verify(message, msg_type)) is not None:
