@@ -27,7 +27,7 @@ class CassandraDAO:
 
         calls = self.__transform(
             lambda call: (
-                {"id": call["call_id"], "name": call["name"]},
+                {"id": call["call_id"], "name": call["meeting_name"]},
                 call["finished"],
                 call["start_datetime"],
             ),
@@ -108,7 +108,7 @@ class CassandraDAO:
 
         return (
             self.__create_conf_details_dict(
-                call["call_id"], call["name"], str(call["start_datetime"])
+                call["call_id"], call["meeting_name"], str(call["start_datetime"])
             )
             if call
             else self.__create_conf_details_dict(conf_id, "unknown", "unknown")
