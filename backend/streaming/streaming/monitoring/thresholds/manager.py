@@ -7,6 +7,9 @@ from ...config import Config
 
 
 class ThresholdManager:
+
+    TAG = 'ThresholdManager'
+
     def __init__(self, config: Config):
         self.config = config
         self.num_workers = config.num_workers
@@ -40,6 +43,7 @@ class ThresholdManager:
 
     async def shutdown(self):
         await asyncio.gather(*[w.stop() for w in self.workers])
+        logging.info(f'{self.TAG}: shutdown')
 
 
 class ChildProcess:
@@ -64,6 +68,7 @@ class ChildProcess:
             # Reset so that backoff doesn't stay large all the time
             if (backoff := backoff * 2) > 10:
                 backoff = 1
+        logging.info(f'{self.uid} main loop shutdown')
 
     async def run_once(self):
         serialized = json.dumps(dataclasses.asdict(self.config))
@@ -81,6 +86,7 @@ class ChildProcess:
         self.running = False
         self.worker.kill()
         await self.worker.wait()
+        logging.info(f'{self.uid} shutdown')
 
     async def _listen(self, stream, what):
         while self.worker.returncode is None:
