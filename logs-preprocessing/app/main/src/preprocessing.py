@@ -107,7 +107,7 @@ class CallInfoPreprocessor(Preprocessor):
                     "mean_participants",
                     "max_participants",
                     "week_day_number",
-                    "name",
+                    "meeting_name",
                     "hour",
                 )
             ).alias("value")
@@ -151,7 +151,7 @@ class CallInfoPreprocessor(Preprocessor):
             grouped.withColumn(
                 "datetime", self.helper.get_last_date_udf(grouped.date_array)
             )
-            .withColumn("name", self.helper.get_name_udf(grouped.name_array))
+            .withColumn("meeting_name", self.helper.get_name_udf(grouped.name_array))
             .withColumn("time_diff", self.helper.get_time_diff_udf(grouped.date_array))
             .withColumn("call_id", grouped.call)
             .withColumn(
@@ -191,7 +191,7 @@ class CallInfoPreprocessor(Preprocessor):
                 "current_participants",
                 "mean_participants",
                 "max_participants",
-                "name"
+                "meeting_name"
             )
         )
 
@@ -231,7 +231,7 @@ class RosterPreprocessor(Preprocessor):
                     "endpoint_recording",
                     "datetime",
                     "call_id",
-                    "name",
+                    "meeting_name",
                     "week_day_number",
                     "hour",
                 )
@@ -277,7 +277,7 @@ class RosterPreprocessor(Preprocessor):
             )
             .groupBy("call")
             .agg(func.collect_list("struct").alias("struct_array"),
-            func.reverse(func.collect_list("name")).getItem(0).alias("name"))
+            func.reverse(func.collect_list("name")).getItem(0).alias("meeting_name"))
         )
 
         preprocessed = grouped.withColumn(
@@ -298,7 +298,7 @@ class RosterPreprocessor(Preprocessor):
             stats.endpoint_recording.alias("endpoint_recording"),
             stats.datetime.alias("datetime"),
             preprocessed.call.alias("call_id"),
-            "name"
+            "meeting_name"
         )
 
         final.printSchema()
@@ -342,8 +342,8 @@ class CallsPreprocessor(Preprocessor):
             .withColumn(
                 "finished", self.helper.get_if_finished_udf(grouped.updateType_array)
             )
-            .withColumn("name", self.helper.get_name_udf(grouped.name_array))
-            .select("start_datetime", "last_update", "call_id", "finished", "name")
+            .withColumn("meeting_name", self.helper.get_name_udf(grouped.name_array))
+            .select("start_datetime", "last_update", "call_id", "finished", "meeting_name")
         )
 
         preprocessed.printSchema()
@@ -361,7 +361,7 @@ class CallsPreprocessor(Preprocessor):
                     "last_update",
                     "call_id",
                     "finished",
-                    "name",
+                    "meeting_name",
                 )
             ).alias("value")
         )
