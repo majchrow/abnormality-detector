@@ -7,6 +7,7 @@ from cassandra.cluster import Cluster
 
 from . import STREAM_FINISHED
 from .criteria import check, validate, MsgType
+from ...config import Config
 
 
 def report(stuff: str):
@@ -31,6 +32,7 @@ class Worker:
         self.loop = None
 
     async def start(self):
+        report('started')
         self.loop = asyncio.get_event_loop()
         await asyncio.gather(self.process_config(), self.process_data(), return_exceptions=True)
 
@@ -61,7 +63,7 @@ class Worker:
             if not (criteria := self.monitoring_criteria.get(meeting_name, None)):
                 continue
 
-            msg_type = MsgType(msg.topic[len('preprocessed_'):])
+            msg_type = MsgType(msg.topic.split('_', 1)[1])
             anomalies = check(msg_dict, msg_type, criteria)
 
             if anomalies:
@@ -72,7 +74,7 @@ class Worker:
                 report(f'detected {len(anomalies)} anomalies')
 
     def set_anomaly(self, meeting_name, datetime, topic, anomalies):
-        if topic == 'callInfoUpdate':
+        if topic == 'preprocessed_callInfoUpdate':
             table = self.call_info_table
         else:
             table = self.roster_table
@@ -90,26 +92,28 @@ class Worker:
         )
 
 
-async def run():
-    # TODO: parameters from cmd line arguments (from parent)
-    producer = AIOKafkaProducer(bootstrap_servers='kafka:29092')
+async def run(config):
+    producer = AIOKafkaProducer(bootstrap_servers=config.kafka_bootstrap_server)
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate', bootstrap_servers='kafka:29092',
-        group_id='monitoring-workers'
+        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
+        bootstrap_servers=config.kafka_bootstrap_server, group_id='monitoring-workers'
     )
 
-    config_consumer = AIOKafkaConsumer('monitoring-config', bootstrap_servers='kafka:29092')
+    config_consumer = AIOKafkaConsumer('monitoring-config', bootstrap_servers=config.kafka_bootstrap_server)
 
     await data_consumer.start()
     await config_consumer.start()
 
-    auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
-    cassandra = Cluster(['cassandra'], port=9042, auth_provider=auth_provider)
-    session = cassandra.connect('test')
+    auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
+    cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
+    session = cassandra.connect(config.keyspace)
 
-    worker = Worker('call_info_update', 'roster_update', session, data_consumer, config_consumer, producer)
+    worker = Worker(
+        config.call_info_table, config.roster_table, session, data_consumer, config_consumer, producer
+    )
+
     try:
         await worker.start()
     finally:
@@ -120,9 +124,12 @@ async def run():
 
 
 def main():
+    config_arg = sys.argv[1]
+    config = Config(**json.loads(config_arg))
+
     loop = asyncio.get_event_loop()
     try:
-        loop.create_task(run())
+        loop.create_task(run(config))
         loop.run_forever()
     finally:
         loop.close()

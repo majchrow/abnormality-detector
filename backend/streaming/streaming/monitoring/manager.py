@@ -20,7 +20,7 @@ class Manager:
         self.config = config
         self.dao = dao
         self.kafka_manager = KafkaManager(config.kafka_bootstrap_server, config.kafka_call_list_topic)
-        self.threshold_manager = ThresholdManager(config.num_workers)
+        self.threshold_manager = ThresholdManager(config)
         # TODO: other managers for e.g. running ML predictions, retraining model etc.
 
     def start(self):
