@@ -68,7 +68,6 @@ class ChildProcess:
             # Reset so that backoff doesn't stay large all the time
             if (backoff := backoff * 2) > 10:
                 backoff = 1
-        logging.info(f'{self.uid} main loop shutdown')
 
     async def run_once(self):
         serialized = json.dumps(dataclasses.asdict(self.config))
