@@ -1,68 +1,81 @@
 <div class="main-body" fxLayout="column">
-  <ng-container
-    *ngIf="settingMeeting; then settingOn; else settingOff">
+  <ng-container *ngIf="settingMeeting; then settingOn; else settingOff">
   </ng-container>
 
   <ng-template #settingOff>
     <mat-card>
-      <mat-card-header style="justify-content: center;">
+      <mat-card-header style="justify-content: center">
         <mat-card-title>
           <h2>Meetings</h2>
         </mat-card-title>
       </mat-card-header>
-      <ng-container
-        *ngIf="allMeetings; then spinnerOff; else spinner">
+      <ng-container *ngIf="selectedMeetings; then spinnerOff; else spinner">
       </ng-container>
       <ng-template #spinnerOff>
+        <app-meeting-type-select (selectedChange)="changeMeetingType($event)">
+        </app-meeting-type-select>
         <mat-card-content>
-          <div fxLayout="row wrap" fxFlex.md="50" class="card-deck-container mat-elevation-z4">
-
-            <div *ngFor="let meeting of allMeetings.created" class="card-item">
+          <div
+            fxLayout="row wrap"
+            fxFlex.md="50"
+            class="card-deck-container mat-elevation-z4"
+          >
+            <div
+              *ngFor="let meeting of selectedMeetings.created"
+              class="card-item"
+            >
               <app-meeting-card-created
                 [meeting]="meeting"
                 (deleteEmitter)="delete(meeting)"
-                (settingEmitter)="setting(meeting)">
-
+                (settingEmitter)="setting(meeting)"
+              >
               </app-meeting-card-created>
             </div>
 
-            <div *ngFor="let meeting of allMeetings.current" class="card-item">
+            <div
+              *ngFor="let meeting of selectedMeetings.current"
+              class="card-item"
+            >
               <app-meeting-card-current
                 [meeting]="meeting"
                 (deleteEmitter)="delete(meeting)"
-                (settingEmitter)="setting(meeting)">
-
+                (settingEmitter)="setting(meeting)"
+              >
               </app-meeting-card-current>
             </div>
 
-            <div *ngFor="let meeting of allMeetings.recent" class="card-item">
+            <div
+              *ngFor="let meeting of selectedMeetings.recent"
+              class="card-item"
+            >
               <app-meeting-card-recent
                 [meeting]="meeting"
                 (deleteEmitter)="delete(meeting)"
-                (settingEmitter)="setting(meeting)">
-
+                (settingEmitter)="setting(meeting)"
+              >
               </app-meeting-card-recent>
             </div>
 
             <div class="card-item">
-              <mat-card class="add-card"
-                        [ngStyle]="{'width':'400' + 'px'}"
-                        (click)="newMeetingDialog()">
-                <mat-card-header style="justify-content: center;">
-                  <mat-card-title>
-                    Dodaj spotkanie
-                  </mat-card-title>
+              <mat-card
+                class="add-card"
+                [ngStyle]="{ width: '400' + 'px' }"
+                (click)="newMeetingDialog()"
+              >
+                <mat-card-header style="justify-content: center">
+                  <mat-card-title> Dodaj spotkanie </mat-card-title>
                 </mat-card-header>
               </mat-card>
-
             </div>
 
-            <div class="footer" *ngIf="allMeetings.current.length !== 0">  <!-- todo - make it working -->
+            <div class="footer" *ngIf="allMeetings.current.length !== 0">
+              <!-- todo - make it working -->
               <mat-paginator
                 [length]="paginatorSize"
                 [pageSize]="numberOfProductsDisplayedInPage"
                 [pageSizeOptions]="pageSizeOptions"
-                (page)="updateMeetingsDisplayedInPage($event)">
+                (page)="updateMeetingsDisplayedInPage($event)"
+              >
               </mat-paginator>
             </div>
           </div>
@@ -79,9 +92,6 @@
   </ng-template>
 
   <ng-template #settingOn>
-    <app-meeting-setting
-      [meeting]="settingMeeting">
-    </app-meeting-setting>
+    <app-meeting-setting [meeting]="settingMeeting"> </app-meeting-setting>
   </ng-template>
-
 </div>
