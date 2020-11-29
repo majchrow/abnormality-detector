@@ -4,6 +4,7 @@ import {environment} from '../../environments/environment';
 import {Observable} from 'rxjs';
 import {AllMeetings} from '../components/meetings/class/all-meetings';
 import {Meeting} from '../components/meetings/class/meeting';
+import {HistorySpec} from '../components/meetings/meeting-history/class/history';
 
 @Injectable({
   providedIn: 'root'
@@ -17,24 +18,29 @@ export class MeetingsService {
   }
 
 
-  put_meeting(meeting: Meeting): Observable<any> {
+  putMeeting(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.meetings}`;
     return this.http.put(url, meeting);
   }
 
-  delete_meeting(meeting: Meeting): Observable<any> {
+  deleteMeeting(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.meetings}?name=${meeting.name}`;
     return this.http.delete(url);
   }
 
-  fetch_meeting(name: string): Observable<Meeting> {
+  fetchMeeting(name: string): Observable<Meeting> {
     const url = `${this.backend.url}/${this.backend.meetings}/${name}`;
     return this.http.get<Meeting>(url);
   }
 
-  fetch_meetings(): Observable<AllMeetings> {
+  fetchMeetings(): Observable<AllMeetings> {
     const url = `${this.backend.url}/${this.backend.meetings}`;
     return this.http.get<AllMeetings>(url);
+  }
+
+  fetchAnomalies(meeting: Meeting, count: number): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.anomalies}?name=${meeting.name}&count=${count}`;
+    return this.http.get<any>(url);
   }
 
 }

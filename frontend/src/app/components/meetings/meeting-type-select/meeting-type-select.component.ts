@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import {Component, EventEmitter, Input, Output} from '@angular/core';
 
 interface MeetingType {
   value: string;
@@ -10,14 +10,14 @@ interface MeetingType {
   templateUrl: './meeting-type-select.component.html',
   styleUrls: ['./meeting-type-select.component.scss']
 })
-export class SelectMeetingType {
+export class SelectMeetingTypeComponent {
   @Output() selectedChange = new EventEmitter<string>();
+  @Input() selected: string;
 
   meetingTypes: MeetingType[] = [
-    { value: 'created', viewValue: 'Created' },
-    { value: 'current', viewValue: 'Current' },
-    { value: 'recent', viewValue: 'Recent' },
-    { value: 'all', viewValue: 'All' }
+    {value: 'created', viewValue: 'Created'},
+    {value: 'current', viewValue: 'Current'},
+    {value: 'recent', viewValue: 'Recent'},
   ];
 
   onMeetingTypeChange(selectedOption: string) {

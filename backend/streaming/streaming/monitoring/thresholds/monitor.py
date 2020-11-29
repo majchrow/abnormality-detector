@@ -65,7 +65,7 @@ class Worker:
 
             msg_type = MsgType(msg.topic.split('_', 1)[1])
             anomalies = check(msg_dict, msg_type, criteria)
-
+            # report(str(anomalies))
             if anomalies:
                 payload = json.dumps({'meeting': meeting_name, 'anomalies': [a.dict() for a in anomalies]})
                 # TODO: create task?

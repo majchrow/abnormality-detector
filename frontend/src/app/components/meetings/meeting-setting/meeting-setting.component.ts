@@ -1,4 +1,4 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {Meeting} from '../class/meeting';
 import {MatDialog} from '@angular/material/dialog';
 import {ConfirmationDialogService} from '../../../services/confirmation-dialog.service';
@@ -25,7 +25,7 @@ export class MeetingSettingComponent implements OnInit {
   }
 
   @Input() meeting: Meeting;
-
+  @Output() exitClick = new EventEmitter<any>();
 
   config: Record<string, any>;
 
@@ -139,7 +139,7 @@ export class MeetingSettingComponent implements OnInit {
   }
 
   fetchConfig(meeting: Meeting) {
-    this.meetingsService.fetch_meeting(meeting.name).subscribe(
+    this.meetingsService.fetchMeeting(meeting.name).subscribe(
       next => {
         this.config = this.parsePayload(next.criteria);
       },
@@ -172,7 +172,7 @@ export class MeetingSettingComponent implements OnInit {
   save() {
     this.dialogService.openConfirmDialog('Are you sure you want to save changes?')
       .afterClosed().subscribe(res => {
-        this.meetingsService.put_meeting(new Meeting(
+        this.meetingsService.putMeeting(new Meeting(
           this.meeting.name,
           this.preparePayload()
         )).subscribe(
@@ -307,6 +307,10 @@ export class MeetingSettingComponent implements OnInit {
     }
     return result;
 
+  }
+
+  onExitClick(): void {
+    this.exitClick.emit();
   }
 
 

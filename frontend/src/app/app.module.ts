@@ -42,8 +42,11 @@ import { FormsModule } from "@angular/forms";
 import { MatSliderModule } from "@angular/material/slider";
 import { DaysDialogComponent } from './components/meetings/meeting-setting/days-dialog/days-dialog.component';
 import { NewMeetingDialogComponent } from './components/meetings/new-meeting-dialog/new-meeting-dialog.component';
-import { SelectMeetingType } from './components/meetings/meeting-type-select/meeting-type-select.component';
+import { SelectMeetingTypeComponent } from './components/meetings/meeting-type-select/meeting-type-select.component';
 import {MatSelectModule} from '@angular/material/select';
+import { MeetingHistoryComponent } from './components/meetings/meeting-history/meeting-history.component';
+import {MatTableModule} from "@angular/material/table";
+import { NotificationDialogComponent } from './components/shared/notification/notification-dialog/notification-dialog.component';
 
 @NgModule({
   declarations: [
@@ -67,33 +70,36 @@ import {MatSelectModule} from '@angular/material/select';
     MeetingCardCreatedComponent,
     DaysDialogComponent,
     NewMeetingDialogComponent,
-    SelectMeetingType
+    SelectMeetingTypeComponent,
+    MeetingHistoryComponent,
+    NotificationDialogComponent
   ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    HttpClientModule,
-    MatToolbarModule,
-    MatButtonModule,
-    MatSelectModule,
-    MatIconModule,
-    MatButtonToggleModule,
-    MatCardModule,
-    FlexLayoutModule,
-    MatPaginatorModule,
-    BrowserAnimationsModule,
-    MatListModule,
-    MatDialogModule,
-    MatSnackBarModule,
-    MatSlideToggleModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatProgressSpinnerModule,
-    NgxSliderModule,
-    MatCheckboxModule,
-    FormsModule,
-    MatSliderModule
-  ],
+    imports: [
+        BrowserModule,
+        AppRoutingModule,
+        HttpClientModule,
+        MatToolbarModule,
+        MatButtonModule,
+        MatSelectModule,
+        MatIconModule,
+        MatButtonToggleModule,
+        MatCardModule,
+        FlexLayoutModule,
+        MatPaginatorModule,
+        BrowserAnimationsModule,
+        MatListModule,
+        MatDialogModule,
+        MatSnackBarModule,
+        MatSlideToggleModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatProgressSpinnerModule,
+        NgxSliderModule,
+        MatCheckboxModule,
+        FormsModule,
+        MatSliderModule,
+        MatTableModule
+    ],
   providers: [],
   bootstrap: [AppComponent]
 })

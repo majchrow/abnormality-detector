@@ -1,6 +1,6 @@
 <mat-form-field appearance="fill">
   <mat-label>Select meeting type</mat-label>
-  <mat-select (selectionChange)="onMeetingTypeChange($event.value)">
+  <mat-select [(value)]="selected" (selectionChange)="onMeetingTypeChange($event.value)">
     <mat-option *ngFor="let type of meetingTypes" [value]="type.value">
       {{ type.viewValue }}
     </mat-option>

@@ -32,7 +32,9 @@ export class NewMeetingDialogComponent implements OnInit {
   onRestoreClick(): void {
     this.dialogService.openConfirmDialog('Are you sure you want to restore changes? Changes you made will not be saved.')
       .afterClosed().subscribe(res => {
-        this.name = '';
+        if (res) {
+          this.name = '';
+        }
       }
     );
   }
@@ -40,21 +42,23 @@ export class NewMeetingDialogComponent implements OnInit {
   onSaveClick(): void {
     this.dialogService.openConfirmDialog('Are you sure you want to create this meeting?')
       .afterClosed().subscribe(res => {
-        this.meetingsService.put_meeting(
-          new Meeting(this.name, [])
-        ).subscribe(
-          result => {
-            this.notificationService.success(
-              'Meeting added sucessfully'
-            );
-            this.dialogRef.close(this.name);
-          }, err => {
-            this.notificationService.warn(
-              'Failed to add meeting'
-            );
-            this.dialogRef.close(this.name);
-          }
-        );
+        if (res) {
+          this.meetingsService.putMeeting(
+            new Meeting(this.name, [])
+          ).subscribe(
+            result => {
+              this.notificationService.success(
+                'Meeting added sucessfully'
+              );
+              this.dialogRef.close(this.name);
+            }, err => {
+              this.notificationService.warn(
+                'Failed to add meeting'
+              );
+              this.dialogRef.close(this.name);
+            }
+          );
+        }
       }
     );
   }

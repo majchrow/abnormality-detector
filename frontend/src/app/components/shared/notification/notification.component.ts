@@ -1,6 +1,9 @@
 import {Component, OnInit} from '@angular/core';
 import {MeetingSSEService} from '../../../services/meeting-sse.service';
 import {NotificationService} from '../../../services/notification.service';
+import {MatDialog} from '@angular/material/dialog';
+import {NotificationDialogComponent} from './notification-dialog/notification-dialog.component';
+import {NotificationSpec} from './class/notification-struct';
 
 @Component({
   selector: 'app-notification',
@@ -11,12 +14,13 @@ export class NotificationComponent implements OnInit {
 
   constructor(
     private meetingSSEService: MeetingSSEService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private dialog: MatDialog
   ) {
   }
 
 
-  notifications: Array<string> = new Array<string>();
+  notifications: NotificationSpec[] = [];
   count = 0;
 
   ngOnInit(): void {
@@ -27,18 +31,41 @@ export class NotificationComponent implements OnInit {
     this.meetingSSEService.getServerSentEvents().subscribe(
       next => {
         this.count += 1;
-        this.notifications.push(next.message);
-        // console.log(next);
+        const tmpData = JSON.parse(next.data);
+        const name = tmpData.name;
+        const data = tmpData.event;
+        this.notifications.push(
+          new NotificationSpec(
+            'info',
+            `${name}`,
+            `${data}`
+          )
+        );
       },
       error => {
-        this.notificationService.warn(error.message);
+        this.notificationService.warn(error.data);
       }
     );
   }
 
 
   onClick() {
-    this.count = 0;
+    if (this.count !== 0) {
+      this.count = 0;
+      this.openDialog();
+    }
+  }
+
+  openDialog(): void {
+    const dialog = this.dialog.open(NotificationDialogComponent, {
+      panelClass: 'app-full-bleed-dialog',
+      data: this.notifications,
+      position: {top: '40px', right: '50px'}
+    });
+
+    dialog.afterClosed().subscribe(
+      () => this.notifications = []
+    );
   }
 
 }

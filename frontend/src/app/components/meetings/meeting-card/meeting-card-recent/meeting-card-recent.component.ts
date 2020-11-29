@@ -9,12 +9,16 @@ import {Meeting} from '../../class/meeting';
 export class MeetingCardRecentComponent implements OnInit {
 
   @Input() meeting: Meeting;
-  @Output() deleteEmitter = new EventEmitter<Meeting>();
-  @Output() settingEmitter = new EventEmitter<Meeting>();
+  @Output() historyEmitter = new EventEmitter<Meeting>();
 
   constructor() {
   }
 
   ngOnInit(): void {
   }
+
+  onHistoryClick() {
+    this.historyEmitter.emit(this.meeting);
+  }
+
 }

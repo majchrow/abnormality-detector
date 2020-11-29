@@ -1,13 +1,12 @@
-import { Component, OnInit } from '@angular/core';
-import { Meeting } from './class/meeting';
-import { MatDialog } from '@angular/material/dialog';
-import { ConfirmationDialogService } from '../../services/confirmation-dialog.service';
-import { NotificationService } from '../../services/notification.service';
-import { MeetingsService } from '../../services/meetings.service';
-import { MeetingSSEService } from '../../services/meeting-sse.service';
-import { AllMeetings } from './class/all-meetings';
-import { NewMeetingDialogComponent } from './new-meeting-dialog/new-meeting-dialog.component';
-import { SelectMeetingType } from './meeting-type-select/meeting-type-select.component';
+import {Component, OnInit} from '@angular/core';
+import {Meeting} from './class/meeting';
+import {MatDialog} from '@angular/material/dialog';
+import {ConfirmationDialogService} from '../../services/confirmation-dialog.service';
+import {NotificationService} from '../../services/notification.service';
+import {MeetingsService} from '../../services/meetings.service';
+import {MeetingSSEService} from '../../services/meeting-sse.service';
+import {AllMeetings} from './class/all-meetings';
+import {NewMeetingDialogComponent} from './new-meeting-dialog/new-meeting-dialog.component';
 
 @Component({
   selector: 'app-meetings',
@@ -25,13 +24,15 @@ export class MeetingsComponent implements OnInit {
   ) {
   }
 
+  selected: string;
   settingMeeting: Meeting;
+  historyMeeting: Meeting;
   paginatorSize = 1;
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
   allMeetings: AllMeetings;
   selectedMeetings: AllMeetings;
-  meetingType: string;
+  meetingType = 'current';
 
 
   updateMeetingsDisplayedInPage(event) {
@@ -39,17 +40,37 @@ export class MeetingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.settingMeeting = null;
+    this.initAllMeetings();
     this.subscribeRest();
   }
 
-  setting(meeting: Meeting) {
+  initAllMeetings() {
+    this.selected = 'None';
+    this.initHistoryMeeting();
+    this.initSettingMeeting();
+  }
+
+  initSettingMeeting() {
+    this.settingMeeting = null;
+  }
+
+  initHistoryMeeting() {
+    this.historyMeeting = null;
+  }
+
+  onSettingClick(meeting: Meeting) {
     this.settingMeeting = meeting;
+    this.selected = 'setting';
+  }
+
+  onHistoryClick(meeting: Meeting) {
+    this.historyMeeting = meeting;
+    this.selected = 'history';
   }
 
 
   subscribeRest() {
-    this.meetingsService.fetch_meetings().subscribe(
+    this.meetingsService.fetchMeetings().subscribe(
       next => {
         this.allMeetings = next;
         this.filterMeetings();
@@ -66,25 +87,20 @@ export class MeetingsComponent implements OnInit {
 
   changeMeetingType(selected: string) {
     this.meetingType = selected;
-    console.log("Selected:", this.meetingType);
     this.filterMeetings();
   }
 
   filterMeetings() {
-    console.log("Filtering");
     switch (this.meetingType) {
       case 'created': {
-        console.log("created");
         this.selectedMeetings = new AllMeetings([], [], [...this.allMeetings.created]);
         break;
       }
       case 'current': {
-        console.log("current");
         this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [], []);
         break;
       }
       case 'recent': {
-        console.log("recent");
         this.selectedMeetings = new AllMeetings([], [...this.allMeetings.recent], []);
         break;
       }
@@ -95,12 +111,12 @@ export class MeetingsComponent implements OnInit {
   }
 
   subscribeAllSSE() {
-    this.allMeetings.current.forEach(
-      meeting => {
-        this.subscribe_sse(meeting.name);
-        console.log(`Meeting ${meeting.name} subscribed`);
-      }
-    );
+    // this.allMeetings.current.forEach(
+    //   meeting => {
+    //     this.subscribe_sse(meeting.name);
+    //     console.log(`Meeting ${meeting.name} subscribed`);
+    //   }
+    // );
   }
 
 
@@ -118,21 +134,21 @@ export class MeetingsComponent implements OnInit {
     );
   }
 
-  delete(meeting: Meeting) {
+  onDeleteClick(meeting: Meeting) {
     this.dialogService.openConfirmDialog('Are you sure you want to delete this meeting?')
       .afterClosed().subscribe(res => {
-        if (res) {
-          this.meetingsService.delete_meeting(meeting).subscribe(
-            () => {
-              this.notificationService.success('Deleted successfully');
-              this.allMeetings = null;
-              this.subscribeRest();
-            }, error => {
-              this.notificationService.warn('Failed to delete meeting');
-            }
-          );
-        }
-      });
+      if (res) {
+        this.meetingsService.deleteMeeting(meeting).subscribe(
+          () => {
+            this.notificationService.success('Deleted successfully');
+            this.allMeetings = null;
+            this.subscribeRest();
+          }, () => {
+            this.notificationService.warn('Failed to delete meeting');
+          }
+        );
+      }
+    });
   }
 
   newMeetingDialog(): void {
