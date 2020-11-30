@@ -23,6 +23,7 @@ if __name__ == "__main__":
     SPARK.conf.set("spark.cassandra.connection.port", os.environ["CASSANDRA_PORT"])
     SPARK.conf.set("spark.cassandra.auth.username", os.environ["CASSANDRA_USER"])
     SPARK.conf.set("spark.cassandra.auth.password", os.environ["CASSANDRA_PASSWORD"])
+    SPARK.conf.set("spark.sql.shuffle.partitions", 5)
     path = os.environ["FILEPATH"]
     kafka = os.environ["KAFKA"]
     preprocessor = PREPROCESSORS[os.environ["UPDATE_TYPE"]](SPARK, kafka, path)

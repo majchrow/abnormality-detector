@@ -15,8 +15,14 @@ if __name__ == "__main__":
     with open(FILEPATH, "r") as f:
         data = json.load(f)
 
+    size = len(data)
+
+    sleep(5)
+
+    print("STARTING")
+
     for j, i in enumerate(data):
         topic = str(i["message"]["type"])
         PRODUCER.send(topic=topic, value=i)
-        print(i)
-        sleep(3)
+        print(f"{j}/{size}")
+        sleep(0.5)
