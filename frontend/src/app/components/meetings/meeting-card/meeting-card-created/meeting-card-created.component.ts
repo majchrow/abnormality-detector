@@ -13,6 +13,7 @@ export class MeetingCardCreatedComponent implements OnInit {
 
   @Input() meeting: Meeting;
   @Output() deleteEmitter = new EventEmitter<Meeting>();
+  @Output() historyEmitter = new EventEmitter<Meeting>();
   @Output() settingEmitter = new EventEmitter<Meeting>();
 
   constructor(
@@ -51,15 +52,15 @@ export class MeetingCardCreatedComponent implements OnInit {
     this.monitoring = null;
   }
 
-  settings(event: MouseEvent) {
+  onSettingClick() {
     this.settingEmitter.emit(this.meeting);
   }
 
-  edit(event: MouseEvent) {
-    console.log('edit');
+  onHistoryClick() {
+    this.historyEmitter.emit(this.meeting);
   }
 
-  delete(event: MouseEvent) {
+  onDeleteClick() {
     this.deleteEmitter.emit(this.meeting);
   }
 

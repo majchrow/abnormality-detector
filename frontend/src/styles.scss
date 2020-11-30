@@ -84,3 +84,7 @@ snack-bar-container.notification simple-snack-bar {
   font-size: 18px !important;
   font-weight: bold;
 }
+
+.app-full-bleed-dialog .mat-dialog-container {
+  padding: 0;
+}

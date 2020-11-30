@@ -7,7 +7,8 @@ export const environment = {
   backend: {
     rest: {
       url: 'http://localhost:5000',
-      meetings: 'conferences'
+      meetings: 'conferences',
+      anomalies: 'anomalies'
     },
     sse: {
       url: 'http://localhost:5001',

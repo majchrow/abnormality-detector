@@ -61,7 +61,7 @@ async def cancel_monitoring(request):
 
 async def get_all_monitoring(request):
     manager = request.app['monitoring']
-    return web.json_response({'monitored': manager.get_all_monitored()})
+    return web.json_response({'monitored': await manager.get_all_monitored()})
 
 
 async def is_monitored(request):
@@ -69,7 +69,7 @@ async def is_monitored(request):
         raise web.HTTPBadRequest(reason='No conference name given')
 
     manager = request.app['monitoring']
-    return web.json_response({'monitored': manager.is_monitored(conf_name)})
+    return web.json_response({'monitored': await manager.is_monitored(conf_name)})
 
 
 async def get_monitoring_notifications(request):
@@ -81,11 +81,11 @@ async def get_monitoring_notifications(request):
     manager = request.app['monitoring']
 
     try:
-        monitoring_receiver = manager.monitoring_receiver(conf_name, monitoring_type)
+        monitoring_receiver = await manager.monitoring_receiver(conf_name, monitoring_type)
         async with sse_response(request) as resp:
             with monitoring_receiver() as receiver:
                 async for anomalies in receiver():
-                    await resp.send(json.dumps([a.dict() for a in anomalies]))
+                    await resp.send(json.dumps(anomalies))
         return resp
 
     except UnmonitoredError:

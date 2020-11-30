@@ -24,11 +24,15 @@ export class MeetingsComponent implements OnInit {
   ) {
   }
 
+  selected: string;
   settingMeeting: Meeting;
+  historyMeeting: Meeting;
   paginatorSize = 1;
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
   allMeetings: AllMeetings;
+  selectedMeetings: AllMeetings;
+  meetingType = 'current';
 
 
   updateMeetingsDisplayedInPage(event) {
@@ -36,19 +40,40 @@ export class MeetingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.settingMeeting = null;
+    this.initAllMeetings();
     this.subscribeRest();
   }
 
-  setting(meeting: Meeting) {
+  initAllMeetings() {
+    this.selected = 'None';
+    this.initHistoryMeeting();
+    this.initSettingMeeting();
+  }
+
+  initSettingMeeting() {
+    this.settingMeeting = null;
+  }
+
+  initHistoryMeeting() {
+    this.historyMeeting = null;
+  }
+
+  onSettingClick(meeting: Meeting) {
     this.settingMeeting = meeting;
+    this.selected = 'setting';
+  }
+
+  onHistoryClick(meeting: Meeting) {
+    this.historyMeeting = meeting;
+    this.selected = 'history';
   }
 
 
   subscribeRest() {
-    this.meetingsService.fetch_meetings().subscribe(
+    this.meetingsService.fetchMeetings().subscribe(
       next => {
         this.allMeetings = next;
+        this.filterMeetings();
         this.subscribeAllSSE();
       },
       error => {
@@ -60,13 +85,38 @@ export class MeetingsComponent implements OnInit {
     );
   }
 
-  subscribeAllSSE() {
-    this.allMeetings.current.forEach(
-      meeting => {
-        this.subscribe_sse(meeting.name);
-        console.log(`Meeting ${meeting.name} subscribed`);
+  changeMeetingType(selected: string) {
+    this.meetingType = selected;
+    this.filterMeetings();
+  }
+
+  filterMeetings() {
+    switch (this.meetingType) {
+      case 'created': {
+        this.selectedMeetings = new AllMeetings([], [], [...this.allMeetings.created]);
+        break;
       }
-    );
+      case 'current': {
+        this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [], []);
+        break;
+      }
+      case 'recent': {
+        this.selectedMeetings = new AllMeetings([], [...this.allMeetings.recent], []);
+        break;
+      }
+      default: {
+        this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [...this.allMeetings.recent], [...this.allMeetings.created]);
+      }
+    }
+  }
+
+  subscribeAllSSE() {
+    // this.allMeetings.current.forEach(
+    //   meeting => {
+    //     this.subscribe_sse(meeting.name);
+    //     console.log(`Meeting ${meeting.name} subscribed`);
+    //   }
+    // );
   }
 
 
@@ -84,16 +134,16 @@ export class MeetingsComponent implements OnInit {
     );
   }
 
-  delete(meeting: Meeting) {
+  onDeleteClick(meeting: Meeting) {
     this.dialogService.openConfirmDialog('Are you sure you want to delete this meeting?')
       .afterClosed().subscribe(res => {
       if (res) {
-        this.meetingsService.delete_meeting(meeting).subscribe(
+        this.meetingsService.deleteMeeting(meeting).subscribe(
           () => {
             this.notificationService.success('Deleted successfully');
             this.allMeetings = null;
             this.subscribeRest();
-          }, error => {
+          }, () => {
             this.notificationService.warn('Failed to delete meeting');
           }
         );

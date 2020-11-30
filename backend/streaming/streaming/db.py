@@ -5,11 +5,9 @@ from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
-from typing import List
 
 from .config import Config
 from .exceptions import DBFailureError
-from .monitoring.thresholds.criteria import Anomaly
 
 
 # TODO:
@@ -19,35 +17,15 @@ class CassandraDAO:
 
     TAG = 'CassandraDAO'
 
-    def __init__(self, cluster, keyspace, meetings_table, call_info_table, roster_table):
+    def __init__(self, cluster, keyspace, meetings_table):
         self.cluster = cluster
         self.keyspace = keyspace
         self.meetings_table = meetings_table
-        self.call_info_table = call_info_table
-        self.roster_table = roster_table
         self.session = None
 
     def start(self):
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
-
-    def set_anomaly(self, meeting_name: str, datetime: str, topic: str, anomalies: List[Anomaly]):
-        if topic == 'callInfoUpdate':
-            table = self.call_info_table
-        else:
-            table = self.roster_table
-
-        reason = json.dumps([a.dict() for a in anomalies])
-        future = self.session.execute_async(
-            f'UPDATE {table} '
-            f'SET anomaly=true, anomaly_reason=%s '
-            f'WHERE meeting_name=%s AND datetime=%s;',
-        (reason, meeting_name, datetime))
-
-        future.add_callbacks(
-            lambda _: logging.info(f'{self.TAG}: set anomaly status for call {meeting_name} at {datetime}'),
-            lambda e: logging.error(f'{self.TAG}: "set anomaly" for {meeting_name} at {datetime} failed with {e}')
-        )
 
     def get_monitored_meetings(self):
         result = self.session.execute_async(
@@ -59,13 +37,39 @@ class CassandraDAO:
         future = loop.create_future()
 
         def on_success(meetings):
-            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings'),
+            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings')
+            for m in meetings:
+                m['criteria'] = json.loads(m['criteria'])
             future.set_result(meetings)
 
         def on_error(e):
             logging.error(f'{self.TAG}: "get monitored meetings" failed with {e}'),
             future.set_exception(
                 DBFailureError(f'"get monitored meetings" failed with {e}')
+            )
+
+        result.add_callbacks(on_success, on_error)
+        return future
+
+    def is_monitored(self, call_name: str):
+        result = self.session.execute_async(
+            f'SELECT monitored FROM {self.meetings_table} '
+            f'WHERE meeting_name=%s;',
+            (call_name,)
+        )
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(result):
+            logging.info(f'{self.TAG}: fetched monitoring status for {call_name}')
+            status = result[0]['monitored'] if result else False
+            future.set_result(status)
+
+        def on_error(e):
+            logging.error(f'{self.TAG}: "is monitored" failed with {e}'),
+            future.set_exception(
+                DBFailureError(f'"is monitored" failed with {e}')
             )
 
         result.add_callbacks(on_success, on_error)
@@ -109,7 +113,7 @@ async def cancel_db(app: web.Application):
 def setup_db(app, config: Config):
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
-    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table, config.call_info_table, config.roster_table)
+    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table)
     app['db'] = dao
     app.on_startup.append(start_db)
     app.on_cleanup.append(cancel_db)

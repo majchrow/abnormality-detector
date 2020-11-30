@@ -2,7 +2,7 @@ from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
-
+import logging
 from .config import Config
 
 
@@ -27,7 +27,8 @@ class CassandraDAO:
 
         calls = self.__transform(
             lambda call: (
-                {"id": call["call_id"], "name": call["name"]},
+                call["call_id"],
+                call["meeting_name"],
                 call["finished"],
                 call["start_datetime"],
             ),
@@ -41,13 +42,13 @@ class CassandraDAO:
         current_datetime = datetime.datetime.now()
 
         for call in calls:
-            if call[1] and self.__check_if_recent(interval, current_datetime, call[2]):
+            if call[2] and self.__check_if_recent(interval, current_datetime, call[3]):
                 recent.add(call)
             else:
                 current.add(call)
 
-        current = self.__transform(lambda call: call[0], current)
-        recent = self.__transform(lambda call: call[0], recent)
+        current = self.__transform(lambda call: {"name": call[1], "criteria": []}, current)
+        recent = self.__transform(lambda call: {"name": call[1], "criteria": []}, recent)
 
         created = self.session.execute(
             f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}"
@@ -108,7 +109,7 @@ class CassandraDAO:
 
         return (
             self.__create_conf_details_dict(
-                call["call_id"], call["name"], str(call["start_datetime"])
+                call["call_id"], call["meeting_name"], str(call["start_datetime"])
             )
             if call
             else self.__create_conf_details_dict(conf_id, "unknown", "unknown")

@@ -10,14 +10,7 @@ from .routes import setup_routes
 def create_app():
     logging.basicConfig(level=logging.INFO)
 
-    # TODO: config file/cmd line
-    config = Config(
-        kafka_topic_map={
-            'preprocessed_callInfoUpdate': 'callInfoUpdate',
-            'preprocessed_rosterUpdate': 'rosterUpdate',
-            'preprocessed_callListUpdate': 'callListUpdate'
-        }
-    )
+    config = Config()
 
     app = web.Application()
     setup_routes(app)

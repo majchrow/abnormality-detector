@@ -11,7 +11,15 @@
 
   </mat-card-content>
   <mat-card-actions fxLayout="row" fxLayoutAlign="end center">
-    <i class="app-icon fa fa-cog" (click)="settings($event)"></i>
-    <i class="app-icon fa fa-history"></i>
+<!--    <mat-slide-toggle class="setting-toogle"-->
+<!--                      color="warn"-->
+<!--                      [checked]="this.monitored"-->
+<!--                      (change)=onMonitoringChange($event.checked)-->
+<!--                      [disabled]="this.meeting.criteria.length === 0">-->
+
+<!--    </mat-slide-toggle>-->
+    <span class="app-spacer"></span>
+    <i class="app-icon fa fa-cog" (click)="onSettingClick()"></i>
+    <i class="app-icon fa fa-history" (click)="onHistoryClick()"></i>
   </mat-card-actions>
 </mat-card>
