@@ -143,7 +143,7 @@ class KafkaManager:
                 msg_dict = json.loads(msg.value.decode())
 
                 if msg.topic == self.call_list_topic:
-                    call_name = msg_dict['name']
+                    call_name = msg_dict['meeting_name']
                     if msg_dict['finished']:
                         event = 'Meeting finished'
                     elif msg_dict['start_datetime'] == msg_dict['last_update']:
