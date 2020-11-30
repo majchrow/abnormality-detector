@@ -1,10 +1,9 @@
-.notification {
-  background-color: red;
-}
-
 .notification:hover {
   cursor: pointer;
 }
 
-.notification-count {
+.mat-icon {
+  font-size: 30px;
+  right: 20px;
+  top: 8px;
 }

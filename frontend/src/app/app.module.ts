@@ -47,6 +47,7 @@ import {MatSelectModule} from '@angular/material/select';
 import { MeetingHistoryComponent } from './components/meetings/meeting-history/meeting-history.component';
 import {MatTableModule} from "@angular/material/table";
 import { NotificationDialogComponent } from './components/shared/notification/notification-dialog/notification-dialog.component';
+import {MatBadgeModule} from "@angular/material/badge";
 
 @NgModule({
   declarations: [
@@ -98,7 +99,8 @@ import { NotificationDialogComponent } from './components/shared/notification/no
         MatCheckboxModule,
         FormsModule,
         MatSliderModule,
-        MatTableModule
+        MatTableModule,
+        MatBadgeModule
     ],
   providers: [],
   bootstrap: [AppComponent]

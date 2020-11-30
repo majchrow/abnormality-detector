@@ -21,7 +21,7 @@ export class NotificationComponent implements OnInit {
 
 
   notifications: NotificationSpec[] = [];
-  count = 0;
+  count = 11;
 
   ngOnInit(): void {
     this.subscribeSSEs();

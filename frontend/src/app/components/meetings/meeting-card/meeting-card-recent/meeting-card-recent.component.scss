@@ -1,4 +1,17 @@
-mat-card {
+.mat-card {
+  display:flex;
+  flex-direction: column;
   background-color: darkcyan;
   opacity: 30%;
+  width: 450px;
+  height: 150px;
+}
+
+.mat-card-header {
+  flex-shrink: 0;
+}
+
+.mat-card-content{
+  flex-grow: 1;
+  overflow: auto;
 }
