@@ -33,7 +33,7 @@ class Worker:
 
     async def start(self):
         report('started')
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
         await asyncio.gather(self.process_config(), self.process_data(), return_exceptions=True)
 
     async def process_config(self):
@@ -58,19 +58,18 @@ class Worker:
     async def process_data(self):
         async for msg in self.data_consumer:
             msg_dict = json.loads(msg.value)
-            meeting_name = msg_dict['name']
-
+            meeting_name = msg_dict['meeting_name']
             if not (criteria := self.monitoring_criteria.get(meeting_name, None)):
                 continue
 
             msg_type = MsgType(msg.topic.split('_', 1)[1])
             anomalies = check(msg_dict, msg_type, criteria)
-            # report(str(anomalies))
+
             if anomalies:
                 payload = json.dumps({'meeting': meeting_name, 'anomalies': [a.dict() for a in anomalies]})
                 # TODO: create task?
                 await self.kafka_producer.send("monitoring-anomalies", payload.encode())
-                self.set_anomaly(msg_dict['name'], msg_dict['datetime'], msg.topic, anomalies)
+                self.set_anomaly(msg_dict['meeting_name'], msg_dict['datetime'], msg.topic, anomalies)
                 report(f'detected {len(anomalies)} anomalies')
 
     def set_anomaly(self, meeting_name, datetime, topic, anomalies):
@@ -97,7 +96,7 @@ async def run(config):
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
+        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate', 
         bootstrap_servers=config.kafka_bootstrap_server, group_id='monitoring-workers'
     )
 
@@ -123,11 +122,31 @@ async def run(config):
         await config_consumer.stop()
 
 
+async def handle_exception(loop, context):
+    msg = context.get("exception", context["message"])
+    report(f"Caught exception: {msg}")
+    asyncio.create_task(shutdown(loop))
+
+
+async def shutdown(loop):
+    report('Shutdown initiated...')
+    tasks = [t for t in asyncio.all_tasks() if t is not
+             asyncio.current_task()]
+
+    [task.cancel() for task in tasks]
+
+    report(f"Cancelling {len(tasks)} outstanding tasks...")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    report('Shutdown complete.')
+    loop.stop()
+
+
 def main():
     config_arg = sys.argv[1]
     config = Config(**json.loads(config_arg))
 
     loop = asyncio.get_event_loop()
+    loop.set_exception_handler(handle_exception)
     try:
         loop.create_task(run(config))
         loop.run_forever()

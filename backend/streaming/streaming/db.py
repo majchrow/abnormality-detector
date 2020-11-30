@@ -5,6 +5,7 @@ from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
+from typing import List, Optional
 
 from .config import Config
 from .exceptions import DBFailureError
@@ -75,12 +76,19 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
-    def set_monitoring_status(self, call_name: str, monitored: bool):
-        result = self.session.execute_async(
-            f'UPDATE {self.meetings_table} '
-            f'SET monitored=%s '
-            f'WHERE meeting_name=%s IF EXISTS;',
-        (monitored, call_name))
+    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]]=None):
+        if criteria is None:
+            result = self.session.execute_async(
+                f'UPDATE {self.meetings_table} '
+                f'SET monitored=%s '
+                f'WHERE meeting_name=%s;', # IF EXISTS;',  # this require frontend to cooperate
+            (monitored, call_name))
+        else:
+            result = self.session.execute_async(
+                f'UPDATE {self.meetings_table} '
+                f'SET monitored=%s, criteria=%s'
+                f'WHERE meeting_name=%s;', # IF EXISTS;',  # this require frontend to cooperate
+            (monitored, json.dumps(criteria), call_name))
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()

@@ -42,6 +42,7 @@ class Manager:
             await kafka_producer.stop()
 
     async def bootstrap(self):
+        await self.threshold_manager.started.wait()
         monitored = await self.dao.get_monitored_meetings()
         for meeting in monitored:
             await self.threshold_manager.schedule(meeting['name'], meeting['criteria'])
@@ -51,7 +52,7 @@ class Manager:
         if monitoring_type == 'threshold':
             validate(criteria)
 
-            await self.dao.set_monitoring_status(conf_name, monitored=True)
+            await self.dao.set_monitoring_status(conf_name, monitored=True, criteria=criteria)
             await self.threshold_manager.schedule(conf_name, criteria)
             logging.info(f'{self.TAG}: scheduled monitoring for {conf_name}')
         else:
@@ -142,7 +143,7 @@ class KafkaManager:
                 msg_dict = json.loads(msg.value.decode())
 
                 if msg.topic == self.call_list_topic:
-                    call_name = msg_dict['name']
+                    call_name = msg_dict['meeting_name']
                     if msg_dict['finished']:
                         event = 'Meeting finished'
                     elif msg_dict['start_datetime'] == msg_dict['last_update']:

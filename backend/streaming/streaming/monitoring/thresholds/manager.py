@@ -14,7 +14,7 @@ class ThresholdManager:
         self.config = config
         self.num_workers = config.num_workers
         self.workers = []
-
+        self.started = asyncio.Event()
         self.kafka_producer = None
 
     def init(self, kafka_producer):
@@ -24,7 +24,13 @@ class ThresholdManager:
         for i in range(self.num_workers):
             worker = ChildProcess(f'worker-{i}', self.config)
             self.workers.append(worker)
+        asyncio.create_task(self.set_started())
         await asyncio.gather(*[w.run() for w in self.workers], return_exceptions=True)
+
+    async def set_started(self):
+        await asyncio.gather(*[w.started.wait() for w in self.workers], return_exceptions=True)
+        await asyncio.sleep(3)
+        self.started.set()
 
     async def schedule(self, meeting_name, criteria):
         payload = json.dumps({
@@ -53,6 +59,7 @@ class ChildProcess:
         self.running = True
         self.worker = None
         self.task = None
+        self.started = asyncio.Event()
 
     async def run(self):
         backoff = 1
@@ -88,6 +95,11 @@ class ChildProcess:
         logging.info(f'{self.uid} shutdown')
 
     async def _listen(self, stream, what):
+        fst_line = (await stream.readline()).decode()
+        if 'started' in fst_line:
+            self.started.set()
+            logging.info(f'{self.uid}: {fst_line}')
+
         while self.worker.returncode is None:
             line = (await stream.readline()).decode()
             if not line:

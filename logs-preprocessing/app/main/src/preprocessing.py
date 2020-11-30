@@ -29,8 +29,9 @@ class Preprocessor:
     def create_output_stream(self, output_mode):
         return (
             self.prepare_final_df()
-            .writeStream
-            .outputMode(output_mode)
+            .writeStream.outputMode(output_mode)
+            .trigger(processingTime="1 seconds")
+            .option("maxOffsetsPerTrigger",5)
             .foreachBatch(self.write_data)
         )
 
@@ -38,9 +39,13 @@ class Preprocessor:
         pass
 
     def do_post_preprocessing(self, preprocessed):
-        return preprocessed.withColumn("hour", func.hour("datetime")).withColumn(
-            "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
-        ).withColumn("anomaly", func.lit(False).cast(BooleanType()))
+        return (
+            preprocessed.withColumn("hour", func.hour("datetime"))
+            .withColumn(
+                "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
+            )
+            .withColumn("anomaly", func.lit(False).cast(BooleanType()))
+        )
 
     def write_data(self, write_df, epoch_id):
         write_df.persist()
@@ -114,7 +119,9 @@ class CallInfoPreprocessor(Preprocessor):
         )
 
     def prepare_final_df(self):
-        self.df = self.df.select("date", "message.callInfo.call", "message.callInfo.name", "message.callInfo")
+        self.df = self.df.select(
+            "date", "message.callInfo.call", "message.callInfo.name", "message.callInfo"
+        )
         info = self.df.callInfo
 
         selected = self.df.select(
@@ -191,7 +198,7 @@ class CallInfoPreprocessor(Preprocessor):
                 "current_participants",
                 "mean_participants",
                 "max_participants",
-                "meeting_name"
+                "meeting_name",
             )
         )
 
@@ -239,7 +246,9 @@ class RosterPreprocessor(Preprocessor):
         )
 
     def prepare_final_df(self):
-        self.df = self.df.select("date", "call", "name", func.explode("message.updates"))
+        self.df = self.df.select(
+            "date", "call", "name", func.explode("message.updates")
+        )
         update_col = self.df.col
 
         selected = self.df.select(
@@ -276,8 +285,12 @@ class RosterPreprocessor(Preprocessor):
                 ),
             )
             .groupBy("call")
-            .agg(func.collect_list("struct").alias("struct_array"),
-            func.reverse(func.collect_list("name")).getItem(0).alias("meeting_name"))
+            .agg(
+                func.collect_list("struct").alias("struct_array"),
+                func.reverse(func.collect_list("name"))
+                .getItem(0)
+                .alias("meeting_name"),
+            )
         )
 
         preprocessed = grouped.withColumn(
@@ -298,7 +311,7 @@ class RosterPreprocessor(Preprocessor):
             stats.endpoint_recording.alias("endpoint_recording"),
             stats.datetime.alias("datetime"),
             preprocessed.call.alias("call_id"),
-            "meeting_name"
+            "meeting_name",
         )
 
         final.printSchema()
@@ -337,13 +350,19 @@ class CallsPreprocessor(Preprocessor):
 
         preprocessed = (
             grouped.withColumn("call_id", grouped.call)
-            .withColumn("start_datetime", self.helper.get_first_date_udf(grouped.date_array))
-            .withColumn("last_update", self.helper.get_last_date_udf(grouped.date_array))
+            .withColumn(
+                "start_datetime", self.helper.get_first_date_udf(grouped.date_array)
+            )
+            .withColumn(
+                "last_update", self.helper.get_last_date_udf(grouped.date_array)
+            )
             .withColumn(
                 "finished", self.helper.get_if_finished_udf(grouped.updateType_array)
             )
             .withColumn("meeting_name", self.helper.get_name_udf(grouped.name_array))
-            .select("start_datetime", "last_update", "call_id", "finished", "meeting_name")
+            .select(
+                "start_datetime", "last_update", "call_id", "finished", "meeting_name"
+            )
         )
 
         preprocessed.printSchema()

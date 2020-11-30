@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     kafka_bootstrap_server: str = os.environ["KAFKA"]
-    kafka_call_list_topic: str = 'preprocessed_callListUpdate'
+    kafka_call_list_topic: str = os.environ['CALL_LIST_TOPIC']
     num_workers: int = int(os.environ['THRESHOLD_WORKERS'])
 
     cassandra_host: str = os.environ["CASSANDRA_HOST"]

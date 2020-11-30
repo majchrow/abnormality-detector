@@ -10,4 +10,4 @@ ENV KAFKA="kafka:29092"
 
 RUN pip install -r requirements.txt
 
-CMD ["python", "producer.py"]
+CMD ["python", "-u", "producer.py"]

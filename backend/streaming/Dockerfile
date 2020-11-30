@@ -9,6 +9,7 @@ COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENV KAFKA="kafka:29092"
+ENV CALL_LIST_TOPIC="preprocessed_callListUpdate"
 ENV CASSANDRA_HOST="cassandra"
 ENV CASSANDRA_USER="cassandra"
 ENV CASSANDRA_PORT="9042"

@@ -4,4 +4,4 @@ if [ -z  "$1" ]; then
     exit
 fi
 
-curl -X PUT -d '{"type": "threshold", "criteria": [{"parameter": "active_speaker", "conditions": {"min": 122}}]}' localhost:5001/monitoring/$1
+curl -X PUT -d '{"type": "threshold", "criteria": [{"parameter": "active_speaker", "conditions": {"min": 1}}]}' localhost:5001/monitoring/$1
