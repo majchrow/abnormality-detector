@@ -6,7 +6,6 @@ import {NotificationService} from '../../../services/notification.service';
 import {LabelType, Options} from '@angular-slider/ngx-slider';
 import {DaysDialogComponent} from './days-dialog/days-dialog.component';
 import {MeetingsService} from '../../../services/meetings.service';
-import {MeetingSSEService} from '../../../services/meeting-sse.service';
 
 @Component({
   selector: 'app-meeting-setting',
@@ -19,8 +18,7 @@ export class MeetingSettingComponent implements OnInit {
     private dialog: MatDialog,
     private dialogService: ConfirmationDialogService,
     private meetingsService: MeetingsService,
-    private notificationService: NotificationService,
-    private meetingSSEService: MeetingSSEService
+    private notificationService: NotificationService
   ) {
   }
 
@@ -139,9 +137,24 @@ export class MeetingSettingComponent implements OnInit {
   }
 
   fetchConfig(meeting: Meeting) {
-    this.meetingsService.fetchMeeting(meeting.name).subscribe(
-      next => {
-        this.config = this.parsePayload(next.criteria);
+    this.meetingsService.fetchMeetings().subscribe(
+      meetings => {
+        if (meetings.created.map(met => met.name).includes(this.meeting.name)) {
+          this.meetingsService.fetchMeeting(meeting.name).subscribe(
+            next => {
+              this.config = this.parsePayload(next.criteria);
+            },
+            err => {
+              if (err.status !== 404) {
+                console.log(err);
+              }
+              this.config = this.getDefaultConfig();
+            }
+          );
+        } else {
+          this.config = this.getDefaultConfig();
+        }
+
       },
       err => {
         console.log(err);

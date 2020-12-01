@@ -10,9 +10,7 @@ import {MAT_DIALOG_DATA, MatDialogRef} from '@angular/material/dialog';
 export class NotificationDialogComponent implements OnInit {
 
   constructor(
-    private dialogService: ConfirmationDialogService,
-    public dialogRef: MatDialogRef<NotificationDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: string[]
+    @Inject(MAT_DIALOG_DATA) public data: any[]
   ) {
   }
 

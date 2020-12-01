@@ -21,7 +21,7 @@ export class NotificationComponent implements OnInit {
 
 
   notifications: NotificationSpec[] = [];
-  count = 11;
+  count = 0;
 
   ngOnInit(): void {
     this.subscribeSSEs();
@@ -30,7 +30,6 @@ export class NotificationComponent implements OnInit {
   subscribeSSEs() {
     this.meetingSSEService.getServerSentEvents().subscribe(
       next => {
-        this.count += 1;
         const tmpData = JSON.parse(next.data);
         const name = tmpData.name;
         const data = tmpData.event;
@@ -41,6 +40,7 @@ export class NotificationComponent implements OnInit {
             `${data}`
           )
         );
+        this.count += 1;
       },
       error => {
         this.notificationService.warn(error.data);

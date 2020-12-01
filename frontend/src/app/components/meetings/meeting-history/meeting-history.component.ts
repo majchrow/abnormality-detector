@@ -34,6 +34,7 @@ export class MeetingHistoryComponent implements OnInit {
   fetchHistory() {
     this.meetingsService.fetchAnomalies(this.meeting, 10).subscribe(
       res => {
+        console.log(res);
         this.anomaliesHistory = res.anomalies.map(
           (obj) => new HistorySpec(
             this._formatDate(obj.datetime),

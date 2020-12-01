@@ -1,5 +1,5 @@
 .mat-card {
-  display:flex;
+  display: flex;
   flex-direction: column;
   background-color: darkcyan;
   opacity: 50%;
@@ -11,7 +11,14 @@
   flex-shrink: 0;
 }
 
-.mat-card-content{
+.mat-card-content {
   flex-grow: 1;
   overflow: auto;
+}
+
+.mat-badge-content {
+  font-size: 10px;
+  left: 20px;
+  text-align: center;
+  align-items: center;
 }

@@ -1,15 +1,15 @@
-import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
 import {Meeting} from '../../class/meeting';
 import {MeetingSSEService} from '../../../../services/meeting-sse.service';
 import {NotificationService} from '../../../../services/notification.service';
-import {Observable} from 'rxjs';
+import {Observable, Subscription} from 'rxjs';
 
 @Component({
   selector: 'app-meeting-card-created',
   templateUrl: './meeting-card-created.component.html',
   styleUrls: ['./meeting-card-created.component.scss']
 })
-export class MeetingCardCreatedComponent implements OnInit {
+export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
 
   @Input() meeting: Meeting;
   @Output() deleteEmitter = new EventEmitter<Meeting>();
@@ -23,16 +23,26 @@ export class MeetingCardCreatedComponent implements OnInit {
   }
 
   monitoring: Observable<any>;
+  subscription: Subscription;
   monitored = false;
+  count = 0;
+
 
   ngOnInit(): void {
     this.fetchMonitoring();
+  }
+
+  ngOnDestroy(): void {
+    this.unsubscribeMonitoring();
   }
 
   fetchMonitoring() {
     this.meetingSSEService.fetchMonitoring(this.meeting.name).subscribe(
       res => {
         this.monitored = res.monitored;
+        if (this.monitored) {
+          this.subscribeMonitoring();
+        }
       }, err => {
         console.log(err);
       }
@@ -42,13 +52,23 @@ export class MeetingCardCreatedComponent implements OnInit {
 
   subscribeMonitoring() {
     this.monitoring = this.meetingSSEService.getServerSentEvent(this.meeting.name);
-    this.monitoring.subscribe(
-      res => console.log(res),
-      err => console.log(err)
-    );
+    this.subscription = this.monitoring.subscribe(
+      res => {
+        this.count += 1;
+        console.log(res);
+      },
+      error => {
+        console.log(error);
+        if (error.eventPhase !== 2) {
+          this.notificationService.warn(error.message);
+        }
+      });
   }
 
   unsubscribeMonitoring() {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
     this.monitoring = null;
   }
 
@@ -77,10 +97,10 @@ export class MeetingCardCreatedComponent implements OnInit {
         }
       );
     } else {
+      this.unsubscribeMonitoring();
       this.meetingSSEService.deleteMonitoring(this.meeting).subscribe(
         () => {
           this.notificationService.success('Deletes monitoring successfully');
-          this.unsubscribeMonitoring();
           this.monitored = false;
         },
         () => {
@@ -88,7 +108,6 @@ export class MeetingCardCreatedComponent implements OnInit {
         }
       );
     }
-
   }
 
 }

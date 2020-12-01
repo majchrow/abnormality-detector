@@ -19,8 +19,7 @@ export class MeetingsComponent implements OnInit {
     private dialog: MatDialog,
     private dialogService: ConfirmationDialogService,
     private notificationService: NotificationService,
-    private meetingsService: MeetingsService,
-    private meetingSSEService: MeetingSSEService
+    private meetingsService: MeetingsService
   ) {
   }
 
@@ -74,7 +73,6 @@ export class MeetingsComponent implements OnInit {
       next => {
         this.allMeetings = next;
         this.filterMeetings();
-        this.subscribeAllSSE();
       },
       error => {
         this.notificationService.warn(error.message);
@@ -87,7 +85,9 @@ export class MeetingsComponent implements OnInit {
 
   changeMeetingType(selected: string) {
     this.meetingType = selected;
-    this.filterMeetings();
+    this.allMeetings = null;
+    this.selectedMeetings = null;
+    this.subscribeRest();
   }
 
   filterMeetings() {
@@ -108,30 +108,6 @@ export class MeetingsComponent implements OnInit {
         this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [...this.allMeetings.recent], [...this.allMeetings.created]);
       }
     }
-  }
-
-  subscribeAllSSE() {
-    // this.allMeetings.current.forEach(
-    //   meeting => {
-    //     this.subscribe_sse(meeting.name);
-    //     console.log(`Meeting ${meeting.name} subscribed`);
-    //   }
-    // );
-  }
-
-
-  subscribe_sse(name: string) {
-    this.meetingSSEService.getServerSentEvent(name).subscribe(
-      next => {
-        this.notificationService.success(
-          `Meeting ${name}: ${next.data}`);
-      },
-      error => {
-        if (error.eventPhase !== 2) {
-          this.notificationService.warn(error.message);
-        }
-      }
-    );
   }
 
   onDeleteClick(meeting: Meeting) {

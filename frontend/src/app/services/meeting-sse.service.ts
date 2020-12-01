@@ -54,6 +54,10 @@ export class MeetingSSEService {
           observer.error(error);
         });
       };
+
+      return () => {
+        eventSource.close();
+      };
     });
   }
 
