@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sys
+import traceback
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
@@ -34,7 +35,7 @@ class Worker:
     async def start(self):
         report('started')
         self.loop = asyncio.get_running_loop()
-        await asyncio.gather(self.process_config(), self.process_data(), return_exceptions=True)
+        await asyncio.gather(self.process_config(), self.process_data())
 
     async def process_config(self):
         async for msg in self.config_consumer:
@@ -104,7 +105,7 @@ async def run(config):
 
     await data_consumer.start()
     await config_consumer.start()
-
+    
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
     session = cassandra.connect(config.keyspace)
@@ -113,23 +114,31 @@ async def run(config):
         config.call_info_table, config.roster_table, session, data_consumer, config_consumer, producer
     )
 
-    try:
+    try:    
         await worker.start()
+    except Exception as e:
+        raise e
     finally:
-        # TODO: more cleanup
         await producer.stop()
         await data_consumer.stop()
         await config_consumer.stop()
 
 
-async def handle_exception(loop, context):
-    msg = context.get("exception", context["message"])
-    report(f"Caught exception: {msg}")
+def handle_exception(loop, context):
+    if e := context.get('exception', None):
+        msg = ''.join(traceback.format_tb(e.__traceback__))
+    else:
+        msg = context["message"]
+    
+    report('--- ERROR ---')
+    report(msg)
+
     asyncio.create_task(shutdown(loop))
 
 
 async def shutdown(loop):
     report('Shutdown initiated...')
+    
     tasks = [t for t in asyncio.all_tasks() if t is not
              asyncio.current_task()]
 
