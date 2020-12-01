@@ -32,7 +32,7 @@ class AnomalySchema(Schema):
     id = fields.Int(dump_only=True)
     meeting_name = fields.Str(required=True)
     datetime = fields.DateTime(required=True)
-    reason = JSONString(required=True)
+    anomaly_reason = JSONString(required=True)
 
 
 class AnomalyRequestSchema(Schema):
