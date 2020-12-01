@@ -4,6 +4,7 @@ import {ConfirmationDialogService} from '../../../services/confirmation-dialog.s
 import {MeetingsService} from '../../../services/meetings.service';
 import {Meeting} from '../class/meeting';
 import {NotificationService} from '../../../services/notification.service';
+import {FormControl, Validators} from '@angular/forms';
 
 @Component({
   selector: 'app-new-meeting-dialog',
@@ -20,20 +21,34 @@ export class NewMeetingDialogComponent implements OnInit {
   ) {
   }
 
-  name = '';
+  meetingControl = new FormControl('', Validators.required);
+  meetings: Meeting[];
+  selectedName = '';
 
   ngOnInit(): void {
+    this.fetchMeetings();
+  }
+
+  fetchMeetings() {
+    this.meetingsService.fetchMeetings().subscribe(
+      next => {
+        this.meetings = next.recent.filter(el => !next.created.some(sub => sub.name === el.name));
+      },
+      error => {
+        console.log(error);
+      }
+    );
   }
 
   onExitClick(): void {
-    this.dialogRef.close(this.name);
+    this.dialogRef.close(this.selectedName);
   }
 
   onRestoreClick(): void {
     this.dialogService.openConfirmDialog('Are you sure you want to restore changes? Changes you made will not be saved.')
       .afterClosed().subscribe(res => {
         if (res) {
-          this.name = '';
+          this.selectedName = '';
         }
       }
     );
@@ -44,18 +59,18 @@ export class NewMeetingDialogComponent implements OnInit {
       .afterClosed().subscribe(res => {
         if (res) {
           this.meetingsService.putMeeting(
-            new Meeting(this.name, [])
+            new Meeting(this.selectedName, [])
           ).subscribe(
             result => {
               this.notificationService.success(
                 'Meeting added sucessfully'
               );
-              this.dialogRef.close(this.name);
+              this.dialogRef.close(this.selectedName);
             }, err => {
               this.notificationService.warn(
                 'Failed to add meeting'
               );
-              this.dialogRef.close(this.name);
+              this.dialogRef.close(this.selectedName);
             }
           );
         }

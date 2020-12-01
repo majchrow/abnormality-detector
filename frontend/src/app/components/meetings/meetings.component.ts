@@ -67,6 +67,11 @@ export class MeetingsComponent implements OnInit {
     this.selected = 'history';
   }
 
+  resetMeetings() {
+    this.allMeetings = null;
+    this.selectedMeetings = null;
+  }
+
 
   subscribeRest() {
     this.meetingsService.fetchMeetings().subscribe(
@@ -85,8 +90,7 @@ export class MeetingsComponent implements OnInit {
 
   changeMeetingType(selected: string) {
     this.meetingType = selected;
-    this.allMeetings = null;
-    this.selectedMeetings = null;
+    this.resetMeetings();
     this.subscribeRest();
   }
 
@@ -117,7 +121,7 @@ export class MeetingsComponent implements OnInit {
         this.meetingsService.deleteMeeting(meeting).subscribe(
           () => {
             this.notificationService.success('Deleted successfully');
-            this.allMeetings = null;
+            this.resetMeetings();
             this.subscribeRest();
           }, () => {
             this.notificationService.warn('Failed to delete meeting');
@@ -133,7 +137,7 @@ export class MeetingsComponent implements OnInit {
     });
 
     dialogRef.afterClosed().subscribe(() => {
-      this.allMeetings = null;
+      this.resetMeetings();
       this.subscribeRest();
     });
   }

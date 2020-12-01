@@ -38,7 +38,7 @@ import {MeetingCardRecentComponent} from './components/meetings/meeting-card/mee
 import {MeetingCardCreatedComponent} from './components/meetings/meeting-card/meeting-card-created/meeting-card-created.component';
 import {NgxSliderModule} from '@angular-slider/ngx-slider';
 import {MatCheckboxModule} from '@angular/material/checkbox';
-import {FormsModule} from '@angular/forms';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {MatSliderModule} from '@angular/material/slider';
 import {DaysDialogComponent} from './components/meetings/meeting-setting/days-dialog/days-dialog.component';
 import {NewMeetingDialogComponent} from './components/meetings/new-meeting-dialog/new-meeting-dialog.component';
@@ -100,7 +100,8 @@ import {MatBadgeModule} from '@angular/material/badge';
     FormsModule,
     MatSliderModule,
     MatTableModule,
-    MatBadgeModule
+    MatBadgeModule,
+    ReactiveFormsModule
   ],
   providers: [],
   bootstrap: [AppComponent]

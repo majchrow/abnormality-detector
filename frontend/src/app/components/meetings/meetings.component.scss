@@ -28,7 +28,22 @@
   width: 100%;
 }
 
+.main-body > mat-card {
+  width: 98%;
+}
+
 #meeting {
   width: 500px;
   height: 500px;
+}
+
+.add-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  background-color: darkcyan;
+  opacity: 60%;
+  width: 450px;
+  height: 150px;
 }
