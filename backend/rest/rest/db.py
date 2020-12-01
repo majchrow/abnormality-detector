@@ -43,12 +43,12 @@ class CassandraDAO:
 
         for call in calls:
             if call[2] and self.__check_if_recent(interval, current_datetime, call[3]):
-                recent.add(call)
+                recent.add(call[1])
             else:
-                current.add(call)
+                current.add(call[1])
 
-        current = self.__transform(lambda call: {"name": call[1], "criteria": []}, current)
-        recent = self.__transform(lambda call: {"name": call[1], "criteria": []}, recent)
+        current = self.__transform(lambda call: {"name": call, "criteria": []}, current)
+        recent = self.__transform(lambda call: {"name": call, "criteria": []}, recent)
 
         created = self.session.execute(
             f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}"
