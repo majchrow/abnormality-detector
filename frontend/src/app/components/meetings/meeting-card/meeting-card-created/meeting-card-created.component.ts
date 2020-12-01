@@ -33,7 +33,9 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.unsubscribeMonitoring();
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 
   fetchMonitoring() {

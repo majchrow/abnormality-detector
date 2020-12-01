@@ -25,7 +25,7 @@
                 <mat-icon mat-list-icon *ngSwitchCase="'info'">info</mat-icon>
                 <mat-icon mat-list-icon *ngSwitchCase="'warning'" color="warn">warning</mat-icon>
                 <mat-icon id="green" mat-list-icon *ngSwitchCase="'success'">feedback</mat-icon>
-                <mat-icon mat-list-icon *ngSwitchDefault>info</mat-icon>
+                <span *ngSwitchDefault></span>
               </ng-container>
             </td>
           </ng-container>
@@ -36,6 +36,12 @@
             <td mat-cell *matCellDef="let element"> {{element.date}} </td>
           </ng-container>
 
+          <!-- Parameter Column -->
+          <ng-container matColumnDef="parameter">
+            <th mat-header-cell *matHeaderCellDef>Parameter</th>
+            <td mat-cell *matCellDef="let element"> {{element.parameter}} </td>
+          </ng-container>
+
           <!-- Reason Column -->
           <ng-container matColumnDef="reason">
             <th mat-header-cell *matHeaderCellDef>Reason</th>
@@ -43,7 +49,7 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" [ngClass]="{'subanomaly': row.date === '' }"></tr>
         </table>
       </ng-template>
       <ng-template #historyOff>

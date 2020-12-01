@@ -21,27 +21,28 @@ export class MeetingHistoryComponent implements OnInit {
   }
 
   anomaliesHistory: HistorySpec[];
-  displayedColumns: string[] = ['type', 'date', 'reason'];
+  displayedColumns: string[] = ['type', 'date', 'parameter', 'reason'];
 
   ngOnInit(): void {
     this.fetchHistory();
   }
 
   _formatDate(date: string) {
-    return `${date.substr(12, 4)} ${date.substr(0, 10)}`;
+    return `${date.substr(12, 7)} ${date.substr(0, 10)}`;
   }
 
   fetchHistory() {
     this.meetingsService.fetchAnomalies(this.meeting, 10).subscribe(
       res => {
         console.log(res);
-        this.anomaliesHistory = res.anomalies.map(
-          (obj) => new HistorySpec(
-            this._formatDate(obj.datetime),
-            'null',
-            'warning'
+        this.anomaliesHistory = res.anomalies.flatMap(anomalyGroup => anomalyGroup.anomaly_reason.map(
+          (anomaly, index) => new HistorySpec(
+            index === 0 ? 'warning' : '',
+            index === 0 ? this._formatDate(anomalyGroup.datetime) : '',
+            anomaly.parameter,
+            anomaly.value
           )
-        );
+        ));
       }, err => {
         console.log(err);
       }
