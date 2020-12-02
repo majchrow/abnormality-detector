@@ -1,8 +1,11 @@
 from cassandra.cluster import Cluster
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
 import logging
+import uuid
+
 from .config import Config
 
 
@@ -21,6 +24,10 @@ class CassandraDAO:
         self.call_info_table = call_info_table
         self.roster_table = roster_table
         self.meetings_table = meetings_table
+        self.init_locks()
+
+    def init_locks(self):
+        pass
 
     def get_conferences(self):
         result = self.session.execute(f"SELECT * FROM {self.calls_table}").all()
@@ -55,11 +62,24 @@ class CassandraDAO:
         ).all()
         return {"current": current, "recent": recent, "created": created}
 
+    def get_meetings(self):
+        result = self.session.execute(f"SELECT meeting_name as name, meeting_number FROM {self.meetings_table}").all()
+        return {'meetings': result}
+
+    def add_meetings(self, meetings):
+        stmt = self.session.prepare(
+            f"INSERT INTO {self.meetings_table} (meeting_name, meeting_number) "
+            f"VALUES (?, ?);"
+        )
+        execute_concurrent_with_args(
+            self.session, stmt, [(m['meeting_name'], m['meeting_number']) for m in meetings],
+        )
+
     def update_meeting(self, name, criteria):
         self.session.execute(
-            f"INSERT INTO {self.meetings_table} (meeting_name, criteria) "
-            f"VALUES (%s, %s);",
-            (name, criteria),
+            f"UPDATE {self.meetings_table} SET criteria=%s "
+            f"WHERE meeting_name=%s IF EXISTS;",
+            (criteria, name),
         )
 
     def remove_meeting(self, name):
@@ -69,7 +89,7 @@ class CassandraDAO:
 
     def meeting_details(self, name):
         results = self.session.execute(
-            f"SELECT meeting_name AS name, criteria FROM {self.meetings_table} "
+            f"SELECT meeting_name AS name, meeting_number, criteria FROM {self.meetings_table} "
             f"WHERE meeting_name = %s "
             f"LIMIT 1",
             (name,),
@@ -97,6 +117,12 @@ class CassandraDAO:
         ).all()
 
         return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])[-count:]}
+
+    def try_lock(self, resource):
+        uid = str(uuid.uuid4())
+        from flask import current_app
+        current_app.logger.info('dummy lock')
+        return True
 
     # Oldies
 

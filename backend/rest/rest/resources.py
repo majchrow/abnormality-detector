@@ -10,6 +10,7 @@ from .schema import anomaly_schema, anomaly_request_schema, meeting_schema
 
 
 class Meetings(Resource):
+    # TODO: this method should belong to separate Conferences resource
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
@@ -66,11 +67,10 @@ class Anomalies(Resource):
             return {"message": f"no meeting {conf_name}"}, 404
 
 
-class Rooms(Resource):
+class BridgeMeetings(Resource):
     @cross_origin()
-    def get(self):
-        cospaces = bridge_dao.get_cospaces()
-        return {'rooms': cospaces}
+    def get(self): 
+        return {'meetings': bridge_dao.get_meetings()}
 
 
 def setup_resources(app):
@@ -78,5 +78,5 @@ def setup_resources(app):
     api.add_resource(Meetings, "/conferences")
     api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
     api.add_resource(Anomalies, "/anomalies")
-    api.add_resource(Rooms, "/rooms")
+    api.add_resource(BridgeMeetings, "/meetings")
 

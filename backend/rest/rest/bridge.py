@@ -51,9 +51,21 @@ class BridgeDao:
     def init(self, bridge_client, db_dao):
         self.client = bridge_client
         self.dao = db_dao
-        
-    def get_cospaces(self):
-        return self.client.get_cospaces()
+       
+    def fetch_meetings(self):
+        cospaces = self.client.get_cospaces()
+        return [
+            {'meeting_name': cs['name'], 'meeting_number': cs['secondaryUri']} for cs in cospaces
+        ]
+
+    def get_meetings(self):
+        meetings = self.dao.get_meetings()
+        if not meetings['meetings']:
+            # DB not seeded
+            if self.dao.try_lock('meetings'):
+                meetings['meetings'] = self.fetch_meetings()
+                self.dao.add_meetings(meetings)
+        return meetings
 
 
 dao = BridgeDao()

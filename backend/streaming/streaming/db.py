@@ -8,7 +8,7 @@ from cassandra.query import dict_factory
 from typing import List, Optional
 
 from .config import Config
-from .exceptions import DBFailureError
+from .exceptions import DBFailureError, MeetingNotExistsError
 
 
 # TODO:
@@ -81,21 +81,26 @@ class CassandraDAO:
             result = self.session.execute_async(
                 f'UPDATE {self.meetings_table} '
                 f'SET monitored=%s '
-                f'WHERE meeting_name=%s;', # IF EXISTS;',  # this require frontend to cooperate
+                f'WHERE meeting_name=%s IF EXISTS;', 
             (monitored, call_name))
         else:
             result = self.session.execute_async(
                 f'UPDATE {self.meetings_table} '
                 f'SET monitored=%s, criteria=%s'
-                f'WHERE meeting_name=%s;', # IF EXISTS;',  # this require frontend to cooperate
+                f'WHERE meeting_name=%s IF EXISTS;', 
             (monitored, json.dumps(criteria), call_name))
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()
 
-        def on_success(_):
-            logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}'),
-            future.set_result(None)
+        def on_success(response):
+            applied = response[0]['[applied]']
+            if applied:
+                logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
+                future.set_result(None)
+            else:
+                logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
+                future.set_exception(MeetingNotExistsError())
 
         def on_error(e):
             logging.error(f'{self.TAG}: "set monitoring status" for call {call_name} failed with {e}'),
