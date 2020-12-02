@@ -60,12 +60,12 @@ class Worker:
         async for msg in self.data_consumer:
             msg_dict = json.loads(msg.value)
             meeting_name = msg_dict['meeting_name']
+
             if not (criteria := self.monitoring_criteria.get(meeting_name, None)):
                 continue
 
             msg_type = MsgType(msg.topic.split('_', 1)[1])
             anomalies = check(msg_dict, msg_type, criteria)
-
             if anomalies:
                 payload = json.dumps({'meeting': meeting_name, 'anomalies': [a.dict() for a in anomalies]})
                 # TODO: create task?

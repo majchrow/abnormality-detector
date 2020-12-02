@@ -1,5 +1,9 @@
+class MeetingNotExistsError(Exception):
+    "Attempted to access inexistent meeting"
+    pass
+
 class UnmonitoredError(Exception):
-    """Attempted to access conference that is not monitored"""
+    """Attempted to access meeting that is not monitored"""
     pass
 
 

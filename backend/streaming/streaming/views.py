@@ -4,7 +4,7 @@ from aiohttp import web
 from aiohttp_sse import sse_response
 from pydantic import ValidationError
 
-from .exceptions import DBFailureError, MonitoringNotSupportedError, UnmonitoredError
+from .exceptions import DBFailureError, MeetingNotExistsError, MonitoringNotSupportedError, UnmonitoredError
 
 __all__ = [
     'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored', 'get_call_info_notifications',
@@ -35,6 +35,8 @@ async def schedule_monitoring(request):
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
+    except MeetingNotExistsError:
+        raise web.HTTPBadRequest(reason=f'room {conf_name} does not exist')
     except MonitoringNotSupportedError:
         raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
     except DBFailureError:

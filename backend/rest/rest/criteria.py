@@ -212,8 +212,6 @@ param_types = {
 # Module interface
 ##################
 def validate(criteria: List[Dict]) -> List[Criterion]:
-    if not criteria:
-        raise ValueError('empty criteria passed')
     validated = []
     for criterion in criteria:
         # note: using this instead of Union type because error messages SUCK otherwise

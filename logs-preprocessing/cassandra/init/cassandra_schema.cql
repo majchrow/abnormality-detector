@@ -47,6 +47,7 @@ finished boolean);
 
 CREATE TABLE meetings(
 meeting_name text PRIMARY KEY, 
+meeting_number text,
 criteria text,
 monitored boolean);
 

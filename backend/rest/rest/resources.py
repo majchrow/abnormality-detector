@@ -4,11 +4,13 @@ from flask import request
 from marshmallow import ValidationError
 
 from .db import dao
+from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
-from .schema import anomaly_schema, anomaly_request_schema, meeting_schema
+from .schema import anomaly_schema, anomaly_request_schema, meeting_schema, meeting_request_schema
 
 
 class Meetings(Resource):
+    # TODO: this method should belong to separate Conferences resource
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
@@ -21,7 +23,7 @@ class Meetings(Resource):
         if not json_data:
             return {"message": "No input data provided"}, 400
         try:
-            data = meeting_schema.load(json_data)
+            data = meeting_request_schema.load(json_data)
         except ValidationError as err:
             return err.messages, 422
 
@@ -45,7 +47,7 @@ class MeetingDetails(Resource):
     @cross_origin()
     def get(self, conf_name):
         if meeting := dao.meeting_details(conf_name):
-            return meeting_schema.dump(meeting)
+            return meeting
         else:
             return {"message": f"no meeting {conf_name}"}, 404
 
@@ -65,8 +67,16 @@ class Anomalies(Resource):
             return {"message": f"no meeting {conf_name}"}, 404
 
 
+class BridgeMeetings(Resource):
+    @cross_origin()
+    def get(self): 
+        return {'meetings': bridge_dao.get_meetings()}
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Meetings, "/conferences")
     api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
     api.add_resource(Anomalies, "/anomalies")
+    api.add_resource(BridgeMeetings, "/meetings")
+
