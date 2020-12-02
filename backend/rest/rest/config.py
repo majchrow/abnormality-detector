@@ -11,3 +11,7 @@ class Config:
     call_info_table = os.environ["CALL_INFO_TABLE"]
     roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
+    bridge_host = os.environ['BRIDGE_HOST']
+    bridge_port = os.environ['BRIDGE_PORT']
+    bridge_username = os.environ['BRIDGE_USER']
+    bridge_password = os.environ['BRIDGE_PASSWORD']

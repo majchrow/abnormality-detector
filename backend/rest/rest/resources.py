@@ -4,6 +4,7 @@ from flask import request
 from marshmallow import ValidationError
 
 from .db import dao
+from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
 from .schema import anomaly_schema, anomaly_request_schema, meeting_schema
 
@@ -65,8 +66,17 @@ class Anomalies(Resource):
             return {"message": f"no meeting {conf_name}"}, 404
 
 
+class Rooms(Resource):
+    @cross_origin()
+    def get(self):
+        cospaces = bridge_dao.get_cospaces()
+        return {'rooms': cospaces}
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Meetings, "/conferences")
     api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
     api.add_resource(Anomalies, "/anomalies")
+    api.add_resource(Rooms, "/rooms")
+
