@@ -30,17 +30,8 @@ class CassandraDAO:
         pass
 
     def get_conferences(self):
-        result = self.session.execute(f"SELECT * FROM {self.calls_table}").all()
-
-        calls = self.__transform(
-            lambda call: (
-                call["call_id"],
-                call["meeting_name"],
-                call["finished"],
-                call["start_datetime"],
-            ),
-            result,
-        )
+        calls = self.session.execute(f"SELECT meeting_name as name, finished, start_datetime FROM {self.calls_table}").all()
+        meetings = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
 
         current = set()
         recent = set()
@@ -49,18 +40,21 @@ class CassandraDAO:
         current_datetime = datetime.datetime.now()
 
         for call in calls:
-            if call[2] and self.__check_if_recent(interval, current_datetime, call[3]):
-                recent.add(call[1])
+            if call['finished'] and self.__check_if_recent(interval, current_datetime, call['start_datetime']):
+                recent.add(call['name'])
             else:
-                current.add(call[1])
+                current.add(call['name'])
 
-        current = self.__transform(lambda call: {"name": call, "criteria": []}, current)
-        recent = self.__transform(lambda call: {"name": call, "criteria": []}, recent)
+        meeting_numbers = {
+            meeting['meeting_name']: meeting['meeting_number'] for meeting in meetings
+        }
+        
+        monitored = [m for m in meetings if m['monitored']]
+        [m.pop('monitored') for m in meetings]
+        current = self.__transform(lambda call: {"name": call, "meeting_numer": meeting_numbers[call], "criteria": []}, current)
+        recent = self.__transform(lambda call: {"name": call, "meeting_numer": meeting_numbers[call], "criteria": []}, recent)
 
-        created = self.session.execute(
-            f"SELECT meeting_name AS name, criteria FROM {self.meetings_table}"
-        ).all()
-        return {"current": current, "recent": recent, "created": created}
+        return {"current": current, "recent": recent, "created": monitored}
 
     def get_meetings(self):
         result = self.session.execute(f"SELECT meeting_name as name, meeting_number FROM {self.meetings_table}").all()
@@ -117,11 +111,9 @@ class CassandraDAO:
         ).all()
 
         return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])[-count:]}
-
+    
+    # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
-        uid = str(uuid.uuid4())
-        from flask import current_app
-        current_app.logger.info('dummy lock')
         return True
 
     # Oldies
