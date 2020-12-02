@@ -9,6 +9,5 @@ class Config:
     addresses: List[Tuple[str, int]]
     logfile: str
     dumpfile: str
-    kafka_file: Optional[str]
     kafka_bootstrap_address: Optional[str]
     ssl: bool = True

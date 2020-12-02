@@ -4,7 +4,7 @@ WORKDIR /bridge-connector
 
 COPY . .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
 ENV BRIDGE_USERNAME=username
 ENV BRIDGE_PASSWORD=password

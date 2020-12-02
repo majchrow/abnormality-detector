@@ -47,8 +47,6 @@ class ClientManager:
 
         if os.path.dirname(config.dumpfile):        
             os.makedirs(os.path.dirname(config.dumpfile), exist_ok=True)
-        if config.kafka_file and os.path.dirname(config.kafka_file):
-            os.makedirs(os.path.dirname(config.kafka_file), exist_ok=True)
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -56,42 +54,43 @@ class ClientManager:
         signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT, signal.SIGQUIT)
         for s in signals:
             loop.add_signal_handler(s, lambda s=s: asyncio.create_task(self.shutdown(loop, signal=s)))
-        
+ 
+        def async_partial(coro_fun, *args, **kwargs):
+            def run():
+                return coro_fun(*args, **kwargs)
+            return run
+       
+        file_flush_task = async_partial(self.flush_to_file, self.dump_queue, self.config.dumpfile)
+        kafka_publish_task = async_partial(self.push_to_kafka)
+        client_tasks = [async_partial(self.run_client, host, port) for host, port in self.config.addresses]
+
         try:
-            loop.create_task(self.flush_to_file(self.dump_queue, self.config.dumpfile))
-            loop.create_task(self.push_to_kafka())
+            loop.create_task(self.retry_on_failure(file_flush_task, 'flush to file task'))
+            loop.create_task(self.retry_on_failure(kafka_publish_task, 'Kafka publish task'))
 
-            # TODO: drop kafka_file altogether?
-            if self.config.kafka_file:
-                loop.create_task(self.flush_to_file(self.publish_queue, self.config.kafka_file))
-            else:
-                logging.info(f'{self.TAG}: running without Kafka file dump')
-
-            for host, port in self.config.addresses:
-                loop.create_task(self.run_client(host, port))
+            for task, addr in zip(client_tasks, self.config.addresses):
+                loop.create_task(self.retry_on_failure(task, f'bridge client task for {addr[0]}:{addr[1]}'))
             loop.run_forever()
         finally:
             loop.close()
             logging.info(f'{self.TAG}: shutdown complete.')
 
-    async def run_client(self, host: str, port: int):
-        client = Client(host, port, self.config.ssl, self)
+    async def retry_on_failure(self, task, name):
         backoff_s = 1
 
         while True:
             try:
-                logging.info(f'{self.TAG}: starting client for {host}:{port}...')
-                await client.run(self.config.login, self.config.password, self.session)
+                await task()
             except asyncio.CancelledError:
                 raise
             except:
-                logging.exception(f'{self.TAG}: run failed!')
+                logging.exception(f'{self.TAG}: {name} failed!')
                 await asyncio.sleep(backoff_s)
 
                 # Reset so that backoff doesn't stay large all the time
                 if (backoff_s := backoff_s * self.backoff_factor) > self.max_backoff_s:
                     backoff_s = 1
-
+   
     async def shutdown(self, loop, signal):
         if signal:
             logging.info(f'{self.TAG}: received exit signal {signal.name}...')
@@ -104,6 +103,11 @@ class ClientManager:
         await asyncio.gather(*tasks, return_exceptions=True)
         
         loop.stop()
+
+    async def run_client(self, host: str, port: int):
+        client = Client(host, port, self.config.ssl, self)
+        logging.info(f'{self.TAG}: starting client for {host}:{port}...')
+        await client.run(self.config.login, self.config.password, self.session)
 
     async def publish(self, msg: dict):
         await self.publish_queue.put(msg)

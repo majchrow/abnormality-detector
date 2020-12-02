@@ -39,9 +39,6 @@ def parse_args():
                         type=str,
                         default='client_dump.json',
                         help='default file to dump all raw server communication')
-    parser.add_argument('--kafka-file',
-                        type=str,
-                        help='file to dump messages as they shall be published to Kafka')
     parser.add_argument('--kafka-bootstrap-server',
                         type=str,
                         help='address of Kafka bootstrap server, e.g. localhost:9092')
@@ -63,8 +60,7 @@ def main():
     config = Config(
         login=login, password=password,
         addresses=args.addresses, kafka_bootstrap_address=args.kafka_bootstrap_server,
-        logfile=args.logfile, dumpfile=args.dumpfile, kafka_file=args.kafka_file,
-        ssl=args.ssl
+        logfile=args.logfile, dumpfile=args.dumpfile, ssl=args.ssl
     )
 
     log_to_file(config.logfile, level=logging.INFO)

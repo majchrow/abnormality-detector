@@ -14,15 +14,6 @@ from typing import Dict, List
 # Notes:
 #  - acknowledgements and subscriptionUpdates are ignored and not sent at all
 #  - if subscribed to "calls", clients get all "calls" events from log in order
-#  - if subscribed to "callRoster" or "callInfo", clients ALSO get all events
-#    from log in order - i.e. for a single subscription to a call X client may
-#    receive messages from various real calls
-#    - reasons:
-#      - ATM this data content doesn't matter so much (it's just a simulation)
-#      - it's tough to say from which call an event came - because subscription
-#        indexes were not used to differentiate calls when current log file was built
-#     TODO: should be changed with log from client with proper use of subscriptions
-
 
 @dataclass
 class DetailSubscription:
