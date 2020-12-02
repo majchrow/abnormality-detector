@@ -132,7 +132,7 @@ class ClientManager:
             await producer.stop()
 
     async def dump(self, msg: dict):
-        await self.dump_queue.put(msg)
+        await self.dump_queue.put(json.dumps(msg, indent=4))
 
     async def flush_to_file(self, queue, file):
         loop = asyncio.get_running_loop()
@@ -140,17 +140,16 @@ class ClientManager:
         try:
             with ThreadPoolExecutor() as executor:
                 while True:
-                    msg_dict = await queue.get()
-                    task = partial(self._save_to_file, msg_dict, file)
+                    msg_serialized = await queue.get()
+                    task = partial(self._save_to_file, msg_serialized, file)
                     await loop.run_in_executor(executor, task)
         except asyncio.CancelledError:
             raise  # TODO: release thread locks?
 
     @staticmethod
-    def _save_to_file(msg_dict, filepath):
+    def _save_to_file(msg_serialized, filepath):
         with open(filepath, 'a') as file:
-            json.dump(msg_dict, file, indent=4)
-            file.write(",\n")
+            file.write(msg_serialized + ',\n')
 
     ################################
     # Callbacks for Client instances
@@ -212,3 +211,4 @@ class Call:
                 self.handler = None
         else:
             self.clients.remove(client)
+

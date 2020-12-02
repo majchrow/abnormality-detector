@@ -116,13 +116,13 @@ class Client:
                 logging.warning(f'{self.TAG}: "callListUpdate" message with empty "updates" list')
                 return
 
-            call_id = updates[0]["call"]
-            if call_id not in self.call_ids:
-                # Conference this client does not handle
-                return
-
-            call = self.call_ids[call_id]
             for update in updates:
+                call_id = update["call"]
+                if call_id not in self.call_ids:
+                    # Conference this client does not handle
+                    continue
+
+                call = self.call_ids[call_id]
                 update['name'] = call.name
         else:
             index = msg_dict["message"]["subscriptionIndex"]
