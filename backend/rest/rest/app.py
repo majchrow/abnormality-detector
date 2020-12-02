@@ -10,12 +10,6 @@ from .db import setup_db
 from .resources import setup_resources
 
 
-def print_date_time():
-    print(time.strftime("%A, %d. %B %Y %I:%M:%S %p"))
-
-
-# Shut down the scheduler when exiting the app
-
 def create_app():
     app = Flask(__name__)
     app.config['JSON_AS_ASCII'] = False
