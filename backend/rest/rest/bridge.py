@@ -1,9 +1,15 @@
 import json
 import requests
+import urllib3
+from datetime import datetime, timedelta
 from lxml import etree
+from flask import current_app
 from requests.auth import HTTPBasicAuth
 
 from .config import Config
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def child_text(element, tag):
     try:
@@ -52,29 +58,42 @@ class BridgeDao:
         self.client = bridge_client
         self.dao = db_dao
        
-    def fetch_meetings(self):
+    def update_meetings(self):
         cospaces = self.client.get_cospaces()
-        return [
+        meetings = [
             {'meeting_name': cs['name'], 'meeting_number': cs['secondaryUri']} for cs in cospaces
         ]
+        self.dao.add_meetings(meetings)
+        return meetings
 
     def get_meetings(self):
         meetings = self.dao.get_meetings()
         if not meetings['meetings']:
             # DB not seeded
             if self.dao.try_lock('meetings'):
-                meetings['meetings'] = self.fetch_meetings()
-                self.dao.add_meetings(meetings)
+                meetings['meetings'] = self.update_meetings()
         return meetings
 
 
 dao = BridgeDao()
 
-def setup_bridge_dao(config: Config):
+def setup_bridge_dao(app, config: Config):
     from .db import dao as db_dao
 
     bridge_client = Client(
         config.bridge_host, config.bridge_port, config.bridge_username, config.bridge_password
     )
     dao.init(bridge_client, db_dao)
+
+    def meetings_update_job():
+        with app.app_context():
+            meetings = dao.update_meetings()
+            current_app.logger.info(f'Updated with {len(meetings)} meetings')
+
+    app.scheduler.add_job(
+        func=meetings_update_job, 
+        trigger='interval', 
+        next_run_time=datetime.now() + timedelta(seconds=10),
+        days=config.meetings_update_period_d
+    )
 
