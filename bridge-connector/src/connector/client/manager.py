@@ -222,10 +222,12 @@ class Call:
         if self.handled:
             # Some client is listening already
             self.clients.add(client)
+            logging.info(f'{self.manager.TAG}: {self.call_name} running on {len(self.clients) + 1} servers')
         else:
             # No one's been listening so this client will
             self.handler = client
             await client.on_connect_to(self.call_name)
+            logging.info(f'{self.manager.TAG}: {self.call_name} running on 1 server')
 
     async def remove(self, client):
         if client == self.handler:
@@ -241,3 +243,11 @@ class Call:
                 self.handler = None
         else:
             self.clients.remove(client)
+
+        if self.handler:
+            msg = f'{self.manager.TAG}: {self.call_name} running on {len(self.clients) + 1} server'
+            if self.clients:
+                msg += 's'
+            logging.info(msg)
+        else:
+            logging.info(f'{self.manager.TAG}: {self.call_name} finished on all servers')
