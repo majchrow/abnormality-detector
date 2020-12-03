@@ -1,8 +1,9 @@
 import aiohttp
 import json
 import logging
-from collections import namedtuple
 from aiohttp import ClientConnectionError
+from dataclasses import dataclass
+from typing import Optional
 from websockets import connect
 
 from .protocol import (
@@ -10,11 +11,16 @@ from .protocol import (
 )
 
 
+@dataclass
+class Call:
+    name: str
+    id: str
+    ci_subscription_index: Optional[int]
+
+
 class Client:
 
     TAG = 'Client'
-
-    Call = namedtuple('Call', ['name', 'id', 'ci_subscription_index'])
 
     def __init__(self, host: str, port: int, ssl: bool, call_manager):
         self.host = host
@@ -113,10 +119,10 @@ class Client:
 
             if update_type == 'add':
                 call_name = update["name"]
-                call = Client.Call(name=call_name, id=call_id, ci_subscription_index=None)
+                call = Call(name=call_name, id=call_id, ci_subscription_index=None)
                 self.calls[call_name] = self.call_ids[call_id] = call
             else:
-                call_name = self.calls[call_id].name
+                call_name = self.call_ids[call_id].name
                 update['name'] = call_name
 
         await self.call_manager.on_call_list_update(msg, self)
@@ -165,10 +171,11 @@ class Client:
         subscriptions = [calls_subscription]
 
         for call_id, call in self.call_ids.items():
-            subscriptions.extend([
-                call_info_subscription(call_id, call.ci_subscription_index),
-                call_roster_subscription(call_id, call.ci_subscription_index + 1)
-            ])
+            if call.ci_subscription_index is not None:
+                subscriptions.extend([
+                    call_info_subscription(call_id, call.ci_subscription_index),
+                    call_roster_subscription(call_id, call.ci_subscription_index + 1)
+                ])
 
         request = subscription_request(subscriptions, self.message_id)
         await self.ws.send(json.dumps(request))

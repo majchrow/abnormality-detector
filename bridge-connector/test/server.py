@@ -15,6 +15,7 @@ from typing import Dict, List
 #  - acknowledgements and subscriptionUpdates are ignored and not sent at all
 #  - if subscribed to "calls", clients get all "calls" events from log in order
 
+
 @dataclass
 class DetailSubscription:
     index: int
