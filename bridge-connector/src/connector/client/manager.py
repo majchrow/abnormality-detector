@@ -81,6 +81,7 @@ class ClientManager:
         while True:
             try:
                 await task()
+                return
             except asyncio.CancelledError:
                 raise
             except:
