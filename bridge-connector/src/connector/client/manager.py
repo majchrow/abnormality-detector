@@ -164,6 +164,7 @@ class ClientManager:
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
         current_ts = datetime.now().isoformat()
+        call = None
 
         for update in updates:
             update_type = update["updateType"]
@@ -184,11 +185,12 @@ class ClientManager:
                     del self.calls[call_name]
             else:
                 call = self.calls[call_name]
-           
-        msg['startDatetime'] = call.start_datetime
-        msg['date'] = current_ts
-        await self.publish(msg)
-        await self.dump(msg)
+
+        if call:
+            msg['startDatetime'] = call.start_datetime
+            msg['date'] = current_ts
+            await self.publish(msg)
+            await self.dump(msg)
 
     async def on_call_info_update(self, msg: dict, call_name: str):
         if not (call := self.calls.get(call_name, None)):
