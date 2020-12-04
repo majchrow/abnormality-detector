@@ -130,7 +130,6 @@ class ClientManager:
         try:
             while True:
                 msg_dict = await self.publish_queue.get()
-                msg_dict['date'] = datetime.now().isoformat()
                 payload = json.dumps(msg_dict).encode()
                 topic = msg_dict['message']['type']
                 await producer.send_and_wait(topic, payload)
@@ -181,7 +180,8 @@ class ClientManager:
                 await call.remove(client_endpoint)
                 if call.done:
                     del self.calls[call_name]
-
+        
+        msg_dict['date'] = datetime.now().isoformat()
         await self.publish(msg)
         await self.dump(msg)
 
@@ -189,7 +189,10 @@ class ClientManager:
         if not (call := self.calls.get(call_name, None)):
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
+
         msg['startDatetime'] = call.start_datetime
+        msg_dict['date'] = datetime.now().isoformat()
+
         await self.publish(msg)
         await self.dump(msg)
 
@@ -197,7 +200,10 @@ class ClientManager:
         if not (call := self.calls.get(call_name, None)):
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
+        
         msg['startDatetime'] = call.start_datetime
+        msg_dict['date'] = datetime.now().isoformat()
+
         await self.publish(msg)
         await self.dump(msg)
 
