@@ -5,10 +5,8 @@ calls_subscription = {
     "index": 1,
     "type": "calls",
     "elements": [
-        "name",
-        # note: these are handled by call_info_subscription below
-        # "participants", "distributedInstances", "recording", "endpointRecording", "streaming", "lockState",
-        # "callType", "callCorrelator"
+        "name", "participants", "distributedInstances", "recording", "endpointRecording", "streaming", 
+        "lockState", "callType", "callCorrelator"
     ]
 }
 
