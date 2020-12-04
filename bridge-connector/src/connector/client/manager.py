@@ -163,13 +163,15 @@ class ClientManager:
 
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
+        current_ts = datetime.now().isoformat()
+
         for update in updates:
             update_type = update["updateType"]
             call_name = update["name"]
 
             if update_type == 'add':
                 if not (call := self.calls.get(call_name, None)):
-                    call = self.calls[call_name] = Call(manager=self, call_name=call_name)
+                    call = self.calls[call_name] = Call(manager=self, call_name=call_name, start_datetime=current_ts)
                 await call.add(client_endpoint)
             elif update_type == 'remove':
                 if call_name not in self.calls:
@@ -180,8 +182,11 @@ class ClientManager:
                 await call.remove(client_endpoint)
                 if call.done:
                     del self.calls[call_name]
-        
-        msg_dict['date'] = datetime.now().isoformat()
+            else:
+                call = self.calls[call_name]
+           
+        msg['startDatetime'] = call.start_datetime
+        msg['date'] = current_ts
         await self.publish(msg)
         await self.dump(msg)
 
@@ -190,9 +195,7 @@ class ClientManager:
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
 
-        msg['startDatetime'] = call.start_datetime
-        msg_dict['date'] = datetime.now().isoformat()
-
+        self.timestamp(msg, call)
         await self.publish(msg)
         await self.dump(msg)
 
@@ -201,20 +204,23 @@ class ClientManager:
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
         
-        msg['startDatetime'] = call.start_datetime
-        msg_dict['date'] = datetime.now().isoformat()
-
+        self.timestamp(msg, call)
         await self.publish(msg)
         await self.dump(msg)
 
+    @staticmethod
+    def timestamp(msg, call):
+        msg['startDatetime'] = call.start_datetime
+        msg['date'] = datetime.now().isoformat()
+        
 
 class Call:
-    def __init__(self, manager, call_name):
+    def __init__(self, manager, call_name, start_datetime):
         self.manager = manager
         self.call_name = call_name
         self.handler = None
         self.clients = set()
-        self.start_datetime = datetime.now().isoformat()
+        self.start_datetime = start_datetime 
 
     @property
     def handled(self):
