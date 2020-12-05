@@ -1,3 +1,4 @@
+from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
 from flask import request
@@ -10,12 +11,9 @@ from .schema import anomaly_schema, anomaly_request_schema, meeting_schema, meet
 
 
 class Meetings(Resource):
-    # TODO: this method should belong to separate Conferences resource
     @cross_origin()
     def get(self):
-        result = dao.get_conferences()
-        result['created'] = list(map(meeting_schema.dump, result['created']))
-        return result
+        return {'meetings': bridge_dao.get_meetings()}
 
     @cross_origin()
     def put(self):
@@ -45,11 +43,38 @@ class Meetings(Resource):
 
 class MeetingDetails(Resource):
     @cross_origin()
-    def get(self, conf_name):
-        if meeting := dao.meeting_details(conf_name):
+    def get(self, meeting_name):
+        if meeting := dao.meeting_details(meeting_name):
             return meeting
         else:
-            return {"message": f"no meeting {conf_name}"}, 404
+            return {"message": f"no meeting {meeting_name}"}, 404
+
+
+class Calls(Resource):
+    @cross_origin()
+    def get(self):
+        result = dao.get_conferences()
+        result['created'] = list(map(meeting_schema.dump, result['created']))
+        return result
+
+
+class CallHistory(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        start_date = request.args.get("from", None)
+        end_date = request.args.get("to", None)
+
+        try:
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
+
+        result = dao.get_calls(meeting_name, start_date, end_date)
+        return {'calls': result}
 
 
 class Anomalies(Resource):
@@ -67,16 +92,10 @@ class Anomalies(Resource):
             return {"message": f"no meeting {conf_name}"}, 404
 
 
-class BridgeMeetings(Resource):
-    @cross_origin()
-    def get(self): 
-        return {'meetings': bridge_dao.get_meetings()}
-
-
 def setup_resources(app):
     api = Api(app)
-    api.add_resource(Meetings, "/conferences")
-    api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
+    api.add_resource(Meetings, "/meetings")
+    api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
+    api.add_resource(Calls, "/calls")
+    api.add_resource(CallHistory, "/calls/<string:meeting_name>")
     api.add_resource(Anomalies, "/anomalies")
-    api.add_resource(BridgeMeetings, "/meetings")
-

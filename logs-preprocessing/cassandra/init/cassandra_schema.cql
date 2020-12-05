@@ -39,11 +39,12 @@ anomaly boolean,
 anomaly_reason text, 
 PRIMARY KEY (meeting_name, datetime));
 
-CREATE TABLE calls(call_id text PRIMARY KEY,
+CREATE TABLE calls(
+meeting_name text,
 start_datetime timestamp,
 last_update timestamp,
-meeting_name text,
-finished boolean);
+finished boolean,
+PRIMARY KEY (meeting_name, start_datetime));
 
 CREATE TABLE meetings(
 meeting_name text PRIMARY KEY, 

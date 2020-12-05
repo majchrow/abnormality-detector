@@ -1,4 +1,3 @@
-import json
 import requests
 import urllib3
 from datetime import datetime, timedelta
@@ -39,6 +38,7 @@ class Client:
         tree = etree.fromstring(response.text)
         return list(map(mk_cospace, tree))
 
+    @staticmethod
     def all_pages(self, call):
         # Note: could be concurrent but performance doesn't matter for now
         all_results = []
@@ -77,6 +77,7 @@ class BridgeDao:
 
 dao = BridgeDao()
 
+
 def setup_bridge_dao(app, config: Config):
     from .db import dao as db_dao
 
@@ -96,4 +97,3 @@ def setup_bridge_dao(app, config: Config):
         next_run_time=datetime.now() + timedelta(seconds=10),
         days=config.meetings_update_period_d
     )
-

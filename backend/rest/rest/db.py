@@ -3,8 +3,6 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
-import logging
-import uuid
 
 from .config import Config
 
@@ -40,7 +38,7 @@ class CassandraDAO:
         current_datetime = datetime.datetime.now()
 
         for call in calls:
-            if call['finished'] and self.__check_if_recent(interval, current_datetime, call['start_datetime']):
+            if call['finished'] and self.__is_recent(interval, current_datetime, call['start_datetime']):
                 recent.add(call['name'])
             else:
                 current.add(call['name'])
@@ -51,10 +49,28 @@ class CassandraDAO:
         
         monitored = [m for m in meetings if m['monitored']]
         [m.pop('monitored') for m in meetings]
-        current = self.__transform(lambda call: {"name": call, "meeting_numer": meeting_numbers[call], "criteria": []}, current)
-        recent = self.__transform(lambda call: {"name": call, "meeting_numer": meeting_numbers[call], "criteria": []}, recent)
+        current = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, current))
+        recent = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, recent))
 
         return {"current": current, "recent": recent, "created": monitored}
+
+    def get_calls(self, meeting_name, start_date, end_date):
+        query = (f'SELECT start_datetime AS start, last_update, finished '
+                 f'FROM {self.calls_table} WHERE meeting_name = %s')
+        args = [meeting_name]
+
+        if start_date:
+            query += ' AND last_update >= %s'
+            args.append(start_date)
+        if end_date:
+            query += ' AND start_datetime <= %s'
+            args.append(end_date)
+
+        result = self.session.execute(query, args).all()
+        return [
+            {'start': c['start'], 'end': c['last_update'] if c['finished'] else None}
+            for c in result
+        ]
 
     def get_meetings(self):
         result = self.session.execute(f"SELECT meeting_name as name, meeting_number FROM {self.meetings_table}").all()
@@ -138,11 +154,7 @@ class CassandraDAO:
         return {"id": call_id, "name": call_name, "start_time": start_datetime}
 
     @staticmethod
-    def __transform(transformation, data):
-        return list(map(transformation, data))
-
-    @staticmethod
-    def __check_if_recent(interval, current_datetime, call_datetime):
+    def __is_recent(interval, current_datetime, call_datetime):
         return (current_datetime - call_datetime).total_seconds() <= interval
 
 
