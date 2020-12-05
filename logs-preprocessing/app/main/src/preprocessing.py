@@ -23,7 +23,7 @@ class Preprocessor:
     @staticmethod
     def do_basic_preprocessing(input_stream, schema):
         return input_stream.withColumn("event", func.from_json("value", schema)).select(
-            "event.date", "event.call", "event.message"
+            "event.date", "event.message"
         )
 
     def create_output_stream(self, output_mode):
@@ -31,7 +31,7 @@ class Preprocessor:
             self.prepare_final_df()
             .writeStream.outputMode(output_mode)
             .trigger(processingTime="1 seconds")
-            .option("maxOffsetsPerTrigger",5)
+            .option("maxOffsetsPerTrigger", 5)
             .foreachBatch(self.write_data)
         )
 
@@ -39,12 +39,8 @@ class Preprocessor:
         pass
 
     def do_post_preprocessing(self, preprocessed):
-        return (
-            preprocessed.withColumn("hour", func.hour("datetime"))
-            .withColumn(
-                "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
-            )
-            .withColumn("anomaly", func.lit(False).cast(BooleanType()))
+        return preprocessed.withColumn("hour", func.hour("datetime")).withColumn(
+            "week_day_number", func.date_format("datetime", "u").cast(IntegerType())
         )
 
     def write_data(self, write_df, epoch_id):
@@ -91,7 +87,7 @@ class CallInfoPreprocessor(Preprocessor):
     @staticmethod
     def do_basic_preprocessing(input_stream, schema):
         return input_stream.withColumn("event", func.from_json("value", schema)).select(
-            "event.date", "event.message"
+            "event.date", "event.message", "event.startDatetime"
         )
 
     def prepare_for_kafka(self, df):
@@ -100,7 +96,7 @@ class CallInfoPreprocessor(Preprocessor):
                 func.struct(
                     "datetime",
                     "time_diff",
-                    "call_id",
+                    "start_datetime",
                     "recording",
                     "streaming",
                     "locked",
@@ -120,13 +116,13 @@ class CallInfoPreprocessor(Preprocessor):
 
     def prepare_final_df(self):
         self.df = self.df.select(
-            "date", "message.callInfo.call", "message.callInfo.name", "message.callInfo"
+            "date", "startDatetime", "message.callInfo.name", "message.callInfo"
         )
         info = self.df.callInfo
 
         selected = self.df.select(
-            "call",
             "name",
+            "startDatetime",
             info.callType.alias("callType"),
             info.distributedInstances.alias("distributedInstances"),
             info.endpointRecording.alias("endpointRecording"),
@@ -138,9 +134,8 @@ class CallInfoPreprocessor(Preprocessor):
             "date",
         )
 
-        grouped = selected.groupBy("call").agg(
+        grouped = selected.groupBy("name", "startDatetime").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),
-            func.collect_list("name").alias("name_array"),
             func.collect_list("recording").alias("recording_array"),
             func.collect_list("streaming").alias("streaming_array"),
             func.collect_list("lockState").alias("lockState_array"),
@@ -158,9 +153,8 @@ class CallInfoPreprocessor(Preprocessor):
             grouped.withColumn(
                 "datetime", self.helper.get_last_date_udf(grouped.date_array)
             )
-            .withColumn("meeting_name", self.helper.get_name_udf(grouped.name_array))
+            .withColumn("meeting_name", func.col("name"))
             .withColumn("time_diff", self.helper.get_time_diff_udf(grouped.date_array))
-            .withColumn("call_id", grouped.call)
             .withColumn(
                 "recording", self.helper.get_if_active_udf(grouped.recording_array)
             )
@@ -184,10 +178,11 @@ class CallInfoPreprocessor(Preprocessor):
             .withColumn(
                 "mean_participants", self.helper.get_mean_udf(grouped.participant_array)
             )
+            .withColumn("start_datetime", grouped.startDatetime.cast(TimestampType()))
             .select(
                 "datetime",
                 "time_diff",
-                "call_id",
+                "start_datetime",
                 "recording",
                 "streaming",
                 "locked",
@@ -222,7 +217,7 @@ class RosterPreprocessor(Preprocessor):
     @staticmethod
     def do_basic_preprocessing(input_stream, schema):
         return input_stream.withColumn("event", func.from_json("value", schema)).select(
-            "event.date", "event.call", "event.message", "event.name"
+            "event.date", "event.startDatetime", "event.message", "event.name"
         )
 
     def prepare_for_kafka(self, df):
@@ -237,7 +232,7 @@ class RosterPreprocessor(Preprocessor):
                     "active_speaker",
                     "endpoint_recording",
                     "datetime",
-                    "call_id",
+                    "start_datetime",
                     "meeting_name",
                     "week_day_number",
                     "hour",
@@ -247,13 +242,13 @@ class RosterPreprocessor(Preprocessor):
 
     def prepare_final_df(self):
         self.df = self.df.select(
-            "date", "call", "name", func.explode("message.updates")
+            "date", "startDatetime", "name", func.explode("message.updates")
         )
         update_col = self.df.col
 
         selected = self.df.select(
-            "call",
             "date",
+            "startDatetime",
             "name",
             update_col.activeSpeaker.alias("activeSpeaker"),
             update_col.canMove.alias("canMove"),
@@ -284,13 +279,8 @@ class RosterPreprocessor(Preprocessor):
                     "updateType",
                 ),
             )
-            .groupBy("call")
-            .agg(
-                func.collect_list("struct").alias("struct_array"),
-                func.reverse(func.collect_list("name"))
-                .getItem(0)
-                .alias("meeting_name"),
-            )
+            .groupBy("name", "startDatetime")
+            .agg(func.collect_list("struct").alias("struct_array"))
         )
 
         preprocessed = grouped.withColumn(
@@ -301,17 +291,23 @@ class RosterPreprocessor(Preprocessor):
 
         stats = preprocessed.call_stats
 
-        final = preprocessed.select(
-            stats.initial.alias("initial"),
-            stats.connected.alias("connected"),
-            stats.onhold.alias("onhold"),
-            stats.ringing.alias("ringing"),
-            stats.presenter.alias("presenter"),
-            stats.active_speaker.alias("active_speaker"),
-            stats.endpoint_recording.alias("endpoint_recording"),
-            stats.datetime.alias("datetime"),
-            preprocessed.call.alias("call_id"),
-            "meeting_name",
+        final = (
+            preprocessed.withColumn("meeting_name", func.col("name"))
+            .withColumn(
+                "start_datetime", preprocessed.startDatetime.cast(TimestampType())
+            )
+            .select(
+                stats.initial.alias("initial"),
+                stats.connected.alias("connected"),
+                stats.onhold.alias("onhold"),
+                stats.ringing.alias("ringing"),
+                stats.presenter.alias("presenter"),
+                stats.active_speaker.alias("active_speaker"),
+                stats.endpoint_recording.alias("endpoint_recording"),
+                stats.datetime.alias("datetime"),
+                func.col("meeting_name"),
+                func.col("start_datetime"),
+            )
         )
 
         final.printSchema()
@@ -334,24 +330,24 @@ class CallsPreprocessor(Preprocessor):
     @staticmethod
     def do_basic_preprocessing(input_stream, schema):
         return input_stream.withColumn("event", func.from_json("value", schema)).select(
-            "event.date", "event.message"
+            "event.date", "event.message", "event.startDatetime"
         )
 
     def prepare_final_df(self):
-        self.df = self.df.select("date", func.explode("message.updates"))
+        self.df = self.df.select(
+            "date", "startDatetime", func.explode("message.updates")
+        )
 
-        selected = self.df.select("date", "col.call", "col.updateType", "col.name")
+        selected = self.df.select("date", "startDatetime", "col.updateType", "col.name")
 
-        grouped = selected.groupBy("call").agg(
+        grouped = selected.groupBy("name", "startDatetime").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),
-            func.collect_list("name").alias("name_array"),
             func.collect_list("updateType").alias("updateType_array"),
         )
 
         preprocessed = (
-            grouped.withColumn("call_id", grouped.call)
-            .withColumn(
-                "start_datetime", self.helper.get_first_date_udf(grouped.date_array)
+            grouped.withColumn(
+                "start_datetime", grouped.startDatetime.cast(TimestampType())
             )
             .withColumn(
                 "last_update", self.helper.get_last_date_udf(grouped.date_array)
@@ -359,9 +355,12 @@ class CallsPreprocessor(Preprocessor):
             .withColumn(
                 "finished", self.helper.get_if_finished_udf(grouped.updateType_array)
             )
-            .withColumn("meeting_name", self.helper.get_name_udf(grouped.name_array))
-            .select(
-                "start_datetime", "last_update", "call_id", "finished", "meeting_name"
+            .withColumn("meeting_name", func.col("name"))
+            .select("start_datetime", "last_update", "finished", "meeting_name")
+            .withColumn(
+                "duration",
+                func.col("last_update").cast(LongType())
+                - func.col("start_datetime").cast(LongType()),
             )
         )
 
@@ -378,9 +377,9 @@ class CallsPreprocessor(Preprocessor):
                 func.struct(
                     "start_datetime",
                     "last_update",
-                    "call_id",
                     "finished",
                     "meeting_name",
+                    "duration",
                 )
             ).alias("value")
         )
