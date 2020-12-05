@@ -7,7 +7,7 @@ from marshmallow import ValidationError
 from .db import dao
 from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
-from .schema import anomaly_schema, anomaly_request_schema, meeting_schema, meeting_request_schema
+from .schema import anomaly_schema, meeting_schema, meeting_request_schema
 
 
 class Meetings(Resource):
@@ -61,8 +61,8 @@ class Calls(Resource):
 class CallHistory(Resource):
     @cross_origin()
     def get(self, meeting_name):
-        start_date = request.args.get("from", None)
-        end_date = request.args.get("to", None)
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
 
         try:
             # TODO: timezone!
@@ -79,17 +79,22 @@ class CallHistory(Resource):
 
 class Anomalies(Resource):
     @cross_origin()
-    def get(self):
-        try:
-            if errors := anomaly_request_schema.validate(request.args.to_dict()):
-                return {"message": f'invalid request: {errors}'}, 400
+    def get(self, meeting_name):
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
 
-            conf_name, count = request.args['name'], int(request.args['count'])
-            result = dao.get_anomalies(conf_name, count)
-            result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
-            return result
-        except NotFoundError:
-            return {"message": f"no meeting {conf_name}"}, 404
+        try:
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
+
+        result = dao.get_anomalies(meeting_name, start_date, end_date)
+        result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
+        return result
 
 
 def setup_resources(app):
@@ -98,4 +103,4 @@ def setup_resources(app):
     api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
     api.add_resource(Calls, "/calls")
     api.add_resource(CallHistory, "/calls/<string:meeting_name>")
-    api.add_resource(Anomalies, "/anomalies")
+    api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")

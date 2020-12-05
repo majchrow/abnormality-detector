@@ -65,6 +65,7 @@ class CassandraDAO:
         if end_date:
             query += ' AND start_datetime <= %s'
             args.append(end_date)
+        query += ' ALLOW FILTERING;'
 
         result = self.session.execute(query, args).all()
         return [
@@ -109,24 +110,27 @@ class CassandraDAO:
             return meetings[0]
         return {}
 
-    def get_anomalies(self, name, count):
-        ci_results = self.session.execute(
-            f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
-            f"WHERE meeting_name = %s AND anomaly=true "
-            f"ORDER BY datetime DESC "
-            f"LIMIT %s ALLOW FILTERING;",
-            (name, count),
-        ).all()
+    def get_anomalies(self, name, start_date, end_date):
+        ci_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
+                    f"WHERE meeting_name = %s AND anomaly=true ")
+        roster_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
+                        f"WHERE meeting_name = %s AND anomaly=true ")
+        args = [name]
 
-        roster_results = self.session.execute(
-            f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
-            f"WHERE meeting_name = %s AND anomaly=true "
-            f"ORDER BY datetime DESC "
-            f"LIMIT %s ALLOW FILTERING;",
-            (name, count),
-        ).all()
+        if start_date:
+            ci_query += ' AND datetime >= %s'
+            roster_query += ' AND datetime >= %s'
+            args.append(start_date)
+        if end_date:
+            ci_query += ' AND datetime <= %s'
+            roster_query += ' AND datetime <= %s'
+            args.append(end_date)
+        ci_query += ' ALLOW FILTERING;'
+        roster_query += ' ALLOW FILTERING;'
 
-        return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])[-count:]}
+        ci_results = self.session.execute(ci_query, args).all()
+        roster_results = self.session.execute(roster_query, args).all()
+        return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])}
     
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):

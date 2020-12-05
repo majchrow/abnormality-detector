@@ -39,7 +39,7 @@ class Client:
         return list(map(mk_cospace, tree))
 
     @staticmethod
-    def all_pages(self, call):
+    def all_pages(call):
         # Note: could be concurrent but performance doesn't matter for now
         all_results = []
         offset = 0
