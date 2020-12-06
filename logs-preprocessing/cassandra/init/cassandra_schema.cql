@@ -4,7 +4,6 @@ USE test;
 CREATE TABLE roster_update(
 meeting_name text,
 datetime timestamp,
-call_id text,
 initial int, 
 ringing int, 
 connected int, 
@@ -15,13 +14,27 @@ endpoint_recording int,
 hour int, 
 week_day_number int,
 anomaly boolean,
-anomaly_reason text, 
+anomaly_reason text,
+start_datetime timestamp,
 PRIMARY KEY (meeting_name, datetime)); 
+
+CREATE TABLE calls(
+start_datetime timestamp,
+last_update timestamp,
+meeting_name text,
+duration int,
+finished boolean,
+PRIMARY KEY (meeting_name, start_datetime));
+
+CREATE TABLE meetings(
+meeting_name text PRIMARY KEY, 
+meeting_number text,
+criteria text,
+monitored boolean);
 
 CREATE TABLE call_info_update(
 meeting_name text,
 datetime timestamp,
-call_id text,
 adhoc boolean, 
 cospace boolean, 
 current_participants int, 
@@ -37,18 +50,5 @@ time_diff bigint,
 week_day_number int,
 anomaly boolean,
 anomaly_reason text, 
-PRIMARY KEY (meeting_name, datetime));
-
-CREATE TABLE calls(
-meeting_name text,
 start_datetime timestamp,
-last_update timestamp,
-finished boolean,
-PRIMARY KEY (meeting_name, start_datetime));
-
-CREATE TABLE meetings(
-meeting_name text PRIMARY KEY, 
-meeting_number text,
-criteria text,
-monitored boolean);
-
+PRIMARY KEY (meeting_name, datetime));

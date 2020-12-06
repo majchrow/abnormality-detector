@@ -263,7 +263,9 @@ class CallsPreprocessorHelper(PreprocessorHelper):
 
     @staticmethod
     def __get_if_finished(values):
-        return "remove" in values
+        add_values = len([value for value in values if value == "add"])
+        remove_values = len([value for value in values if value == "remove"])
+        return add_values == remove_values
 
     @staticmethod
     def __get_first_date(dates):

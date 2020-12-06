@@ -19,9 +19,6 @@ from ..config import Config
 #  - if Kafka producer slows down for whatever reason queues will overflow
 #    - we can't drop callListUpdate events - required to know conversation state in later processing stages
 #    - but we could theoretically drop roster and callInfo updates
-#  - exception handling
-#    - failure to fetch token
-#    - HTTP 401 (?) error - refresh token?
 #  - async logging
 
 
