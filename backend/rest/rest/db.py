@@ -93,9 +93,11 @@ class CassandraDAO:
             (criteria, name),
         )
 
-    def remove_meeting(self, name):
+    def clear_meeting(self, name):
         self.session.execute(
-            f"DELETE FROM {self.meetings_table} WHERE meeting_name=%s", (name,)
+            f"UPDATE {self.meetings_table} "
+            f"SET monitored=false, criteria='[]' "
+            f"WHERE meeting_name=%s IF EXISTS;", (name,)
         )
 
     def meeting_details(self, name):
@@ -135,27 +137,6 @@ class CassandraDAO:
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
         return True
-
-    # Oldies
-
-    def conference_details(self, conf_id):
-        result = self.session.execute(
-            f"SELECT * FROM {self.calls_table} WHERE call_id='{conf_id}'"
-        )
-        calls = result.all()
-        call = calls[0] if calls else None
-
-        return (
-            self.__create_conf_details_dict(
-                call["call_id"], call["meeting_name"], str(call["start_datetime"])
-            )
-            if call
-            else self.__create_conf_details_dict(conf_id, "unknown", "unknown")
-        )
-
-    @staticmethod
-    def __create_conf_details_dict(call_id, call_name, start_datetime):
-        return {"id": call_id, "name": call_name, "start_time": start_datetime}
 
     @staticmethod
     def __is_recent(interval, current_datetime, call_datetime):

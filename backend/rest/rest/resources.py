@@ -35,7 +35,7 @@ class Meetings(Resource):
             return {"message": f"conference to remove is not specified"}, 400
 
         try:
-            dao.remove_meeting(name)
+            dao.clear_meeting(name)
             return {"message": f"successfully removed {name} from monitored conferences"}, 200
         except NotFoundError:
             return {"message": f"no meeting {name}"}, 404
