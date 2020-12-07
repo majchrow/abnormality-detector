@@ -7,3 +7,6 @@ aiokafka==0.7.0
 python-dateutil==2.8.1  # for RFC 3339 strings from Spark
 cassandra-driver==3.24.0
 pydantic==1.7.2
+pyod==0.8.4
+numpy==1.19.4
+pandas==1.1.4

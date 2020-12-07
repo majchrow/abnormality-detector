@@ -1,19 +1,13 @@
 import asyncio
 import json
-import sys
-import traceback
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 
 from . import STREAM_FINISHED
 from .criteria import check, validate, MsgType
+from ..workers import main, report
 from ...config import Config
-
-
-def report(stuff: str):
-    sys.stdout.write(stuff + '\n')
-    sys.stdout.flush()
 
 
 class Worker:
@@ -69,7 +63,7 @@ class Worker:
             if anomalies:
                 payload = json.dumps({'meeting': meeting_name, 'anomalies': [a.dict() for a in anomalies]})
                 # TODO: create task?
-                await self.kafka_producer.send("monitoring-anomalies", payload.encode())
+                await self.kafka_producer.send("monitoring-results-anomalies", payload.encode())
                 self.set_anomaly(msg_dict['meeting_name'], msg_dict['datetime'], msg.topic, anomalies)
                 report(f'detected {len(anomalies)} anomalies')
 
@@ -92,76 +86,34 @@ class Worker:
         )
 
 
-async def run(config):
+async def setup(config: Config):
     producer = AIOKafkaProducer(bootstrap_servers=config.kafka_bootstrap_server)
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate', 
+        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
         bootstrap_servers=config.kafka_bootstrap_server, group_id='monitoring-workers'
     )
 
-    config_consumer = AIOKafkaConsumer('monitoring-config', bootstrap_servers=config.kafka_bootstrap_server)
+    config_consumer = AIOKafkaConsumer('monitoring-thresholds-config', bootstrap_servers=config.kafka_bootstrap_server)
 
     await data_consumer.start()
     await config_consumer.start()
-    
+
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
     session = cassandra.connect(config.keyspace)
 
-    worker = Worker(
+    return Worker(
         config.call_info_table, config.roster_table, session, data_consumer, config_consumer, producer
     )
 
-    try:    
-        await worker.start()
-    except Exception as e:
-        raise e
-    finally:
-        await producer.stop()
-        await data_consumer.stop()
-        await config_consumer.stop()
 
-
-def handle_exception(loop, context):
-    if e := context.get('exception', None):
-        msg = ''.join(traceback.format_tb(e.__traceback__))
-    else:
-        msg = context["message"]
-    
-    report('--- ERROR ---')
-    report(msg)
-
-    asyncio.create_task(shutdown(loop))
-
-
-async def shutdown(loop):
-    report('Shutdown initiated...')
-    
-    tasks = [t for t in asyncio.all_tasks() if t is not
-             asyncio.current_task()]
-
-    [task.cancel() for task in tasks]
-
-    report(f"Cancelling {len(tasks)} outstanding tasks...")
-    await asyncio.gather(*tasks, return_exceptions=True)
-    report('Shutdown complete.')
-    loop.stop()
-
-
-def main():
-    config_arg = sys.argv[1]
-    config = Config(**json.loads(config_arg))
-
-    loop = asyncio.get_event_loop()
-    loop.set_exception_handler(handle_exception)
-    try:
-        loop.create_task(run(config))
-        loop.run_forever()
-    finally:
-        loop.close()
+async def teardown(worker: Worker):
+    await worker.kafka_producer.stop()
+    await worker.data_consumer.stop()
+    await worker.config_consumer.stop()
 
 
 if __name__ == '__main__':
-    main()
+    main(setup, teardown)

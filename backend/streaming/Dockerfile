@@ -6,7 +6,7 @@ COPY streaming src/
 COPY setup.py setup.py
 COPY requirements.txt requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
 ENV KAFKA="kafka:29092"
 ENV CALL_LIST_TOPIC="preprocessed_callListUpdate"
