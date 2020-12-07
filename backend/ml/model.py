@@ -1,3 +1,4 @@
+import pickle
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -79,9 +80,22 @@ class Model:
         self.train()
         test_data = self._generate_synthetic(samples=10)
         pandas_test_data = pd.DataFrame(test_data)
+        # anomalies = self.predict(pandas_test_data)
+        # print(f"[{self.name}] Predicted: ")
+        # print(anomalies)
+        self.serialize('new')
+        self.deserialize('new')
         anomalies = self.predict(pandas_test_data)
         print(f"[{self.name}] Predicted: ")
         print(anomalies)
+
+    def serialize(self, name):
+        with open(name + '.pkl', 'wb') as clf:
+            pickle.dump(self.model, clf)
+
+    def deserialize(self, name):
+        with open(name + '.pkl', 'rb') as clf:
+            self.model = pickle.load(clf)
 
 
 if __name__ == '__main__':
