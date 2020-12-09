@@ -225,14 +225,17 @@ class AnomalyManager(BaseWorkerManager):
 
     async def periodic_dispatch(self):
         while True:
-            with self.dao.try_lock('anomaly-inference-schedule') as locked:
+            async with self.dao.try_lock('inference-schedule') as locked:
                 if not locked:
+                    logging.info(f'{self.TAG}: failed to obtain inference-schedule lock')
                     await asyncio.sleep(5)  # TODO: make configurable
                     continue
 
+                logging.info(f'{self.TAG}: obtained inference-schedule lock')
                 monitored = await self.dao.get_anomaly_monitored_meetings()
                 last_inferences = await self.dao.get_last_inferences(monitored)
 
+                await asyncio.sleep(5)
                 # add inference jobs for meetings with stale results
                 now = datetime.now()
                 jobs = []
@@ -243,14 +246,14 @@ class AnomalyManager(BaseWorkerManager):
 
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
 
+            logging.info(f'{self.TAG}: released inference-schedule lock')
             # actually schedule them (lock not necessary anymore)
             kafka_jobs = [
                 self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
                 for job in jobs
             ]
             await asyncio.gather(*kafka_jobs)
-
-        await asyncio.sleep(5)  # TODO: make configurable
+            await asyncio.sleep(5)  # TODO: make configurable
 
     async def periodic_cleanup(self):
         # TODO:

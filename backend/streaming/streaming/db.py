@@ -5,7 +5,7 @@ from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
@@ -183,32 +183,20 @@ class CassandraDAO:
             (meeting_name, model_id, start, end, 'pending')
         )
 
-    @contextmanager
-    def try_lock(self, resource):
+    @asynccontextmanager
+    async def try_lock(self, resource):
         try:
             # lock using Cassandra's lightweight transactions
-            uid = uuid4()
-            result = self.session.execute(
+            uid = str(uuid4())
+            result = await self.async_exec(
                 f'UPDATE locks SET lock_id=%s '
                 f'WHERE resource_name=%s '
                 f'IF lock_id=null;',
                 (uid, resource)
             )
-
-            loop = asyncio.get_running_loop()
-            future = loop.create_future()
-
-            def on_success(response):
-                applied = response[0]['[applied]']
-                future.set_result(applied)
-
-            def on_error(e):
-                future.set_result(False)
-
-            result.add_callbacks(on_success, on_error)
-            yield future
+            yield next(iter(result))['[applied]']
         finally:
-            self.session.execute(
+            await self.async_exec(
                 'UPDATE locks SET lock_id=null '
                 'WHERE resource_name=%s;',
                 (resource,)
