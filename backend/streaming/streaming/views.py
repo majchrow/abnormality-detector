@@ -4,11 +4,12 @@ from aiohttp import web
 from aiohttp_sse import sse_response
 from pydantic import ValidationError
 
-from .exceptions import DBFailureError, MeetingNotExistsError, MonitoringNotSupportedError, UnmonitoredError
+from .exceptions import DBFailureError, MeetingNotExistsError, UnmonitoredError
 
 __all__ = [
-    'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored', 'get_call_info_notifications',
-    'get_monitoring_notifications'
+    'schedule_training', 'schedule_inference', 'unschedule_inference',
+    'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored',
+    'get_call_info_notifications', 'get_monitoring_notifications'
 ]
 
 
@@ -16,29 +17,58 @@ __all__ = [
 #  - TEST CASES, no manual curling!
 #  - reasons for HTTP 400
 #  - MonitoringNotSupportedError for all endpoints?
-async def schedule_monitoring(request):
+async def schedule_training(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='No conference name given')
 
     try:
         payload = await request.json()
-        monitoring_type = payload['type']
+        calls = payload['calls']
+    except JSONDecodeError:
+        raise web.HTTPBadRequest(reason='Failed to parse JSON')
+    except KeyError:
+        raise web.HTTPBadRequest(reason='field "calls" is mandatory')
+
+    manager = request.app['monitoring']
+    try:
+        await manager.schedule_training(conf_name, calls)
+        return web.Response()
+    except ValidationError as e:
+        return web.HTTPBadRequest(reason=str(e))
+
+
+async def schedule_inference(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='No conference name given')
+
+
+async def unschedule_inference(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='No conference name given')
+
+
+async def schedule_monitoring(request):
+    # TODO: meeting_name, not conf_name
+    # TODO: type not necessary anymore
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='No conference name given')
+
+    try:
+        payload = await request.json()
         criteria = payload['criteria']
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
     except KeyError:
-        raise web.HTTPBadRequest(reason='keys "type" and "criteria" are mandatory')
+        raise web.HTTPBadRequest(reason='field "criteria" is mandatory')
 
     manager = request.app['monitoring']
     try:
-        await manager.schedule(conf_name, criteria, monitoring_type)
+        await manager.schedule_monitoring(conf_name, criteria)
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'room {conf_name} does not exist')
-    except MonitoringNotSupportedError:
-        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
     except DBFailureError:
         return web.HTTPInternalServerError(reason='DB operation failed')
 
@@ -46,17 +76,13 @@ async def schedule_monitoring(request):
 async def cancel_monitoring(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='No conference name given')
-    if (monitoring_type := request.rel_url.query.get('type', None)) is None:
-        raise web.HTTPBadRequest(reason='Missing "type" query parameter')
 
     manager = request.app['monitoring']
     try:
-        await manager.unschedule(conf_name, monitoring_type)
+        await manager.unschedule_monitoring(conf_name)
         return web.Response()
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
-    except MonitoringNotSupportedError:
-        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
     except DBFailureError:
         return web.HTTPInternalServerError(reason='DB operation failed')
 
@@ -77,13 +103,11 @@ async def is_monitored(request):
 async def get_monitoring_notifications(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='No conference name given')
-    if (monitoring_type := request.rel_url.query.get('type', None)) is None:
-        raise web.HTTPBadRequest(reason='Missing "type" query parameter')
 
     manager = request.app['monitoring']
 
     try:
-        monitoring_receiver = await manager.monitoring_receiver(conf_name, monitoring_type)
+        monitoring_receiver = await manager.monitoring_receiver(conf_name)
         async with sse_response(request) as resp:
             with monitoring_receiver() as receiver:
                 async for anomalies in receiver():
@@ -92,8 +116,6 @@ async def get_monitoring_notifications(request):
 
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
-    except MonitoringNotSupportedError:
-        raise web.HTTPBadRequest(reason=f'no support for {monitoring_type} monitoring!')
 
 
 async def get_call_info_notifications(request: web.Request):

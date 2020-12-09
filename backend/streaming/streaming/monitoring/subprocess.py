@@ -92,7 +92,7 @@ class ChildProcess:
 async def run_for_result(uid: str, cmd: List[str]):
     async def listen(stream, what):
         while worker.returncode is None:
-            line = (await stream.readline()).decode()
+            line = (await stream.readline()).decode().strip()
             if not line:
                 await asyncio.sleep(1)
             else:

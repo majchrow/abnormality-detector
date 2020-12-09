@@ -7,8 +7,9 @@ from pyod.models.hbos import HBOS
 
 
 class Model:
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, meeting_name, model_id):
+        self.meeting_name = meeting_name
+        self.id = model_id
         self.data = None
         self.model = None
 

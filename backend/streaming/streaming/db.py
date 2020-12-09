@@ -5,6 +5,7 @@ from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
+from datetime import datetime
 from typing import List, Optional
 
 from .config import Config
@@ -18,10 +19,12 @@ class CassandraDAO:
 
     TAG = 'CassandraDAO'
 
-    def __init__(self, cluster, keyspace, meetings_table):
+    def __init__(self, cluster, config):
         self.cluster = cluster
-        self.keyspace = keyspace
-        self.meetings_table = meetings_table
+        self.keyspace = config.keyspace
+        self.meetings_table = config.meetings_table
+        self.training_jobs_table = config.training_jobs_table
+        self.models_table = config.models_table
         self.session = None
 
     def start(self):
@@ -111,6 +114,30 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
+    def add_training_job(self, meeting_name: str, calls: List[str]):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        result = self.session.execute_async(
+            f"INSERT INTO {self.training_jobs_table} (meeting_name, training_calls, submission_datetime, status) "
+            f"VALUES (%s, %s, %s, %s);",
+            (meeting_name, calls, now, 'pending')
+        )
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(_):
+            logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
+            future.set_result(now)
+
+        def on_error(e):
+            logging.error(f'{self.TAG}: "add training job" failed with {e}'),
+            future.set_exception(
+                DBFailureError(f'"add training job" failed with {e}')
+            )
+
+        result.add_callbacks(on_success, on_error)
+        return future
+
     async def shutdown(self):
         logging.info(f'{self.TAG}: connection shutdown.')
 
@@ -126,7 +153,7 @@ async def cancel_db(app: web.Application):
 def setup_db(app, config: Config):
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
-    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table)
+    dao = CassandraDAO(cassandra, config)
     app['db'] = dao
     app.on_startup.append(start_db)
     app.on_cleanup.append(cancel_db)

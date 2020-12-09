@@ -7,11 +7,12 @@ from asyncio import Queue
 from contextlib import contextmanager
 from typing import List
 
-from ..config import Config
-from ..exceptions import MonitoringNotSupportedError, UnmonitoredError
 from .kafka import KafkaListener
-from .thresholds import validate, STREAM_FINISHED
+from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
+from ..db import CassandraDAO
+from ..config import Config
+from ..exceptions import UnmonitoredError
 
 
 class Manager:
@@ -22,10 +23,9 @@ class Manager:
         self.config = config
         self.dao = dao
 
-        self.anomaly_manager = AnomalyManager(config)
+        self.anomaly_manager = AnomalyManager(dao, config)
         self.kafka_manager = KafkaListener(config.kafka_bootstrap_server, config.kafka_call_list_topic)
         self.threshold_manager = ThresholdManager(config)
-        # TODO: other managers for e.g. running ML predictions, retraining model etc.
 
     def start(self):
         asyncio.create_task(self._run())
@@ -41,42 +41,39 @@ class Manager:
                 self.anomaly_manager.run(),
                 self.threshold_manager.run(),
                 self.kafka_manager.run(),
-                self.bootstrap(),
                 return_exceptions=True
             )
         finally:
             await kafka_producer.stop()
 
-    async def bootstrap(self):
-        await self.threshold_manager.started.wait()
-        monitored = await self.dao.get_monitored_meetings()
-        for meeting in monitored:
-            await self.threshold_manager.schedule(meeting['name'], meeting['criteria'])
-        logging.info(f'{self.TAG}: bootstrapped from {len(monitored)} meetings')
+    ###################
+    # anomaly detection
+    ###################
+    async def schedule_training(self, meeting_name: str, calls: List[str]):
+        await self.anomaly_manager.train(meeting_name, calls)
+        logging.info(f'{self.TAG}: scheduled model training for meeting {meeting_name} on calls {calls}')
 
-    async def schedule(self, conf_name: str, criteria: List[dict], monitoring_type: str):
-        if monitoring_type == 'threshold':
-            validate(criteria)
+    async def schedule_inference(self, meeting_name: str, model_id: str):
+        await self.anomaly_manager.schedule(meeting_name, 'HBOS')
+        logging.info(f'{self.TAG}: scheduled inference for {meeting_name} with model {model_id}')
 
-            await self.dao.set_monitoring_status(conf_name, monitored=True, criteria=criteria)
-            await self.threshold_manager.schedule(conf_name, criteria)
-            logging.info(f'{self.TAG}: scheduled monitoring for {conf_name}')
-        elif monitoring_type == 'anomaly':
-            await self.anomaly_manager.schedule(conf_name, 'HBOS')
-            logging.info(f'{self.TAG}: scheduled monitoring for {conf_name}')
-        else:
-            raise MonitoringNotSupportedError()
+    async def unschedule_inference(self, meeting_name: str, model_id: str):
+        await self.anomaly_manager.unschedule(meeting_name, model_id)
+        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name} with model {model_id}')
 
-    async def unschedule(self, conf_name: str, monitoring_type: str):
-        if monitoring_type == 'threshold':
-            await self.dao.set_monitoring_status(conf_name, monitored=False)
-            await self.threshold_manager.unschedule(conf_name)
-            logging.info(f'{self.TAG}: unscheduled monitoring for {conf_name}')
-        elif monitoring_type == 'anomaly':
-            await self.anomaly_manager.unschedule(conf_name)
-            logging.info(f'{self.TAG}: unscheduled monitoring for {conf_name}')
-        else:
-            raise MonitoringNotSupportedError()
+    ############
+    # monitoring
+    ############
+    async def schedule_monitoring(self, meeting_name: str, criteria: List[dict]):
+        validate(criteria)
+        await self.dao.set_monitoring_status(meeting_name, monitored=True, criteria=criteria)
+        await self.threshold_manager.schedule(meeting_name, criteria)
+        logging.info(f'{self.TAG}: scheduled monitoring for {meeting_name}')
+
+    async def unschedule_monitoring(self, meeting_name: str):
+        await self.dao.set_monitoring_status(meeting_name, monitored=False)
+        await self.threshold_manager.unschedule(meeting_name)
+        logging.info(f'{self.TAG}: unscheduled monitoring for {meeting_name}')
 
     async def get_all_monitored(self):
         # TODO: test if DAO works
@@ -101,11 +98,9 @@ class Manager:
         finally:
             self.kafka_manager.call_event_unsubscribe(queue)
 
-    async def monitoring_receiver(self, call_name, monitoring_type: str):
+    async def monitoring_receiver(self, call_name):
         if not (await self.is_monitored(call_name)):
             raise UnmonitoredError()
-        if monitoring_type != 'threshold':
-            raise MonitoringNotSupportedError()
 
         @contextmanager
         def _listen_manager():
@@ -128,6 +123,7 @@ class Manager:
 
     async def shutdown(self):
         await self.threshold_manager.shutdown()
+        await self.anomaly_manager.shutdown()
         logging.info(f'{self.TAG}: shutdown finished')
 
 
@@ -138,7 +134,7 @@ class ThresholdManager(BaseWorkerManager):
     def __init__(self, config: Config):
         super().__init__()
         self.cmd = ['python3', '-m', 'streaming.monitoring.thresholds.monitor']
-        self.num_workers = config.num_workers  # TODO: separate for thresholds and anomalies
+        self.num_workers = config.num_threshold_workers
         self.worker_id = 'thresholds-worker'
         self.kafka_producer = None
 
@@ -161,21 +157,52 @@ class ThresholdManager(BaseWorkerManager):
         await self.kafka_producer.send_and_wait(topic='monitoring-thresholds-config', value=payload)
 
 
+# TODO:
+#  - idea:
+#    - pool of long-running workers
+#    - "anomaly_monitored" and "last_update" columns in "meetings" table
+#    - so state of all anomaly monitoring is persisted
+#    - periodically:
+#      - query the DB (with lock)
+#      - find meetings with old last_update (configurable, say 1 minute)
+#      - push jobs to Kafka
+#      - unlock the DB
+#    - also, no "schedule" and "delete" - don't keep any state in the worker (state in DB, not in memory pls)
+
+# Assumptions:
+#  - we don't (yet) store which model reported anomaly (would likely require separate table)
+#  - when re-running old jobs, it may so happen that it gets completed multiple times (very
+#    slow workers case), should not be an issue for now, might think of better tactic later
 class AnomalyManager(BaseWorkerManager):
 
     TAG = 'AnomalyManager'
 
-    def __init__(self, config: Config):
+    def __init__(self, dao: CassandraDAO, config: Config):
         super().__init__()
-        self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
-        self.num_workers = config.num_workers  # TODO: separate for thresholds and anomalies
-        self.worker_id = 'inference-worker'
+        self.dao = dao
         self.kafka_producer = None
+
+        self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
+        self.num_workers = config.num_anomaly_workers
+        self.worker_id = 'inference-worker'
 
     def init(self, kafka_producer):
         self.kafka_producer = kafka_producer
 
+    async def train(self, meeting_name, calls):
+        submission_date = await self.dao.add_training_job(meeting_name, calls)
+        # TODO:
+        #  kill worker on shutdown smh
+
+        asyncio.create_task(run_for_result(
+            'training-worker',
+            ['python3', '-m', 'streaming.monitoring.anomalies.training', meeting_name, submission_date, *calls]
+        ))
+
     async def schedule(self, meeting_name, model):
+        # TODO:
+        #  - check if not monitored already (if it is - quit)
+        #  - set monitoring status and model in "meetings" table
         payload = json.dumps({
             'type': 'schedule',
             'meeting_name': meeting_name,
@@ -183,18 +210,28 @@ class AnomalyManager(BaseWorkerManager):
         }).encode()
         await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-config', value=payload)
 
-    async def unschedule(self, meeting_name):
+    async def unschedule(self, meeting_name, model):
+        # TODO:
+        #  - check if monitored at all (if not - quit)
+        #  - unset monitoring status
         payload = json.dumps({
             'type': 'unschedule',
             'meeting_name': meeting_name
         }).encode()
         await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-config', value=payload)
 
-    async def train(self, meeting_name, model, calls):
-        await run_for_result(
-            'training-worker',
-            ['python3', '-m', 'streaming.monitoring.anomalies.training', meeting_name, model, *calls]
-        )
+    async def periodic_dispatch(self):
+        # TODO:
+        #  - periodically take lock
+        #  - get all monitored meetings & last scheduled inference
+        #  - if last inference old enough - schedule another one (to DB and Kafka)
+        pass
+
+    async def periodic_cleanup(self):
+        # TODO:
+        #  - remove stale locks (what if process fails while holding a lock??)
+        #  - re-run old and still not completed jobs
+        pass
 
 
 async def start_all(app: web.Application):

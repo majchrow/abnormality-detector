@@ -2,7 +2,7 @@ import asyncio
 import json
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, dict_factory
 
 from . import STREAM_FINISHED
 from .criteria import check, validate, MsgType
@@ -12,13 +12,12 @@ from ...config import Config
 
 class Worker:
 
-    def __init__(
-        self, call_info_table, roster_table, cassandra_session,
-        data_consumer, config_consumer, producer
-    ):
-        self.call_info_table = call_info_table
-        self.roster_table = roster_table
+    def __init__(self, config, cassandra_session,data_consumer, config_consumer, producer):
+        self.call_info_table = config.call_info_table
+        self.roster_table = config.roster_table
+        self.meetings_table = config.meetings_table
         self.session = cassandra_session
+        self.session.row_factory = dict_factory
         self.data_consumer = data_consumer
         self.config_consumer = config_consumer
         self.kafka_producer = producer
@@ -28,8 +27,19 @@ class Worker:
 
     async def start(self):
         report('started')
+        try:
+            await self.bootstrap()
+        except Exception as e:
+            report(f'bootstrap failed with {e}')
+            return
+
         self.loop = asyncio.get_running_loop()
         await asyncio.gather(self.process_config(), self.process_data())
+
+    async def bootstrap(self):
+        meetings = await self.get_monitored_meetings()
+        self.monitoring_criteria = {m['name']: m['criteria'] for m in meetings}
+        report(f'bootstrapped from {len(meetings)} meetings')
 
     async def process_config(self):
         async for msg in self.config_consumer:
@@ -66,6 +76,26 @@ class Worker:
                 await self.kafka_producer.send("monitoring-results-anomalies", payload.encode())
                 self.set_anomaly(msg_dict['meeting_name'], msg_dict['datetime'], msg.topic, anomalies)
                 report(f'detected {len(anomalies)} anomalies')
+
+    def get_monitored_meetings(self):
+        result = self.session.execute_async(
+            f'SELECT meeting_name as name, criteria FROM {self.meetings_table} '
+            f'WHERE monitored=true ALLOW FILTERING;'
+        )
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(meetings):
+            for m in meetings:
+                m['criteria'] = json.loads(m['criteria'])
+            future.set_result(meetings)
+
+        def on_error(e):
+            future.set_exception(e)
+
+        result.add_callbacks(on_success, on_error)
+        return future
 
     def set_anomaly(self, meeting_name, datetime, topic, anomalies):
         if topic == 'preprocessed_callInfoUpdate':
@@ -105,7 +135,7 @@ async def setup(config: Config):
     session = cassandra.connect(config.keyspace)
 
     return Worker(
-        config.call_info_table, config.roster_table, session, data_consumer, config_consumer, producer
+        config, session, data_consumer, config_consumer, producer
     )
 
 
