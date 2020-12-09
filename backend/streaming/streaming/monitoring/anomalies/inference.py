@@ -27,7 +27,7 @@ class Worker:
             msg_dict = json.loads(msg.value)
 
             meeting_name = msg_dict['meeting_name']
-            model_id = msg_dict['model']
+            model_id = msg_dict['model_id']
             start, end = msg_dict['start'], msg_dict['end']
             report(f'job received: run model {model_id} on {meeting_name} from {start} to {end}')
 

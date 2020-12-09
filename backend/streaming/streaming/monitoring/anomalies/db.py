@@ -16,12 +16,12 @@ class CassandraDAO:
 
     def load_model(self, meeting_name, model_id):
         result = self.session.execute(
-            f'SELECT blob FROM models '
+            f'SELECT model FROM models '
             f'WHERE meeting_name=%s AND model_id=%s;',
         (meeting_name, model_id)).all()
 
         # TODO: handle incorrect model_id
-        blob = result[0]['blob']
+        blob = result[0]['model']
         model = Model(meeting_name, model_id)
         model.deserialize(blob)
         return model

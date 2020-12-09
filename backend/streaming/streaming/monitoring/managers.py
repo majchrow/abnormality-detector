@@ -5,6 +5,7 @@ from aiohttp import web
 from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import List
 
 from .kafka import KafkaListener
@@ -188,6 +189,8 @@ class AnomalyManager(BaseWorkerManager):
 
     def init(self, kafka_producer):
         self.kafka_producer = kafka_producer
+        # TODO: keep reference to kill on shutdown
+        asyncio.create_task(self.periodic_dispatch())
 
     async def train(self, meeting_name, calls):
         submission_date = await self.dao.add_training_job(meeting_name, calls)
@@ -221,11 +224,33 @@ class AnomalyManager(BaseWorkerManager):
         await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-config', value=payload)
 
     async def periodic_dispatch(self):
-        # TODO:
-        #  - periodically take lock
-        #  - get all monitored meetings & last scheduled inference
-        #  - if last inference old enough - schedule another one (to DB and Kafka)
-        pass
+        while True:
+            with self.dao.try_lock('anomaly-inference-schedule') as locked:
+                if not locked:
+                    await asyncio.sleep(5)  # TODO: make configurable
+                    continue
+
+                monitored = await self.dao.get_anomaly_monitored_meetings()
+                last_inferences = await self.dao.get_last_inferences(monitored)
+
+                # add inference jobs for meetings with stale results
+                now = datetime.now()
+                jobs = []
+                for inf in last_inferences:
+                    if now - inf['end'] > timedelta(minutes=1):  # TODO: make configurable
+                        inf['start'] = now
+                        jobs.append(inf)
+
+                await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
+
+            # actually schedule them (lock not necessary anymore)
+            kafka_jobs = [
+                self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
+                for job in jobs
+            ]
+            await asyncio.gather(*kafka_jobs)
+
+        await asyncio.sleep(5)  # TODO: make configurable
 
     async def periodic_cleanup(self):
         # TODO:
