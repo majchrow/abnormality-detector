@@ -13,7 +13,7 @@ from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import UnmonitoredError
+from ..exceptions import MeetingNotExistsError, ModelNotExistsError, MonitoredAlreadyError, UnmonitoredError
 
 
 class Manager:
@@ -202,26 +202,28 @@ class AnomalyManager(BaseWorkerManager):
             ['python3', '-m', 'streaming.monitoring.anomalies.training', meeting_name, submission_date, *calls]
         ))
 
-    async def schedule(self, meeting_name, model):
-        # TODO:
-        #  - check if not monitored already (if it is - quit)
-        #  - set monitoring status and model in "meetings" table
-        payload = json.dumps({
-            'type': 'schedule',
-            'meeting_name': meeting_name,
-            'model': model
-        }).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-config', value=payload)
+    async def schedule(self, meeting_name, model_id):
+        async def check():
+            monitoring = await self.dao.get_anomaly_monitoring_status(meeting_name)
+            if any(m['monitored'] for m in monitoring):
+                raise MonitoredAlreadyError
+        await self.set_monitoring_status(meeting_name, model_id, True, check)
 
-    async def unschedule(self, meeting_name, model):
-        # TODO:
-        #  - check if monitored at all (if not - quit)
-        #  - unset monitoring status
-        payload = json.dumps({
-            'type': 'unschedule',
-            'meeting_name': meeting_name
-        }).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-config', value=payload)
+    async def unschedule(self, meeting_name, model_id):
+        async def check():
+            if not await self.dao.get_anomaly_monitoring_instance(meeting_name, model_id):
+                raise UnmonitoredError
+        await self.set_monitoring_status(meeting_name, model_id, True, check)
+
+    async def set_monitoring_status(self, meeting_name, model_id, status, check):
+        # Note: phew, that's a lot of checks here and it could be deleted in the meantime
+        if not self.dao.meeting_exists(meeting_name):
+            raise MeetingNotExistsError
+        if not self.dao.model_exists(model_id):
+            raise ModelNotExistsError
+
+        await check()
+        await self.dao.set_anomaly_monitoring_status(meeting_name, model_id, status)
 
     async def periodic_dispatch(self):
         while True:

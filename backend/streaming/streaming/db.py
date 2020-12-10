@@ -11,7 +11,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError
+from .exceptions import DBFailureError, MeetingNotExistsError, MonitoredAlreadyError
 
 
 # TODO:
@@ -156,6 +156,50 @@ class CassandraDAO:
 
         result.add_callbacks(on_success, on_error)
         return future
+
+    async def meeting_exists(self, meeting_name):
+        result = await self.async_exec(
+            f'SELECT * FROM meetings '
+            f'WHERE meeting_name=%s '
+            f'LIMIT 1;',
+            (meeting_name,)
+        )
+        return bool(list(result))
+
+    async def model_exists(self, model_id):
+        result = await self.async_exec(
+            f'SELECT * FROM models '
+            f'WHERE model_id=%s '
+            f'LIMIT 1;',
+            (model_id,)
+        )
+        return bool(list(result))
+
+    async def get_anomaly_monitoring_status(self, meeting_name):
+        result = await self.async_exec(
+            f'SELECT model_id, monitored '
+            f'FROM anomaly_monitoring '
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
+        )
+        return list(result)
+
+    async def get_anomaly_monitoring_instance(self, meeting_name, model_id):
+        result = list(await self.async_exec(
+            f'SELECT monitored '
+            f'FROM anomaly_monitoring '
+            f'WHERE meeting_name=%s AND model_id=%s;',
+            (meeting_name, model_id)
+        ))
+        return result[0] if result else None
+
+    async def set_anomaly_monitoring_status(self, meeting_name, model_id, status):
+        # TODO: races (lock again?)
+        await self.async_exec(
+            f'INSERT INTO anomaly_monitoring(meeting_name, model_id, monitored) '
+            f'VALUES (%s, %s, %s);',
+            (meeting_name, model_id, status)
+        )
 
     async def get_anomaly_monitored_meetings(self):
         return await self.async_exec(
