@@ -160,7 +160,7 @@ class ClientManager:
 
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
-        current_ts = datetime.now().isoformat()
+        current_ts = msg['date']  # datetime.now().isoformat()
         call = None
 
         for update in updates:
@@ -185,7 +185,7 @@ class ClientManager:
 
         if call:
             msg['startDatetime'] = call.start_datetime
-            msg['date'] = current_ts
+            # msg['date'] = current_ts
             await self.publish(msg)
             await self.dump(msg)
 
@@ -210,7 +210,7 @@ class ClientManager:
     @staticmethod
     def timestamp(msg, call):
         msg['startDatetime'] = call.start_datetime
-        msg['date'] = datetime.now().isoformat()
+        # msg['date'] = datetime.now().isoformat()
         
 
 class Call:
