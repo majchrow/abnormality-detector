@@ -184,21 +184,21 @@ class CassandraDAO:
         )
         return list(result)
 
-    async def get_anomaly_monitoring_instance(self, meeting_name, model_id):
+    async def get_anomaly_monitoring_instance(self, meeting_name):
         result = list(await self.async_exec(
             f'SELECT monitored '
             f'FROM anomaly_monitoring '
-            f'WHERE meeting_name=%s AND model_id=%s;',
-            (meeting_name, model_id)
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
         ))
         return result[0] if result else None
 
-    async def set_anomaly_monitoring_status(self, meeting_name, model_id, status):
+    async def set_anomaly_monitoring_status(self, meeting_name, status):
         # TODO: races (lock again?)
         await self.async_exec(
-            f'INSERT INTO anomaly_monitoring(meeting_name, model_id, monitored) '
-            f'VALUES (%s, %s, %s);',
-            (meeting_name, model_id, status)
+            f'INSERT INTO anomaly_monitoring(meeting_name, monitored) '
+            f'VALUES (%s, %s);',
+            (meeting_name, status)
         )
 
     async def get_anomaly_monitored_meetings(self):

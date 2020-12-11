@@ -202,28 +202,26 @@ class AnomalyManager(BaseWorkerManager):
             ['python3', '-m', 'streaming.monitoring.anomalies.training', meeting_name, submission_date, *calls]
         ))
 
-    async def schedule(self, meeting_name, model_id):
+    async def schedule(self, meeting_name):
         async def check():
             monitoring = await self.dao.get_anomaly_monitoring_status(meeting_name)
             if any(m['monitored'] for m in monitoring):
                 raise MonitoredAlreadyError
-        await self.set_monitoring_status(meeting_name, model_id, True, check)
+        await self.set_monitoring_status(meeting_name, True, check)
 
-    async def unschedule(self, meeting_name, model_id):
+    async def unschedule(self, meeting_name):
         async def check():
-            if not await self.dao.get_anomaly_monitoring_instance(meeting_name, model_id):
+            if not await self.dao.get_anomaly_monitoring_instance(meeting_name):
                 raise UnmonitoredError
-        await self.set_monitoring_status(meeting_name, model_id, True, check)
+        await self.set_monitoring_status(meeting_name, True, check)
 
-    async def set_monitoring_status(self, meeting_name, model_id, status, check):
+    async def set_monitoring_status(self, meeting_name, status, check):
         # Note: phew, that's a lot of checks here and it could be deleted in the meantime
         if not self.dao.meeting_exists(meeting_name):
             raise MeetingNotExistsError
-        if not self.dao.model_exists(model_id):
-            raise ModelNotExistsError
 
         await check()
-        await self.dao.set_anomaly_monitoring_status(meeting_name, model_id, status)
+        await self.dao.set_anomaly_monitoring_status(meeting_name, status)
 
     async def periodic_dispatch(self):
         while True:

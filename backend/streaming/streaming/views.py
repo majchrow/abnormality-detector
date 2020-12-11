@@ -42,35 +42,25 @@ async def schedule_training(request):
 async def schedule_inference(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='no conference name given')
-    try:
-        model_id = request.rel_url.query['model_id']
-    except KeyError:
-        raise web.HTTPBadRequest(reason='no model_id given')
 
     manager = request.app['monitoring']
     try:
-        await manager.schedule_inference(conf_name, model_id)
+        await manager.schedule_inference(conf_name)
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except ModelNotExistsError:
-        raise web.HTTPBadRequest(reason=f'model {model_id} does not exist')
+        raise web.HTTPBadRequest(reason=f'model for {conf_name} does not exist')
 
 
 async def unschedule_inference(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='No conference name given')
-    try:
-        model_id = request.rel_url.query['model_id']
-    except KeyError:
-        raise web.HTTPBadRequest(reason='no model_id given')
 
     manager = request.app['monitoring']
     try:
-        await manager.unschedule_inference(conf_name, model_id)
+        await manager.unschedule_inference(conf_name)
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
-    except ModelNotExistsError:
-        raise web.HTTPBadRequest(reason=f'model {model_id} does not exist')
 
 
 async def schedule_monitoring(request):
