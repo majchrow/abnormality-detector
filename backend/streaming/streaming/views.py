@@ -37,7 +37,8 @@ async def schedule_training(request):
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
-
+    except MeetingNotExistsError:
+        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
 
 async def schedule_inference(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:

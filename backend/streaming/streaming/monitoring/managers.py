@@ -13,7 +13,7 @@ from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import MeetingNotExistsError, UnmonitoredError
+from ..exceptions import MeetingNotExistsError, ModelNotExistsError, UnmonitoredError
 
 
 class Manager:
@@ -193,6 +193,8 @@ class AnomalyManager(BaseWorkerManager):
         asyncio.create_task(self.periodic_dispatch())
 
     async def train(self, meeting_name, calls):
+        if not await self.dao.meeting_exists(meeting_name):
+            raise MeetingNotExistsError
         job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
         #  - kill worker on shutdown smh
@@ -202,6 +204,8 @@ class AnomalyManager(BaseWorkerManager):
         ))
 
     async def schedule(self, meeting_name):
+        if not await self.dao.model_exists(meeting_name):
+            raise ModelNotExistsError
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
             raise MeetingNotExistsError
         await self.dao.add_inference_job(meeting_name, datetime.now(), datetime.now(), 'completed')

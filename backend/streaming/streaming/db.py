@@ -173,12 +173,12 @@ class CassandraDAO:
         )
         return bool(list(result))
 
-    async def model_exists(self, model_id):
+    async def model_exists(self, meeting):
         result = await self.async_exec(
             f'SELECT * FROM models '
-            f'WHERE model_id=%s '
+            f'WHERE meeting_name=%s '
             f'LIMIT 1;',
-            (model_id,)
+            (meeting,)
         )
         return bool(list(result))
 
