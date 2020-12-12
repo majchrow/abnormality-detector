@@ -4,6 +4,7 @@ from cassandra.auth import PlainTextAuthProvider
 import datetime
 import logging
 from .config import Config
+import pandas as pd
 
 
 class CassandraDAO:
@@ -14,7 +15,15 @@ class CassandraDAO:
         self.roster_table = None
         self.meetings_table = None
 
-    def init(self, cluster, keyspace, calls_table, call_info_table, roster_table, meetings_table):
+    def init(
+        self,
+        cluster,
+        keyspace,
+        calls_table,
+        call_info_table,
+        roster_table,
+        meetings_table,
+    ):
         self.session = cluster.connect(keyspace, wait_for_all_pools=True)
         self.session.row_factory = dict_factory
         self.calls_table = calls_table
@@ -27,7 +36,6 @@ class CassandraDAO:
 
         calls = self.__transform(
             lambda call: (
-                call["call_id"],
                 call["meeting_name"],
                 call["finished"],
                 call["start_datetime"],
@@ -42,10 +50,10 @@ class CassandraDAO:
         current_datetime = datetime.datetime.now()
 
         for call in calls:
-            if call[2] and self.__check_if_recent(interval, current_datetime, call[3]):
-                recent.add(call[1])
+            if call[1] and self.__check_if_recent(interval, current_datetime, call[2]):
+                recent.add(call[0])
             else:
-                current.add(call[1])
+                current.add(call[0])
 
         current = self.__transform(lambda call: {"name": call, "criteria": []}, current)
         recent = self.__transform(lambda call: {"name": call, "criteria": []}, recent)
@@ -96,7 +104,11 @@ class CassandraDAO:
             (name, count),
         ).all()
 
-        return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])[-count:]}
+        return {
+            "anomalies": sorted(
+                ci_results + roster_results, key=lambda r: r["datetime"]
+            )[-count:]
+        }
 
     # Oldies
 
@@ -127,6 +139,53 @@ class CassandraDAO:
     def __check_if_recent(interval, current_datetime, call_datetime):
         return (current_datetime - call_datetime).total_seconds() <= interval
 
+    def get_meetings(self):
+        result = self.session.execute(
+            f"SELECT meeting_name FROM {self.calls_table}"
+        ).all()
+        return result
+
+    def get_call_info_data(self, name, start_date, end_date):
+        result = pd.DataFrame(
+            self.session.execute(
+                f"SELECT * FROM {self.call_info_table} WHERE meeting_name='{name}'"
+            ).all()
+        )
+        if result.empty:
+            return result
+        return self.__add_date_and_time_columns_and_filter(result, start_date, end_date)
+
+    def get_roster_data(self, name, start_date, end_date):
+        result = pd.DataFrame(
+            self.session.execute(
+                f"SELECT * FROM {self.roster_table} WHERE meeting_name='{name}'"
+            ).all()
+        )
+        if result.empty:
+            return result
+        return self.__add_date_and_time_columns_and_filter(result, start_date, end_date)
+
+    def get_calls_data(self, name, start_date, end_date):
+        result = pd.DataFrame(
+            self.session.execute(
+                f"SELECT * FROM {self.calls_table} WHERE meeting_name='{name}' ALLOW FILTERING"
+            ).all()
+        )
+        if result.empty:
+            return result
+        result["date"] = result["start_datetime"].apply(lambda d: d.date())
+        result["start_time"] = result["start_datetime"].apply(lambda d: d.time())
+        result["last_update_time"] = result["last_update"].apply(lambda d: d.time())
+        result = result[(result["date"] >= start_date) & (result["date"] <= end_date)]
+        return result
+
+    @staticmethod
+    def __add_date_and_time_columns_and_filter(df, start_date, end_date):
+        df["date"] = df["datetime"].apply(lambda d: d.date())
+        df["time"] = df["datetime"].apply(lambda d: d.time())
+        df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
+        return df
+
 
 dao = CassandraDAO()
 
@@ -140,5 +199,5 @@ def setup_db(config: Config):
         config.calls_table,
         config.call_info_table,
         config.roster_table,
-        config.meetings_table
+        config.meetings_table,
     )

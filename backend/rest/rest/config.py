@@ -11,3 +11,4 @@ class Config:
     call_info_table = os.environ["CALL_INFO_TABLE"]
     roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
+    template_folder = "/flask/rest/resources/output"

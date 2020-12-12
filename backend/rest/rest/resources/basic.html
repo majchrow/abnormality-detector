@@ -1,0 +1,53 @@
+<html>
+  <head>
+    <title>{{meeting_name}}</title>
+  <link rel="stylesheet" href="mystyle.css">  
+  </head>
+  <body>
+    <h1>{{meeting_name}}</h1>
+    <h3><i>{{start_date}} - {{end_date}}</i></h3>
+    <p style="font-family: Arial; font-weight: normal;">
+     <table style="width:100%">
+        <tr style="background-color: lightgrey;">
+        {% for column in general_stats_columns %}
+        <th>{{column}}</th>
+        {% endfor %}
+        </tr>
+        {% for record in general_stats_records %}
+        <tr>
+        {% for column in general_stats_columns %}
+        <th>{{record[column]}}</th>
+        {% endfor %}
+        </tr>
+        {% endfor %}
+</table> 
+    {% for date in dates %}
+    <h4>Day: {{date}}</h4>
+    <p>
+    <table style="width:100%">
+        <tr style="background-color: lightgrey;">
+        <th>meeting</th>
+        {% for column in daily_stats_columns %}
+        <th>{{column}}</th>
+        {% endfor %}
+        </tr>
+        {% for record in daily_stats_records[date] %}
+        <tr>
+        <th>{{loop.index0+1}}</th>
+        {% for column in daily_stats_columns %}
+        <th>{{record[column]}}</th>
+        {% endfor %}
+        </tr>
+        {% endfor %}
+</table>
+    <div class="pagebreak"> </div>
+    {% for meeting in meetings[date] %}
+    <h5>Meeting {{loop.index0+1}}</h5>
+    {% for plot in plots[date][meeting] %}
+    <img src={{plot}}>
+    {% endfor %}
+    <div class="pagebreak"> </div>
+    {% endfor %}
+    {% endfor %}
+  </body>
+</html>

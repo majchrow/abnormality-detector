@@ -31,7 +31,7 @@ class Preprocessor:
             self.prepare_final_df()
             .writeStream.outputMode(output_mode)
             .trigger(processingTime="1 seconds")
-            .option("maxOffsetsPerTrigger",5)
+            .option("maxOffsetsPerTrigger", 5)
             .foreachBatch(self.write_data)
         )
 
@@ -136,7 +136,7 @@ class CallInfoPreprocessor(Preprocessor):
             info.streaming.alias("streaming"),
             info.joinAudioMuteOverride.alias("joinAudioMute"),
             "date",
-        )
+        ).filter(func.col("name").startswith("["))
 
         grouped = selected.groupBy("call").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),
@@ -267,7 +267,7 @@ class RosterPreprocessor(Preprocessor):
             update_col.state.alias("state"),
             update_col.updateType.alias("updateType"),
             update_col.uri.alias("uri"),
-        )
+        ).filter(func.col("name").startswith("["))
 
         selected.printSchema()
 
@@ -340,7 +340,9 @@ class CallsPreprocessor(Preprocessor):
     def prepare_final_df(self):
         self.df = self.df.select("date", func.explode("message.updates"))
 
-        selected = self.df.select("date", "col.call", "col.updateType", "col.name")
+        selected = self.df.select(
+            "date", "col.call", "col.updateType", "col.name"
+        ).filter(func.col("name").startswith("["))
 
         grouped = selected.groupBy("call").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),

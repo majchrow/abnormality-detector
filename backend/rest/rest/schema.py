@@ -39,8 +39,13 @@ class AnomalyRequestSchema(Schema):
     name = fields.Str(required=True)
     count = fields.Int(required=True, validate=Range(min=1, error='count must be positive'))
 
+class ReportRequestSchema(Schema):
+    name = fields.Str(required=True)
+    start_date = fields.Date(required=True)
+    end_date = fields.Date(required=True)
 
 anomaly_schema = AnomalySchema()
 meeting_schema = MeetingSchema()
 
 anomaly_request_schema = AnomalyRequestSchema()
+report_request_schema = ReportRequestSchema()
