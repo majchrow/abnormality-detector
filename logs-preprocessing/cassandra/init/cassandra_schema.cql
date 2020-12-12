@@ -27,6 +27,8 @@ CREATE TABLE calls(
     meeting_name text,
     duration int,
     finished boolean,
+    anomaly boolean,
+    anomaly_reason text,
     PRIMARY KEY (meeting_name, start_datetime)
 );
 
