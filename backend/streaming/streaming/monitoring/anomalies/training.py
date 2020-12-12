@@ -1,5 +1,4 @@
 import sys
-from uuid import uuid4
 
 from .db import build_dao
 from .model import Model
@@ -20,8 +19,8 @@ def main(job_id):
     ci_df, roster_df = dao.load_calls_data(job['meeting_name'], job['training_call_starts'])
     report(f'loaded training data for {job_id}: call-info {ci_df.shape}, roster {roster_df.shape}')
 
-    ci_model = Model(job['meeting_name'], f'HBOS-CALL_INFO-{str(uuid4())}')
-    roster_model = Model(job['meeting_name'], f'HBOS-ROSTER-{str(uuid4())}')
+    ci_model = Model(job['meeting_name'])
+    roster_model = Model(job['meeting_name'])
 
     ci_model.train(ci_df)
     report('call info training finished')

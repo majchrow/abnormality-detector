@@ -55,17 +55,18 @@ class CassandraDAO:
     ###########
     # inference
     ###########
-    def load_model(self, meeting_name, model_id):
+    def load_models(self, meeting_name):
         result = self.session.execute(
-            f'SELECT model FROM models '
-            f'WHERE meeting_name=%s AND model_id=%s;',
-        (meeting_name, model_id)).all()
+            f'SELECT call_info_model, roster_model FROM models '
+            f'WHERE meeting_name=%s;',
+        (meeting_name,)).all()
 
-        # TODO: handle incorrect model_id
-        blob = result[0]['model']
-        model = Model(meeting_name, model_id)
-        model.deserialize(blob)
-        return model
+        # TODO: handle inexistent model
+        ci_model = Model(meeting_name)
+        roster_model = Model(meeting_name)
+        ci_model.deserialize(result[0]['call_info_model'])
+        roster_model.deserialize(result[0]['roster_model'])
+        return ci_model, roster_model
 
     def load_data(self, meeting_name, start, end):
         ci_result = self.session.execute(
@@ -81,29 +82,37 @@ class CassandraDAO:
         ).all()
 
         def select(row_dict):
-            return {k: v for k, v in row_dict.items() if k in Model.get_columns().keys()}
+            return {k: v for k, v in row_dict.items() if k in Model.get_columns()}
         ci_sel, roster_sel = list(map(select, ci_result)), list(map(select, roster_result))
-        ci_df = pd.DataFrame.from_records(ci_sel, index='datetime')
-        roster_df = pd.DataFrame.from_records(roster_sel, index='datetime')
+        if ci_sel:
+            ci_df = pd.DataFrame.from_records(ci_sel, index='datetime')
+        else:
+            ci_df = pd.DataFrame([], index=['datetime'])
+        if roster_sel:
+            roster_df = pd.DataFrame.from_records(roster_sel, index='datetime')
+        else:
+            roster_df = pd.DataFrame([], index=['datetime'])
         return ci_df, roster_df
 
     def save_anomalies(self, meeting_name, ci_results, roster_results):
         # TODO: save explanation from the model to ml_anomaly_reason column
-        ci_anomalies = [(meeting_name, timestamp) for timestamp, pred in ci_results.items() if pred]
-        ci_stmt = self.session.prepare(
-            f"UPDATE call_info_update "
-            f"SET ml_anomaly=true "
-            f"WHERE meeting_name=%s AND datetime=%s;"
-        )
-        execute_concurrent_with_args(self.session, ci_stmt, ci_anomalies)
+        if ci_results:
+            ci_anomalies = [(meeting_name, timestamp) for timestamp, pred in ci_results.items() if pred]
+            ci_stmt = self.session.prepare(
+                f"UPDATE call_info_update "
+                f"SET ml_anomaly=true "
+                f"WHERE meeting_name=%s AND datetime=%s;"
+            )
+            execute_concurrent_with_args(self.session, ci_stmt, ci_anomalies)
 
-        roster_anomalies = [(meeting_name, timestamp) for timestamp, pred in roster_results.items() if pred]
-        roster_stmt = self.session.prepare(
-            f"UPDATE roster_update "
-            f"SET ml_anomaly=true "
-            f"WHERE meeting_name=%s AND datetime=%s;"
-        )
-        execute_concurrent_with_args(self.session, roster_stmt, roster_anomalies)
+        if roster_results:
+            roster_anomalies = [(meeting_name, timestamp) for timestamp, pred in roster_results.items() if pred]
+            roster_stmt = self.session.prepare(
+                f"UPDATE roster_update "
+                f"SET ml_anomaly=true "
+                f"WHERE meeting_name=%s AND datetime=%s;"
+            )
+            execute_concurrent_with_args(self.session, roster_stmt, roster_anomalies)
 
 
 def build_dao(config: Config):

@@ -184,7 +184,7 @@ class CassandraDAO:
 
     async def get_anomaly_monitoring_status(self, meeting_name):
         result = await self.async_exec(
-            f'SELECT model_id, monitored '
+            f'SELECT anomaly_monitored '
             f'FROM anomaly_monitoring '
             f'WHERE meeting_name=%s;',
             (meeting_name,)
@@ -202,17 +202,21 @@ class CassandraDAO:
 
     async def set_anomaly_monitoring_status(self, meeting_name, status):
         # TODO: races (lock again?)
-        await self.async_exec(
-            f'INSERT INTO anomaly_monitoring(meeting_name, monitored) '
-            f'VALUES (%s, %s);',
-            (meeting_name, status)
+        result = await self.async_exec(
+            f'UPDATE meetings '
+            f'SET anomaly_monitored=%s '
+            f'WHERE meeting_name=%s '
+            f'IF EXISTS;',
+            (status, meeting_name)
         )
+        return next(iter(result))['[applied]'] if result else False
 
     async def get_anomaly_monitored_meetings(self):
-        return await self.async_exec(
+        result = await self.async_exec(
             f'SELECT meeting_name FROM meetings '
             f'WHERE anomaly_monitored=true ALLOW FILTERING;'
         )
+        return [m['meeting_name'] for m in result]
 
     async def get_last_inferences(self, monitored_meetings):
         # TODO: use execute_concurrent?
@@ -222,16 +226,16 @@ class CassandraDAO:
             f'WHERE meeting_name=%s '
             f'ORDER BY end_datetime DESC '
             f'LIMIT 1;',
-            (m['meeting_name'],)
-        ) for m in monitored_meetings]
+            (meeting,)
+        ) for meeting in monitored_meetings]
         results = await asyncio.gather(*jobs)
         return [res[0] for res in results if res]
 
-    async def add_inference_job(self, meeting_name, start, end):
+    async def add_inference_job(self, meeting_name, start, end, status='pending'):
         await self.async_exec(
             f"INSERT INTO inference_jobs (meeting_name, start_datetime, end_datetime, status) "
-            f"VALUES (%s, %s, %s, %s, %);",
-            (meeting_name, start, end, 'pending')
+            f"VALUES (%s, %s, %s, %s);",
+            (meeting_name, start, end, status)
         )
 
     @asynccontextmanager

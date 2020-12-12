@@ -194,7 +194,7 @@ class AnomalyManager(BaseWorkerManager):
     async def train(self, meeting_name, calls):
         job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
-        #  - indicate its' by call start datetime
+        #  - indicate it's by call start datetime
         #  - kill worker on shutdown smh
 
         asyncio.create_task(run_for_result(
@@ -202,25 +202,13 @@ class AnomalyManager(BaseWorkerManager):
         ))
 
     async def schedule(self, meeting_name):
-        async def check():
-            monitoring = await self.dao.get_anomaly_monitoring_status(meeting_name)
-            if any(m['monitored'] for m in monitoring):
-                raise MonitoredAlreadyError
-        await self.set_monitoring_status(meeting_name, True, check)
+        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+            raise MeetingNotExistsError
+        await self.dao.add_inference_job(meeting_name, datetime.now(), datetime.now(), 'completed')
 
     async def unschedule(self, meeting_name):
-        async def check():
-            if not await self.dao.get_anomaly_monitoring_instance(meeting_name):
-                raise UnmonitoredError
-        await self.set_monitoring_status(meeting_name, True, check)
-
-    async def set_monitoring_status(self, meeting_name, status, check):
-        # Note: phew, that's a lot of checks here and it could be deleted in the meantime
-        if not self.dao.meeting_exists(meeting_name):
+        if not await self.dao.set_anomaly_monitoring_status(meeting_name, False):
             raise MeetingNotExistsError
-
-        await check()
-        await self.dao.set_anomaly_monitoring_status(meeting_name, status)
 
     async def periodic_dispatch(self):
         while True:
@@ -239,13 +227,17 @@ class AnomalyManager(BaseWorkerManager):
                 now = datetime.now()
                 jobs = []
                 for inf in last_inferences:
-                    if now - inf['end'] > timedelta(minutes=1):  # TODO: make configurable
+                    if now - inf['end'] > timedelta(seconds=1):  # TODO: make configurable
                         inf['start'], inf['end'] = inf['end'], now
                         jobs.append(inf)
-
+                logging.info(str(jobs))
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
 
             logging.info(f'{self.TAG}: released inference-schedule lock')
+
+            for job in jobs:
+                job['start'] = job['start'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
+                job['end'] = job['end'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
             # actually schedule them (lock not necessary anymore)
             kafka_jobs = [
                 self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from datetime import datetime as dt
 
 from .db import CassandraDAO, build_dao
 from ..workers import main, report
@@ -27,18 +28,24 @@ class Worker:
             msg_dict = json.loads(msg.value)
 
             meeting_name = msg_dict['meeting_name']
-            model_id = msg_dict['model_id']
-            start, end = msg_dict['start'], msg_dict['end']
-            report(f'job received: run model {model_id} on {meeting_name} from {start} to {end}')
+            start = dt.strptime(msg_dict['start'], '%Y-%m-%d %H:%M:%S.%fZ')
+            end = dt.strptime(msg_dict['end'], '%Y-%m-%d %H:%M:%S.%fZ')
+            report(f'job received: run model on {meeting_name} from {start} to {end}')
 
             # TODO: we block here...
-            model = self.dao.load_model(meeting_name, model_id)
+            ci_model, roster_model = self.dao.load_models(meeting_name)
             ci_batch, roster_batch = self.dao.load_data(meeting_name, start, end)
-            ci_results = model.predict(ci_batch)
-            roster_results = model.predict(roster_batch)
+            if not ci_batch.empty:
+                ci_results = ci_model.predict(ci_batch)
+            else:
+                ci_results = []
+            if not roster_batch.empty:
+                roster_results = roster_model.predict(roster_batch)
+            else:
+                roster_results = []
             self.dao.save_anomalies(meeting_name, ci_results, roster_results)
-
-            report(f'job finished: run model {model_id} on {meeting_name} from {start} to {end}')
+            # TODO: complete inference
+            report(f'job finished: run model on {meeting_name} from {start} to {end}')
 
 
 async def setup(config: Config):

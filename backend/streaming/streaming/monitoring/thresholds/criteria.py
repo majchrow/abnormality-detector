@@ -116,7 +116,6 @@ class NumericCriterion(StrictModel, Criterion):
         return v
 
     def verify(self, message, msg_type):
-
         if self.parameter not in nc_msg_params[msg_type]:
             return
         value = message[self.parameter]
