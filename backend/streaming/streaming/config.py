@@ -19,3 +19,5 @@ class Config:
     meetings_table: str = os.environ["MEETINGS_TABLE"]
     training_jobs_table: str = os.environ["TRAINING_JOBS_TABLE"]
     models_table: str = os.environ["MODELS_TABLE"]
+
+    inference_period_s: int = os.environ['INFERENCE_PERIOD_SECONDS']

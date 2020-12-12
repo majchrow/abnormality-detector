@@ -13,7 +13,7 @@ from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import MeetingNotExistsError, ModelNotExistsError, MonitoredAlreadyError, UnmonitoredError
+from ..exceptions import MeetingNotExistsError, UnmonitoredError
 
 
 class Manager:
@@ -181,6 +181,7 @@ class AnomalyManager(BaseWorkerManager):
         super().__init__()
         self.dao = dao
         self.kafka_producer = None
+        self.dispatch_period = config.inference_period_s
 
         self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
         self.num_workers = config.num_anomaly_workers
@@ -194,7 +195,6 @@ class AnomalyManager(BaseWorkerManager):
     async def train(self, meeting_name, calls):
         job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
-        #  - indicate it's by call start datetime
         #  - kill worker on shutdown smh
 
         asyncio.create_task(run_for_result(
@@ -212,39 +212,39 @@ class AnomalyManager(BaseWorkerManager):
 
     async def periodic_dispatch(self):
         while True:
+            await asyncio.sleep(self.dispatch_period)
+
             async with self.dao.try_lock('inference-schedule') as locked:
                 if not locked:
                     logging.info(f'{self.TAG}: failed to obtain inference-schedule lock')
-                    await asyncio.sleep(5)  # TODO: make configurable
                     continue
 
                 logging.info(f'{self.TAG}: obtained inference-schedule lock')
                 monitored = await self.dao.get_anomaly_monitored_meetings()
                 last_inferences = await self.dao.get_last_inferences(monitored)
 
-                await asyncio.sleep(5)
                 # add inference jobs for meetings with stale results
                 now = datetime.now()
                 jobs = []
                 for inf in last_inferences:
-                    if now - inf['end'] > timedelta(seconds=1):  # TODO: make configurable
+                    if now - inf['end'] > timedelta(seconds=self.dispatch_period):
                         inf['start'], inf['end'] = inf['end'], now
                         jobs.append(inf)
-                logging.info(str(jobs))
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
+                logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
 
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
+            # actually schedule them (lock not necessary anymore)
+            # transform date for json to serialize
             for job in jobs:
                 job['start'] = job['start'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
                 job['end'] = job['end'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
-            # actually schedule them (lock not necessary anymore)
             kafka_jobs = [
                 self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
                 for job in jobs
             ]
             await asyncio.gather(*kafka_jobs)
-            await asyncio.sleep(5)  # TODO: make configurable
 
     async def periodic_cleanup(self):
         # TODO:

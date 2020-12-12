@@ -35,17 +35,25 @@ class Worker:
             # TODO: we block here...
             ci_model, roster_model = self.dao.load_models(meeting_name)
             ci_batch, roster_batch = self.dao.load_data(meeting_name, start, end)
-            if not ci_batch.empty:
-                ci_results = ci_model.predict(ci_batch)
-            else:
-                ci_results = []
-            if not roster_batch.empty:
-                roster_results = roster_model.predict(roster_batch)
-            else:
-                roster_results = []
-            self.dao.save_anomalies(meeting_name, ci_results, roster_results)
-            # TODO: complete inference
+            ci_predictions = ci_model.predict(ci_batch)
+            roster_predictions = roster_model.predict(roster_batch)
+
+            def anomaly_filter(df):
+                return filter_anomalies(meeting_name, df)
+
+            ci_results, roster_results = map(anomaly_filter, [ci_predictions, roster_predictions])
+            self.dao.save_anomalies(ci_results, roster_results)
+            self.dao.complete_inference_job(meeting_name, end)
+
             report(f'job finished: run model on {meeting_name} from {start} to {end}')
+
+
+def filter_anomalies(meeting, scores_df):
+    anomalies = []
+    for ts, p in scores_df.iterrows():
+        if p[1] > 0.5:  # TODO: configurable threshold?
+            anomalies.append((meeting, ts))
+    return anomalies
 
 
 async def setup(config: Config):
@@ -56,7 +64,6 @@ async def setup(config: Config):
     await job_consumer.start()
 
     dao = build_dao(config)
-
     return Worker(job_consumer, producer, dao)
 
 

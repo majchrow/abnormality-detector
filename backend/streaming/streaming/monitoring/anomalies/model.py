@@ -49,5 +49,8 @@ class Model:
         self.model.fit(data, None)
 
     def predict(self, batch):
-        assert self.model is not None, "Cannot predict batch without training model"
-        return self.model.predict_proba(batch)
+        if not batch.empty:
+            predictions = self.model.predict_proba(batch)
+            return pd.DataFrame(predictions, index=batch.index, columns=['p0', 'p1'])
+        else:
+            return pd.DataFrame([], columns=['p0', 'p1'])

@@ -1,10 +1,8 @@
-import numpy as np
 import pandas as pd
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, dict_factory
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import ValueSequence
-from itertools import chain
 
 from .model import Model
 from ...config import Config
@@ -61,7 +59,7 @@ class CassandraDAO:
             f'WHERE meeting_name=%s;',
         (meeting_name,)).all()
 
-        # TODO: handle inexistent model
+        # TODO: handle non-existent model
         ci_model = Model(meeting_name)
         roster_model = Model(meeting_name)
         ci_model.deserialize(result[0]['call_info_model'])
@@ -83,36 +81,39 @@ class CassandraDAO:
 
         def select(row_dict):
             return {k: v for k, v in row_dict.items() if k in Model.get_columns()}
+
         ci_sel, roster_sel = list(map(select, ci_result)), list(map(select, roster_result))
-        if ci_sel:
-            ci_df = pd.DataFrame.from_records(ci_sel, index='datetime')
-        else:
-            ci_df = pd.DataFrame([], index=['datetime'])
-        if roster_sel:
-            roster_df = pd.DataFrame.from_records(roster_sel, index='datetime')
-        else:
-            roster_df = pd.DataFrame([], index=['datetime'])
+        ci_df = pd.DataFrame.from_records(ci_sel, index=['datetime'])
+        roster_df = pd.DataFrame.from_records(roster_sel, index=['datetime'])
         return ci_df, roster_df
 
-    def save_anomalies(self, meeting_name, ci_results, roster_results):
+    def save_anomalies(self, ci_results, roster_results):
         # TODO: save explanation from the model to ml_anomaly_reason column
         if ci_results:
-            ci_anomalies = [(meeting_name, timestamp) for timestamp, pred in ci_results.items() if pred]
-            ci_stmt = self.session.prepare(
-                f"UPDATE call_info_update "
-                f"SET ml_anomaly=true "
-                f"WHERE meeting_name=%s AND datetime=%s;"
-            )
-            execute_concurrent_with_args(self.session, ci_stmt, ci_anomalies)
-
+            try:
+                ci_stmt = self.session.prepare(
+                    f"UPDATE call_info_update "
+                    f"SET ml_anomaly=true "
+                    f"WHERE meeting_name=? AND datetime=?;"
+                )
+                execute_concurrent_with_args(self.session, ci_stmt, ci_results)
+            except Exception as e:
+                print(e)
         if roster_results:
-            roster_anomalies = [(meeting_name, timestamp) for timestamp, pred in roster_results.items() if pred]
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
                 f"SET ml_anomaly=true "
-                f"WHERE meeting_name=%s AND datetime=%s;"
+                f"WHERE meeting_name=? AND datetime=?;"
             )
-            execute_concurrent_with_args(self.session, roster_stmt, roster_anomalies)
+            execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+
+    def complete_inference_job(self, meeting_name, end_datetime):
+        self.session.execute(
+            f"UPDATE inference_jobs "
+            f"SET status='completed' "
+            f"WHERE meeting_name=%s AND end_datetime=%s;",
+            (meeting_name, end_datetime)
+        )
 
 
 def build_dao(config: Config):
