@@ -90,15 +90,12 @@ class CassandraDAO:
     def save_anomalies(self, ci_results, roster_results):
         # TODO: save explanation from the model to ml_anomaly_reason column
         if ci_results:
-            try:
-                ci_stmt = self.session.prepare(
-                    f"UPDATE call_info_update "
-                    f"SET ml_anomaly=true "
-                    f"WHERE meeting_name=? AND datetime=?;"
-                )
-                execute_concurrent_with_args(self.session, ci_stmt, ci_results)
-            except Exception as e:
-                print(e)
+            ci_stmt = self.session.prepare(
+                f"UPDATE call_info_update "
+                f"SET ml_anomaly=true "
+                f"WHERE meeting_name=? AND datetime=?;"
+            )
+            execute_concurrent_with_args(self.session, ci_stmt, ci_results)
         if roster_results:
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
