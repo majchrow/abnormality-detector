@@ -175,9 +175,8 @@ class AnomalyManager(BaseWorkerManager):
         super().__init__()
         self.dao = dao
         self.kafka_producer = None
-        self.dispatch_period = 5  # config.inference_period_s
-
-        self.dispatch_task = self.cleanup_task = None
+        self.dispatch_period = config.inference_period_s
+        self.dispatch_task = None
 
         self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
         self.num_workers = config.num_anomaly_workers
@@ -187,10 +186,7 @@ class AnomalyManager(BaseWorkerManager):
         self.kafka_producer = kafka_producer
 
         dispatch_task = self._retry_on_failure(async_partial(self.periodic_dispatch), 'inference dispatch')
-        cleanup_task = self._retry_on_failure(async_partial(self.periodic_cleanup), 'cleanup')
-
         self.dispatch_task = asyncio.create_task(dispatch_task)
-        self.cleanup_task = asyncio.create_task(cleanup_task)
 
     async def _retry_on_failure(self, task, name):
         while True:
@@ -251,29 +247,20 @@ class AnomalyManager(BaseWorkerManager):
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
             # actually schedule them (lock not necessary anymore)
-            # transform date for json to serialize
-            for job in jobs:
-                job['start'] = job['start'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
-                job['end'] = job['end'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
-            kafka_jobs = [
-                self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
-                for job in jobs
-            ]
-            await asyncio.gather(*kafka_jobs)
+            await asyncio.gather(*map(self.push_inference_job, jobs))
+            logging.info(f'{self.TAG}: pushed to workers')
 
-    async def periodic_cleanup(self):
-        # TODO:
-        #  - remove stale locks (what if process fails while holding a lock??)
-        #  - re-run old and still not completed jobs
-        pass
+    async def push_inference_job(self, job):
+        # transform date for json to serialize
+        job['start'] = job['start'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
+        job['end'] = job['end'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
+        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
 
     async def shutdown(self):
         await super().shutdown()
 
         self.dispatch_task.cancel()
-        self.cleanup_task.cancel()
         await self.dispatch_task
-        await self.cleanup_task
 
 
 async def start_all(app: web.Application):
