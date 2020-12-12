@@ -46,10 +46,11 @@ async def schedule_inference(request):
     manager = request.app['monitoring']
     try:
         await manager.schedule_inference(conf_name)
+        return web.Response()
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except ModelNotExistsError:
-        raise web.HTTPBadRequest(reason=f'model for {conf_name} does not exist')
+        raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
 
 
 async def unschedule_inference(request):
@@ -59,8 +60,11 @@ async def unschedule_inference(request):
     manager = request.app['monitoring']
     try:
         await manager.unschedule_inference(conf_name)
+        return web.Response()
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
+    except UnmonitoredError:
+        raise web.HTTPBadRequest(reason=f'meeting {conf_name} is not monitored')
 
 
 async def schedule_monitoring(request):

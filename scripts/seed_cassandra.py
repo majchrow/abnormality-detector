@@ -4,7 +4,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import dict_factory
 from datetime import datetime, timedelta
 from faker import Faker
-from random import randint, random
+from random import randint, random, seed
 
 USER = 'cassandra'
 PASSWORD = 'cassandra'
@@ -14,6 +14,7 @@ KEYSPACE = 'test'
 
 session = None
 fake = None
+seed(42)
 
 
 def build_session():

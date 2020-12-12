@@ -7,24 +7,34 @@ from ..workers import report
 from ...config import Config
 
 
-def main(meeting_name, submission_date, calls):
+# TODO:
+#  - job doesn't exist
+#  - no training data
+#  - other failures during training?
+def main(job_id):
     config = Config()
     dao = build_dao(config)
-    training_data = dao.load_calls_data(meeting_name, calls)
+    job = dao.load_training_job(job_id)
+    report(f'loaded training job {job_id}')
 
-    model_id = f'HBOS-{str(uuid4())}'
-    model = Model(meeting_name, model_id)
-    model.data = training_data
-    # model.train()
-    model.run_synthetic()
-    report('training finished')
+    ci_df, roster_df = dao.load_calls_data(job['meeting_name'], job['training_call_starts'])
+    report(f'loaded training data for {job_id}: call-info {ci_df.shape}, roster {roster_df.shape}')
 
-    dao.save_model(model, calls)
-    report('model saved')
+    ci_model = Model(job['meeting_name'], f'HBOS-CALL_INFO-{str(uuid4())}')
+    roster_model = Model(job['meeting_name'], f'HBOS-ROSTER-{str(uuid4())}')
 
-    dao.complete_training_job(meeting_name, submission_date)
+    ci_model.train(ci_df)
+    report('call info training finished')
+
+    roster_model.train(roster_df)
+    report('roster training finished')
+
+    dao.save_models(ci_model, roster_model, job['training_call_starts'])
+    report('models saved')
+
+    dao.complete_training_job(job_id)
     report('all done')
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2], sys.argv[3:])
+    main(sys.argv[1])

@@ -107,7 +107,7 @@ async def run_for_result(uid: str, cmd: List[str]):
     )
 
     out_task = asyncio.create_task(listen(worker.stdout, 'OUT'))
-    err_task = asyncio.create_task(listen(worker.stdout, 'ERR'))
+    err_task = asyncio.create_task(listen(worker.stderr, 'ERR'))
 
     await worker.wait()
     out_task.cancel()

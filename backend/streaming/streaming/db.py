@@ -50,6 +50,9 @@ class CassandraDAO:
         promise.add_callbacks(callback, errback)
         return await future
 
+    ############
+    # thresholds
+    ############
     def get_monitored_meetings(self):
         result = self.session.execute_async(
             f'SELECT meeting_name as name, criteria FROM {self.meetings_table} '
@@ -98,7 +101,7 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
-    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]]=None):
+    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]] = None):
         if criteria is None:
             result = self.session.execute_async(
                 f'UPDATE {self.meetings_table} '
@@ -133,12 +136,16 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
+    ###################
+    # anomaly detection
+    ###################
     def add_training_job(self, meeting_name: str, calls: List[str]):
+        uid = str(uuid4())
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         result = self.session.execute_async(
-            f"INSERT INTO {self.training_jobs_table} (meeting_name, training_calls, submission_datetime, status) "
-            f"VALUES (%s, %s, %s, %s);",
-            (meeting_name, calls, now, 'pending')
+            f"INSERT INTO training_jobs (job_id, meeting_name, submission_datetime, training_call_starts, status) "
+            f"VALUES (%s, %s, %s, %s, %s);",
+            (uid, meeting_name, now, calls, 'pending')
         )
 
         loop = asyncio.get_running_loop()
@@ -146,7 +153,7 @@ class CassandraDAO:
 
         def on_success(_):
             logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
-            future.set_result(now)
+            future.set_result(uid)
 
         def on_error(e):
             logging.error(f'{self.TAG}: "add training job" failed with {e}'),
@@ -203,28 +210,28 @@ class CassandraDAO:
 
     async def get_anomaly_monitored_meetings(self):
         return await self.async_exec(
-            f'SELECT meeting_name, model_id FROM anomaly_monitoring '
-            f'WHERE monitored=true ALLOW FILTERING;'
+            f'SELECT meeting_name FROM meetings '
+            f'WHERE anomaly_monitored=true ALLOW FILTERING;'
         )
 
     async def get_last_inferences(self, monitored_meetings):
         # TODO: use execute_concurrent?
         jobs = [self.async_exec(
-            f'SELECT meeting_name, model_id, end_datetime as end '
+            f'SELECT meeting_name, end_datetime as end '
             f'FROM inference_jobs '
-            f'WHERE meeting_name=%s AND model_id=%s '
+            f'WHERE meeting_name=%s '
             f'ORDER BY end_datetime DESC '
             f'LIMIT 1;',
-            (m['meeting_name'], m['model_id'])
+            (m['meeting_name'],)
         ) for m in monitored_meetings]
         results = await asyncio.gather(*jobs)
         return [res[0] for res in results if res]
 
-    async def add_inference_job(self, meeting_name, model_id, start, end):
+    async def add_inference_job(self, meeting_name, start, end):
         await self.async_exec(
-            f"INSERT INTO inference_jobs (meeting_name, model_id, start_datetime, end_datetime, status) "
+            f"INSERT INTO inference_jobs (meeting_name, start_datetime, end_datetime, status) "
             f"VALUES (%s, %s, %s, %s, %);",
-            (meeting_name, model_id, start, end, 'pending')
+            (meeting_name, start, end, 'pending')
         )
 
     @asynccontextmanager

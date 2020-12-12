@@ -54,13 +54,13 @@ class Manager:
         await self.anomaly_manager.train(meeting_name, calls)
         logging.info(f'{self.TAG}: scheduled model training for meeting {meeting_name} on calls {calls}')
 
-    async def schedule_inference(self, meeting_name: str, model_id: str):
-        await self.anomaly_manager.schedule(meeting_name, 'HBOS')
-        logging.info(f'{self.TAG}: scheduled inference for {meeting_name} with model {model_id}')
+    async def schedule_inference(self, meeting_name: str):
+        await self.anomaly_manager.schedule(meeting_name)
+        logging.info(f'{self.TAG}: scheduled inference for {meeting_name}')
 
-    async def unschedule_inference(self, meeting_name: str, model_id: str):
-        await self.anomaly_manager.unschedule(meeting_name, model_id)
-        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name} with model {model_id}')
+    async def unschedule_inference(self, meeting_name: str):
+        await self.anomaly_manager.unschedule(meeting_name)
+        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
 
     ############
     # monitoring
@@ -171,7 +171,6 @@ class ThresholdManager(BaseWorkerManager):
 #    - also, no "schedule" and "delete" - don't keep any state in the worker (state in DB, not in memory pls)
 
 # Assumptions:
-#  - we don't (yet) store which model reported anomaly (would likely require separate table)
 #  - when re-running old jobs, it may so happen that it gets completed multiple times (very
 #    slow workers case), should not be an issue for now, might think of better tactic later
 class AnomalyManager(BaseWorkerManager):
@@ -193,13 +192,13 @@ class AnomalyManager(BaseWorkerManager):
         asyncio.create_task(self.periodic_dispatch())
 
     async def train(self, meeting_name, calls):
-        submission_date = await self.dao.add_training_job(meeting_name, calls)
+        job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
-        #  kill worker on shutdown smh
+        #  - indicate its' by call start datetime
+        #  - kill worker on shutdown smh
 
         asyncio.create_task(run_for_result(
-            'training-worker',
-            ['python3', '-m', 'streaming.monitoring.anomalies.training', meeting_name, submission_date, *calls]
+            'training-worker', ['python3', '-m', 'streaming.monitoring.anomalies.training', job_id]
         ))
 
     async def schedule(self, meeting_name):
@@ -241,7 +240,7 @@ class AnomalyManager(BaseWorkerManager):
                 jobs = []
                 for inf in last_inferences:
                     if now - inf['end'] > timedelta(minutes=1):  # TODO: make configurable
-                        inf['start'] = now
+                        inf['start'], inf['end'] = inf['end'], now
                         jobs.append(inf)
 
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])

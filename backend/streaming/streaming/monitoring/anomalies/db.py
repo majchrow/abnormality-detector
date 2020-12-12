@@ -14,6 +14,47 @@ class CassandraDAO:
     def __init__(self, session):
         self.session = session
 
+    ##########
+    # training
+    ##########
+    def load_training_job(self, job_id):
+        result = self.session.execute(
+            f'SELECT * FROM training_jobs '
+            f'WHERE job_id=%s;',
+            (job_id,)
+        ).all()
+        return result[0] if result else None
+
+    def load_calls_data(self, meeting_name, call_starts):
+        calls = self.session.execute(
+            f'SELECT start_datetime as start, last_update as end '
+            f'FROM calls '
+            f'WHERE meeting_name=%s AND start_datetime IN %s;',
+            (meeting_name, ValueSequence(call_starts))
+        ).all()
+
+        calls_dfs = [self.load_data(meeting_name, call['start'], call['end']) for call in calls]
+        ci_dfs, roster_dfs = zip(*calls_dfs)
+        return pd.concat(ci_dfs), pd.concat(roster_dfs)
+
+    def save_models(self, ci_model, roster_model, calls):
+        self.session.execute(
+            f'INSERT INTO models(meeting_name, training_call_starts, call_info_model, roster_model) '
+            f'VALUES (%s, %s, %s, %s);',
+            (ci_model.meeting_name, calls, ci_model.serialize(), roster_model.serialize())
+        )
+
+    def complete_training_job(self, job_id):
+        self.session.execute(
+            f"UPDATE training_jobs "
+            f"SET status='completed' "
+            f"WHERE job_id=%s;",
+            (job_id,)
+        )
+
+    ###########
+    # inference
+    ###########
     def load_model(self, meeting_name, model_id):
         result = self.session.execute(
             f'SELECT model FROM models '
@@ -39,38 +80,12 @@ class CassandraDAO:
             (meeting_name, start, end)
         ).all()
 
-        def extend(row_dict):
-            return {k: row_dict.get(k, np.NaN) for k in Model.get_columns().keys()}
-        ci_ext, roster_ext = list(map(extend, ci_result)), list(map(extend, roster_result))
-        return pd.DataFrame(ci_ext, index=['datetime']), pd.DataFrame(roster_ext, index=['datetime'])
-
-    def load_calls_data(self, meeting_name, call_starts):
-        calls = self.session.execute(
-            f'SELECT start_datetime as start, last_update as end '
-            f'FROM calls '
-            f'WHERE meeting_name=%s AND start_datetime IN %s;',
-            (meeting_name, ValueSequence(call_starts))
-        ).all()
-
-        calls_dfs = [self.load_data(meeting_name, call['start'], call['end']) for call in calls]
-        return pd.concat(chain(*calls_dfs))
-
-    def save_model(self, model, calls):
-        blob = model.serialize()
-        self.session.execute(
-            f'INSERT INTO models(meeting_name, model_id, training_calls, model) '
-            f'VALUES (%s, %s, %s, %s);',
-            (model.meeting_name, model.id, calls, blob)
-        )
-
-    def complete_training_job(self, meeting_name, submission_date):
-        print(submission_date)
-        self.session.execute(
-            f"UPDATE training_jobs "
-            f"SET status='completed' "
-            f"WHERE meeting_name=%s AND submission_datetime=%s;",
-            (meeting_name, submission_date)
-        )
+        def select(row_dict):
+            return {k: v for k, v in row_dict.items() if k in Model.get_columns().keys()}
+        ci_sel, roster_sel = list(map(select, ci_result)), list(map(select, roster_result))
+        ci_df = pd.DataFrame.from_records(ci_sel, index='datetime')
+        roster_df = pd.DataFrame.from_records(roster_sel, index='datetime')
+        return ci_df, roster_df
 
     def save_anomalies(self, meeting_name, ci_results, roster_results):
         # TODO: save explanation from the model to ml_anomaly_reason column

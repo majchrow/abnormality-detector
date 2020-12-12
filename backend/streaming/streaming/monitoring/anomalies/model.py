@@ -10,7 +10,6 @@ class Model:
     def __init__(self, meeting_name, model_id):
         self.meeting_name = meeting_name
         self.id = model_id
-        self.data = None
         self.model = None
 
     def _init_model(self):
@@ -19,7 +18,7 @@ class Model:
     @staticmethod
     def get_columns():
         return {
-            # "datetime": datetime,
+            "datetime": datetime,
             "active_speaker": int,
             "connected": int,
             "endpoint_recording": int,
@@ -40,26 +39,15 @@ class Model:
             "time_diff": float
         }
 
-    # 'startDatetime', 'week_day_number', 'hour', 'datetime', 'meeting_name'
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, data):
-        self._data = data
-
     def serialize(self):
         return pkl.dumps(self.model)
 
     def deserialize(self, serialized):
         self.model = pkl.loads(serialized)
 
-    def train(self):
-        assert self.data is not None, "Cannot train model, without data set"
+    def train(self, data):
         self._init_model()
-        self.model.fit(self.data, None)
+        self.model.fit(data, None)
 
     def predict(self, batch):
         assert self.model is not None, "Cannot predict batch without training model"
@@ -86,8 +74,7 @@ class Model:
     def run_synthetic(self):
         data = self._generate_synthetic(samples=100000)
         pandas_data = pd.DataFrame(data)
-        self.data = pandas_data
-        self.train()
+        self.train(pandas_data)
         test_data = self._generate_synthetic(samples=10)
         pandas_test_data = pd.DataFrame(test_data)
         return self.predict(pandas_test_data)
