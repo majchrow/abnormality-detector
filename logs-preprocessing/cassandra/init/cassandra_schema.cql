@@ -58,38 +58,31 @@ CREATE TABLE meetings(
     meeting_name text PRIMARY KEY, 
     meeting_number text,
     criteria text,
-    monitored boolean
+    monitored boolean,
+    anomaly_monitored boolean
 );
 
 CREATE TABLE training_jobs(
+    job_id text PRIMARY KEY,
     meeting_name text,
     submission_datetime timestamp,
-    training_calls list<timestamp>,
-    status text,
-    PRIMARY KEY (meeting_name, submission_datetime)
+    training_call_starts list<timestamp>,
+    status text
 );
 
 CREATE TABLE models(
-    model_id text PRIMARY KEY,
-    meeting_name text,
-    training_calls list<timestamp>,
-    model blob
-);
-
-CREATE TABLE anomaly_monitoring(
-    meeting_name text,
-    model_id text,
-    monitored boolean,
-    PRIMARY KEY (meeting_name, model_id)
+    meeting_name text PRIMARY KEY,
+    training_call_starts list<timestamp>,
+    call_info_model blob,
+    roster_model blob
 );
 
 CREATE TABLE inference_jobs(
     meeting_name text,
-    model_id text,
     start_datetime timestamp,
     end_datetime timestamp,
     status text,
-    PRIMARY KEY ((meeting_name, model_id), end_datetime)
+    PRIMARY KEY (meeting_name, end_datetime)
 );
 
 CREATE TABLE locks(
