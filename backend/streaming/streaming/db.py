@@ -5,10 +5,13 @@ from aiohttp import web
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
+from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import List, Optional
+from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError
+from .exceptions import DBFailureError, MeetingNotExistsError, MonitoredAlreadyError
 
 
 # TODO:
@@ -18,16 +21,38 @@ class CassandraDAO:
 
     TAG = 'CassandraDAO'
 
-    def __init__(self, cluster, keyspace, meetings_table):
+    def __init__(self, cluster, config):
         self.cluster = cluster
-        self.keyspace = keyspace
-        self.meetings_table = meetings_table
+        self.keyspace = config.keyspace
+        self.meetings_table = config.meetings_table
+        self.training_jobs_table = config.training_jobs_table
+        self.models_table = config.models_table
         self.session = None
 
     def start(self):
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
+    async def async_exec(self, query, args=None):
+        def callback(result):
+            future.set_result(result)
+
+        def errback(e):
+            future.set_exception(e)
+
+        if args:
+            promise = self.session.execute_async(query, args)
+        else:
+            promise = self.session.execute_async(query)
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        promise.add_callbacks(callback, errback)
+        return await future
+
+    ############
+    # thresholds
+    ############
     def get_monitored_meetings(self):
         result = self.session.execute_async(
             f'SELECT meeting_name as name, criteria FROM {self.meetings_table} '
@@ -76,7 +101,7 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
-    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]]=None):
+    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]] = None):
         if criteria is None:
             result = self.session.execute_async(
                 f'UPDATE {self.meetings_table} '
@@ -111,6 +136,127 @@ class CassandraDAO:
         result.add_callbacks(on_success, on_error)
         return future
 
+    ###################
+    # anomaly detection
+    ###################
+    def add_training_job(self, meeting_name: str, calls: List[str]):
+        uid = str(uuid4())
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        result = self.session.execute_async(
+            f"INSERT INTO training_jobs (job_id, meeting_name, submission_datetime, training_call_starts, status) "
+            f"VALUES (%s, %s, %s, %s, %s);",
+            (uid, meeting_name, now, calls, 'pending')
+        )
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(_):
+            logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
+            future.set_result(uid)
+
+        def on_error(e):
+            logging.error(f'{self.TAG}: "add training job" failed with {e}'),
+            future.set_exception(
+                DBFailureError(f'"add training job" failed with {e}')
+            )
+
+        result.add_callbacks(on_success, on_error)
+        return future
+
+    async def meeting_exists(self, meeting_name):
+        result = await self.async_exec(
+            f'SELECT * FROM meetings '
+            f'WHERE meeting_name=%s '
+            f'LIMIT 1;',
+            (meeting_name,)
+        )
+        return bool(list(result))
+
+    async def model_exists(self, meeting):
+        result = await self.async_exec(
+            f'SELECT * FROM models '
+            f'WHERE meeting_name=%s '
+            f'LIMIT 1;',
+            (meeting,)
+        )
+        return bool(list(result))
+
+    async def get_anomaly_monitoring_status(self, meeting_name):
+        result = await self.async_exec(
+            f'SELECT anomaly_monitored '
+            f'FROM anomaly_monitoring '
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
+        )
+        return list(result)
+
+    async def get_anomaly_monitoring_instance(self, meeting_name):
+        result = list(await self.async_exec(
+            f'SELECT monitored '
+            f'FROM anomaly_monitoring '
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
+        ))
+        return result[0] if result else None
+
+    async def set_anomaly_monitoring_status(self, meeting_name, status):
+        # TODO: races (lock again?)
+        result = await self.async_exec(
+            f'UPDATE meetings '
+            f'SET anomaly_monitored=%s '
+            f'WHERE meeting_name=%s '
+            f'IF EXISTS;',
+            (status, meeting_name)
+        )
+        return next(iter(result))['[applied]'] if result else False
+
+    async def get_anomaly_monitored_meetings(self):
+        result = await self.async_exec(
+            f'SELECT meeting_name FROM meetings '
+            f'WHERE anomaly_monitored=true ALLOW FILTERING;'
+        )
+        return [m['meeting_name'] for m in result]
+
+    async def get_last_inferences(self, monitored_meetings):
+        # TODO: use execute_concurrent?
+        jobs = [self.async_exec(
+            f'SELECT meeting_name, end_datetime as end '
+            f'FROM inference_jobs '
+            f'WHERE meeting_name=%s '
+            f'ORDER BY end_datetime DESC '
+            f'LIMIT 1;',
+            (meeting,)
+        ) for meeting in monitored_meetings]
+        results = await asyncio.gather(*jobs)
+        return [res[0] for res in results if res]
+
+    async def add_inference_job(self, meeting_name, start, end, status='pending'):
+        await self.async_exec(
+            f"INSERT INTO inference_jobs (meeting_name, start_datetime, end_datetime, status) "
+            f"VALUES (%s, %s, %s, %s);",
+            (meeting_name, start, end, status)
+        )
+
+    @asynccontextmanager
+    async def try_lock(self, resource):
+        try:
+            # lock using Cassandra's lightweight transactions
+            uid = str(uuid4())
+            result = await self.async_exec(
+                f'UPDATE locks SET lock_id=%s '
+                f'WHERE resource_name=%s '
+                f'IF lock_id=null;',
+                (uid, resource)
+            )
+            yield next(iter(result))['[applied]']
+        finally:
+            await self.async_exec(
+                'UPDATE locks SET lock_id=null '
+                'WHERE resource_name=%s;',
+                (resource,)
+            )
+
     async def shutdown(self):
         logging.info(f'{self.TAG}: connection shutdown.')
 
@@ -126,7 +272,7 @@ async def cancel_db(app: web.Application):
 def setup_db(app, config: Config):
     auth_provider = PlainTextAuthProvider(username=config.cassandra_user, password=config.cassandra_passwd)
     cassandra = Cluster([config.cassandra_host], port=config.cassandra_port, auth_provider=auth_provider)
-    dao = CassandraDAO(cassandra, config.keyspace, config.meetings_table)
+    dao = CassandraDAO(cassandra, config)
     app['db'] = dao
     app.on_startup.append(start_db)
     app.on_cleanup.append(cancel_db)

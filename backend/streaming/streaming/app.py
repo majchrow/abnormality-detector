@@ -3,7 +3,7 @@ from aiohttp import web
 
 from .config import Config
 from .db import setup_db
-from .monitoring.manager import setup_monitoring
+from .monitoring.managers import setup_monitoring
 from .routes import setup_routes
 
 

@@ -4,7 +4,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import dict_factory
 from datetime import datetime, timedelta
 from faker import Faker
-from random import randint
+from random import randint, random, seed
 
 USER = 'cassandra'
 PASSWORD = 'cassandra'
@@ -14,6 +14,7 @@ KEYSPACE = 'test'
 
 session = None
 fake = None
+seed(42)
 
 
 def build_session():
@@ -46,6 +47,54 @@ def seed_calls(meetings, count):
     print(f'-> inserted calls')
     return calls
 
+ci_cols = [
+    ("adhoc", int),
+    ("cospace", bool),
+    ("current_participants", int),
+    ("forwarding", int),
+    ("hour", int),
+    ("week_day_number", int),
+    ("locked", int),
+    ("max_participants", int),
+    ("mean_participants", int),
+    ("lync_conferencing", bool),
+    ("recording", int),
+    ("streaming", int),
+    ("time_diff", int)
+]
+roster_cols = [
+    ("active_speaker", int),
+    ("presenter", int),
+    ("endpoint_recording", int),
+    ("hour", int),
+    ("week_day_number", int),
+    ("initial", int),
+    ("ringing", int),
+    ("connected", int),
+    ("onhold", int)
+]
+
+def gen_row(meeting, dt, cols):
+    row = []
+    for key, type in cols:
+        value = None
+        if type == int:
+            value = randint(0, 7)
+        elif type == float:
+            value = random() * 40
+        elif type == bool:
+            value = bool(randint(0, 1))
+        assert value is not None, f"Wrong type provided: {type}"
+        row.append(value)
+
+    return (meeting, dt, *row)
+
+def gen_ci(meeting, dt):
+    return gen_row(meeting, dt, ci_cols)
+
+def gen_roster(meeting, dt):
+    return gen_row(meeting, dt, roster_cols)
+
 def seed_call_info_roster(calls, length):
     call_info = []
     roster = []
@@ -55,18 +104,20 @@ def seed_call_info_roster(calls, length):
         step = int(duration / length)
         cur_dt = start
         for _ in range(length):
-            call_info.append((meeting, cur_dt, randint(0, 10), bool(randint(0,1))))
-            roster.append((meeting, cur_dt, randint(0, 10), randint(0, 10)))
+            call_info.append(gen_ci(meeting, cur_dt))
+            roster.append(gen_roster(meeting, cur_dt))
             cur_dt += timedelta(seconds=step)
-               
+    
+    cols = list(map(lambda c: c[0], ci_cols))
     stmt = session.prepare(
-        'INSERT INTO call_info_update(meeting_name, datetime, max_participants, recording) VALUES (?, ?, ?, ?);'
+        f'INSERT INTO call_info_update(meeting_name, datetime, {", ".join(cols)}) VALUES (?, ?, {", ".join(["?"] * len(cols))});'
     )
     execute_concurrent_with_args(session, stmt, call_info)
     print(f'-> inserted call_info')
 
+    cols = list(map(lambda c: c[0], roster_cols))
     stmt = session.prepare(
-        'INSERT INTO roster_update(meeting_name, datetime, active_speaker, onhold) VALUES (?, ?, ?, ?);'
+         f'INSERT INTO roster_update(meeting_name, datetime, {", ".join(cols)}) VALUES (?, ?, {", ".join(["?"] * len(cols))});'      
     )
     execute_concurrent_with_args(session, stmt, roster)
     print(f'-> inserted roster')
