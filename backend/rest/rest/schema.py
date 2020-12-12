@@ -44,13 +44,7 @@ class AnomalySchema(Schema):
     anomaly_reason = JSONString(required=True)
 
 
-class AnomalyRequestSchema(Schema):
-    name = fields.Str(required=True)
-    count = fields.Int(required=True, validate=Range(min=1, error='count must be positive'))
-
-
 anomaly_schema = AnomalySchema()
-anomaly_request_schema = AnomalyRequestSchema()
 meeting_schema = MeetingSchema()
 meeting_request_schema = MeetingRequestSchema()
 

@@ -1,3 +1,4 @@
+from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
 from flask import request
@@ -6,16 +7,13 @@ from marshmallow import ValidationError
 from .db import dao
 from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
-from .schema import anomaly_schema, anomaly_request_schema, meeting_schema, meeting_request_schema
+from .schema import anomaly_schema, meeting_schema, meeting_request_schema
 
 
 class Meetings(Resource):
-    # TODO: this method should belong to separate Conferences resource
     @cross_origin()
     def get(self):
-        result = dao.get_conferences()
-        result['created'] = list(map(meeting_schema.dump, result['created']))
-        return result
+        return {'meetings': bridge_dao.get_meetings()}
 
     @cross_origin()
     def put(self):
@@ -37,7 +35,7 @@ class Meetings(Resource):
             return {"message": f"conference to remove is not specified"}, 400
 
         try:
-            dao.remove_meeting(name)
+            dao.clear_meeting(name)
             return {"message": f"successfully removed {name} from monitored conferences"}, 200
         except NotFoundError:
             return {"message": f"no meeting {name}"}, 404
@@ -45,38 +43,64 @@ class Meetings(Resource):
 
 class MeetingDetails(Resource):
     @cross_origin()
-    def get(self, conf_name):
-        if meeting := dao.meeting_details(conf_name):
+    def get(self, meeting_name):
+        if meeting := dao.meeting_details(meeting_name):
             return meeting
         else:
-            return {"message": f"no meeting {conf_name}"}, 404
+            return {"message": f"no meeting {meeting_name}"}, 404
+
+
+class Calls(Resource):
+    @cross_origin()
+    def get(self):
+        result = dao.get_conferences()
+        result['created'] = list(map(meeting_schema.dump, result['created']))
+        return result
+
+
+class CallHistory(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
+
+        try:
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
+
+        result = dao.get_calls(meeting_name, start_date, end_date)
+        return {'calls': result}
 
 
 class Anomalies(Resource):
     @cross_origin()
-    def get(self):
+    def get(self, meeting_name):
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
+
         try:
-            if errors := anomaly_request_schema.validate(request.args.to_dict()):
-                return {"message": f'invalid request: {errors}'}, 400
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
 
-            conf_name, count = request.args['name'], int(request.args['count'])
-            result = dao.get_anomalies(conf_name, count)
-            result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
-            return result
-        except NotFoundError:
-            return {"message": f"no meeting {conf_name}"}, 404
-
-
-class BridgeMeetings(Resource):
-    @cross_origin()
-    def get(self): 
-        return {'meetings': bridge_dao.get_meetings()}
+        result = dao.get_anomalies(meeting_name, start_date, end_date)
+        result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
+        return result
 
 
 def setup_resources(app):
     api = Api(app)
-    api.add_resource(Meetings, "/conferences")
-    api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
-    api.add_resource(Anomalies, "/anomalies")
-    api.add_resource(BridgeMeetings, "/meetings")
-
+    api.add_resource(Meetings, "/meetings")
+    api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
+    api.add_resource(Calls, "/calls")
+    api.add_resource(CallHistory, "/calls/<string:meeting_name>")
+    api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
