@@ -13,6 +13,7 @@ from ...config import Config
 class Worker:
 
     def __init__(self, config, cassandra_session,data_consumer, config_consumer, producer):
+        self.calls_table = config.calls_table
         self.call_info_table = config.call_info_table
         self.roster_table = config.roster_table
         self.meetings_table = config.meetings_table
@@ -98,16 +99,21 @@ class Worker:
         return future
 
     def set_anomaly(self, meeting_name, datetime, topic, anomalies):
+        dt_field = 'datetime'
+
         if topic == 'preprocessed_callInfoUpdate':
             table = self.call_info_table
-        else:
+        elif topic == 'preprocessed_rosterUpdate':
             table = self.roster_table
+        else:
+            table = self.calls_table
+            dt_field = 'last_update'
 
         reason = json.dumps([a.dict() for a in anomalies])
         future = self.session.execute_async(
             f'UPDATE {table} '
             f'SET anomaly=true, anomaly_reason=%s '
-            f'WHERE meeting_name=%s AND datetime=%s;',
+            f'WHERE meeting_name=%s AND {dt_field}=%s;',
         (reason, meeting_name, datetime))
 
         future.add_callbacks(
@@ -121,7 +127,7 @@ async def setup(config: Config):
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
+        'preprocessed_callListUpdate', 'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
         bootstrap_servers=config.kafka_bootstrap_server, group_id='monitoring-workers'
     )
 

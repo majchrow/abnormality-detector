@@ -15,6 +15,7 @@ class StrictModel(BaseModel):
 
 
 class MsgType(Enum):
+    CALLS = 'callListUpdate'
     CALL_INFO = 'callInfoUpdate'
     ROSTER = 'rosterUpdate'
 
@@ -84,22 +85,29 @@ class ThresholdCondition(StrictModel, Condition):
             assert mn <= mx, '"min" value must be <= "max" value'
         return values
 
-    def satisfies(self, value):
+    def min_satisfies(self, value):
         if self.min is not None and value < self.min:
             return False
+        return True
+
+    def max_satisfies(self, value):
         if self.max is not None and value > self.max:
             return False
         return True
 
+    def satisfies(self, value):
+        return self.min_satisfies(value) and self.max_satisfies(value)
+
 
 nc_msg_params = {
-    MsgType.CALL_INFO: {'time_diff', 'max_participants'},
+    MsgType.CALLS: {},
+    MsgType.CALL_INFO: {'max_participants'},
     MsgType.ROSTER: {'active_speaker'}
 }
 
 
 class NumericCriterion(StrictModel, Criterion):
-    parameter: Literal['time_diff', 'max_participants', 'active_speaker']
+    parameter: Literal['max_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, int]
 
     @validator('conditions', pre=True)
@@ -197,10 +205,27 @@ class DaysCriterion(StrictModel, Criterion):
             return Anomaly(parameter='day', value=week_day)
 
 
+class TimeCriterion(NumericCriterion):
+    @validator('conditions')
+    def is_dict(cls, v):
+        assert isinstance(v, dict), f'value {v} is not a dictionary'
+        return v
+
+    def verify(self, message, msg_type):
+        if msg_type == MsgType.CALLS:
+            value = message['duration']
+            if message['finished'] and not self.conditions.satisfies(value):
+                return Anomaly(parameter=self.parameter, value=value)
+        elif msg_type == MsgType.CALL_INFO:
+            value = message['time_diff']
+            if not self.conditions.max_satisfies(value):
+                return Anomaly(parameter=self.parameter, value=value)
+
+
 param_types = {
     'recording': BooleanCriterion,
     'streaming': BooleanCriterion,
-    'time_diff': NumericCriterion,
+    'time_diff': TimeCriterion,
     'max_participants': NumericCriterion,
     'active_speaker': NumericCriterion,
     'days': DaysCriterion
