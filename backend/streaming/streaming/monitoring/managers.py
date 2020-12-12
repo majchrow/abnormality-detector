@@ -158,17 +158,11 @@ class ThresholdManager(BaseWorkerManager):
         await self.kafka_producer.send_and_wait(topic='monitoring-thresholds-config', value=payload)
 
 
-# TODO:
-#  - idea:
-#    - pool of long-running workers
-#    - "anomaly_monitored" and "last_update" columns in "meetings" table
-#    - so state of all anomaly monitoring is persisted
-#    - periodically:
-#      - query the DB (with lock)
-#      - find meetings with old last_update (configurable, say 1 minute)
-#      - push jobs to Kafka
-#      - unlock the DB
-#    - also, no "schedule" and "delete" - don't keep any state in the worker (state in DB, not in memory pls)
+def async_partial(coro_fun, *args, **kwargs):
+    def run():
+        return coro_fun(*args, **kwargs)
+    return run
+
 
 # Assumptions:
 #  - when re-running old jobs, it may so happen that it gets completed multiple times (very
@@ -181,7 +175,9 @@ class AnomalyManager(BaseWorkerManager):
         super().__init__()
         self.dao = dao
         self.kafka_producer = None
-        self.dispatch_period = config.inference_period_s
+        self.dispatch_period = 5  # config.inference_period_s
+
+        self.dispatch_task = self.cleanup_task = None
 
         self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
         self.num_workers = config.num_anomaly_workers
@@ -189,8 +185,23 @@ class AnomalyManager(BaseWorkerManager):
 
     def init(self, kafka_producer):
         self.kafka_producer = kafka_producer
-        # TODO: keep reference to kill on shutdown
-        asyncio.create_task(self.periodic_dispatch())
+
+        dispatch_task = self._retry_on_failure(async_partial(self.periodic_dispatch), 'inference dispatch')
+        cleanup_task = self._retry_on_failure(async_partial(self.periodic_cleanup), 'cleanup')
+
+        self.dispatch_task = asyncio.create_task(dispatch_task)
+        self.cleanup_task = asyncio.create_task(cleanup_task)
+
+    async def _retry_on_failure(self, task, name):
+        while True:
+            try:
+                await task()
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logging.exception(f'{self.TAG}: {name} failed with {e}!')
+                await asyncio.sleep(1)
 
     async def train(self, meeting_name, calls):
         if not await self.dao.meeting_exists(meeting_name):
@@ -255,6 +266,14 @@ class AnomalyManager(BaseWorkerManager):
         #  - remove stale locks (what if process fails while holding a lock??)
         #  - re-run old and still not completed jobs
         pass
+
+    async def shutdown(self):
+        await super().shutdown()
+
+        self.dispatch_task.cancel()
+        self.cleanup_task.cancel()
+        await self.dispatch_task
+        await self.cleanup_task
 
 
 async def start_all(app: web.Application):

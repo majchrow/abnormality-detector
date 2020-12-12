@@ -11,7 +11,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError, MonitoredAlreadyError
+from .exceptions import DBFailureError, MeetingNotExistsError
 
 
 # TODO:
@@ -140,6 +140,7 @@ class CassandraDAO:
     # anomaly detection
     ###################
     def add_training_job(self, meeting_name: str, calls: List[str]):
+        logging.info(calls)
         uid = str(uuid4())
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         result = self.session.execute_async(
@@ -242,12 +243,13 @@ class CassandraDAO:
     async def try_lock(self, resource):
         try:
             # lock using Cassandra's lightweight transactions
+            now = datetime.now()
             uid = str(uuid4())
             result = await self.async_exec(
-                f'UPDATE locks SET lock_id=%s '
+                f'UPDATE locks SET lock_id=%s, last_locked=%s '
                 f'WHERE resource_name=%s '
                 f'IF lock_id=null;',
-                (uid, resource)
+                (uid, now, resource)
             )
             yield next(iter(result))['[applied]']
         finally:

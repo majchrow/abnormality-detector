@@ -20,4 +20,4 @@ class Config:
     training_jobs_table: str = os.environ["TRAINING_JOBS_TABLE"]
     models_table: str = os.environ["MODELS_TABLE"]
 
-    inference_period_s: int = os.environ['INFERENCE_PERIOD_SECONDS']
+    inference_period_s: int = int(os.environ['INFERENCE_PERIOD_SECONDS'])

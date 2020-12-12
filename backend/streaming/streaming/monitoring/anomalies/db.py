@@ -6,6 +6,7 @@ from cassandra.query import ValueSequence
 
 from .model import Model
 from ...config import Config
+from ...exceptions import DataMissingError
 
 
 class CassandraDAO:
@@ -24,6 +25,9 @@ class CassandraDAO:
         return result[0] if result else None
 
     def load_calls_data(self, meeting_name, call_starts):
+        if not call_starts:
+            raise DataMissingError
+
         calls = self.session.execute(
             f'SELECT start_datetime as start, last_update as end '
             f'FROM calls '
@@ -42,12 +46,12 @@ class CassandraDAO:
             (ci_model.meeting_name, calls, ci_model.serialize(), roster_model.serialize())
         )
 
-    def complete_training_job(self, job_id):
+    def complete_training_job(self, job_id, status='completed'):
         self.session.execute(
             f"UPDATE training_jobs "
-            f"SET status='completed' "
+            f"SET status=%s "
             f"WHERE job_id=%s;",
-            (job_id,)
+            (status, job_id,)
         )
 
     ###########

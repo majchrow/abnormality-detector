@@ -40,6 +40,7 @@ async def schedule_training(request):
     except MeetingNotExistsError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
 
+
 async def schedule_inference(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='no conference name given')

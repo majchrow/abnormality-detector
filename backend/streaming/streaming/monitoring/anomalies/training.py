@@ -4,6 +4,7 @@ from .db import build_dao
 from .model import Model
 from ..workers import report
 from ...config import Config
+from ...exceptions import DataMissingError
 
 
 # TODO:
@@ -16,8 +17,14 @@ def main(job_id):
     job = dao.load_training_job(job_id)
     report(f'loaded training job {job_id}')
 
-    ci_df, roster_df = dao.load_calls_data(job['meeting_name'], job['training_call_starts'])
-    report(f'loaded training data for {job_id}: call-info {ci_df.shape}, roster {roster_df.shape}')
+    try:
+        ci_df, roster_df = dao.load_calls_data(job['meeting_name'], job['training_call_starts'])
+        report(f'loaded training data for {job_id}: call-info {ci_df.shape}, roster {roster_df.shape}')
+    except DataMissingError:
+        dao.complete_training_job(job_id, 'invalid - no data')
+        report('job invalid - no data')
+        report('all done')
+        return
 
     ci_model = Model(job['meeting_name'])
     roster_model = Model(job['meeting_name'])

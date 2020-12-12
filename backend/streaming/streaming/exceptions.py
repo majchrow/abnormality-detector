@@ -1,3 +1,8 @@
+class DataMissingError(Exception):
+    """Attempted to train on empty dataset."""
+    pass
+
+
 class MeetingNotExistsError(Exception):
     """Attempted to access non-existent meeting."""
     pass

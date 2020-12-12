@@ -83,7 +83,7 @@ CREATE TABLE inference_jobs(
     end_datetime timestamp,
     status text,
     PRIMARY KEY (meeting_name, end_datetime)
-);
+) WITH default_time_to_live = 3600;
 
 CREATE TABLE locks(
     resource_name text PRIMARY KEY,

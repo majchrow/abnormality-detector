@@ -60,7 +60,8 @@ async def setup(config: Config):
     producer = AIOKafkaProducer(bootstrap_servers=config.kafka_bootstrap_server)
     await producer.start()
 
-    job_consumer = AIOKafkaConsumer('monitoring-anomalies-jobs', bootstrap_servers=config.kafka_bootstrap_server)
+    job_consumer = AIOKafkaConsumer('monitoring-anomalies-jobs', bootstrap_servers=config.kafka_bootstrap_server,
+                                    group_id='monitoring-workers')
     await job_consumer.start()
 
     dao = build_dao(config)
