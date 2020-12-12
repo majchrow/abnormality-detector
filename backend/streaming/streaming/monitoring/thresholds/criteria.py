@@ -23,6 +23,8 @@ class MsgType(Enum):
 class Anomaly(BaseModel):
     parameter: str
     value: Union[bool, float, str]
+    condition_type: str
+    condition_value: Union[bool, float, str]
 
 
 class Criterion(ABC):
@@ -33,7 +35,11 @@ class Criterion(ABC):
 
 class Condition(ABC):
     @abstractmethod
-    def satisfies(self, value: Union[bool, str, float]) -> bool:
+    def min_satisfies(self, value: Union[bool, str, float]) -> bool:
+        pass
+
+    @abstractmethod
+    def max_satisfies(self, value: Union[bool, str, float]) -> bool:
         pass
 
 
@@ -53,7 +59,9 @@ class BooleanCriterion(StrictModel, Criterion):
         if msg_type != MsgType.CALL_INFO:
             return
         if (value := message[self.parameter]) != self.conditions:
-            return Anomaly(parameter=self.parameter, value=value)
+            return Anomaly(
+                parameter=self.parameter, value=value, condition_type='eq', condition_value=self.conditions
+            )
 
 
 class ThresholdCondition(StrictModel, Condition):
@@ -95,9 +103,6 @@ class ThresholdCondition(StrictModel, Condition):
             return False
         return True
 
-    def satisfies(self, value):
-        return self.min_satisfies(value) and self.max_satisfies(value)
-
 
 nc_msg_params = {
     MsgType.CALLS: {},
@@ -128,10 +133,24 @@ class NumericCriterion(StrictModel, Criterion):
             return
         value = message[self.parameter]
         if isinstance(self.conditions, ThresholdCondition):
-            if not self.conditions.satisfies(value):
-                return Anomaly(parameter=self.parameter, value=value)
+            if not self.conditions.max_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
+            if not self.conditions.min_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='min',
+                    condition_value=self.conditions.min
+                )
         elif value != self.conditions:
-            return Anomaly(parameter=self.parameter, value=value)
+            return Anomaly(
+                parameter=self.parameter, value=value, condition_type='eq', condition_value=self.conditions
+            )
 
 
 def validate_time(time_str):
@@ -171,9 +190,12 @@ class DayCondition(StrictModel, Condition):
             assert min_h <= max_h, '"min_hour" value must be <= "max_hour" value'
         return values
 
-    def satisfies(self, date_time):
+    def min_satisfies(self, date_time):
         if self.min_hour is not None and date_time < self.min_hour:
             return False
+        return True
+
+    def max_satisfies(self, date_time):
         if self.max_hour is not None and date_time > self.max_hour:
             return False
         return True
@@ -198,11 +220,28 @@ class DaysCriterion(StrictModel, Criterion):
 
         for c in self.conditions:
             if week_day == c.day:
-                if not c.satisfies(date_time):
-                    return Anomaly(parameter='datetime', value=str(date_time))
+                if not c.min_satisfies(date_time):
+                    return Anomaly(
+                        parameter='datetime',
+                        value=str(date_time),
+                        condition_type='min',
+                        condition_value=c.min_hour
+                    )
+                if not c.max_satisfies(date_time):
+                    return Anomaly(
+                        parameter='datetime',
+                        value=str(date_time),
+                        condition_type='max',
+                        condition_value=c.max_hour
+                    )
                 break
         else:
-            return Anomaly(parameter='day', value=week_day)
+            return Anomaly(
+                parameter='day',
+                value=week_day,
+                condition_type='in',
+                condition_value=[c.day for c in self.conditions]
+            )
 
 
 class TimeCriterion(NumericCriterion):
@@ -214,12 +253,29 @@ class TimeCriterion(NumericCriterion):
     def verify(self, message, msg_type):
         if msg_type == MsgType.CALLS:
             value = message['duration']
-            if message['finished'] and not self.conditions.satisfies(value):
-                return Anomaly(parameter=self.parameter, value=value)
+            if message['finished'] and not self.conditions.min_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='min',
+                    condition_value=self.conditions.min
+                )
+            elif not self.conditions.max_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
         elif msg_type == MsgType.CALL_INFO:
             value = message['time_diff']
             if not self.conditions.max_satisfies(value):
-                return Anomaly(parameter=self.parameter, value=value)
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
 
 
 param_types = {
