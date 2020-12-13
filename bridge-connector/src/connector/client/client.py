@@ -1,9 +1,9 @@
 import aiohttp
 import json
 import logging
-from datetime import datetime
-from collections import namedtuple
 from aiohttp import ClientConnectionError
+from dataclasses import dataclass
+from typing import Optional
 from websockets import connect
 
 from .protocol import (
@@ -11,11 +11,16 @@ from .protocol import (
 )
 
 
+@dataclass
+class Call:
+    name: str
+    id: str
+    ci_subscription_index: Optional[int]
+
+
 class Client:
 
     TAG = 'Client'
-
-    Call = namedtuple('Call', ['name', 'id', 'ci_subscription_index'])
 
     def __init__(self, host: str, port: int, ssl: bool, call_manager):
         self.host = host
@@ -40,6 +45,7 @@ class Client:
         #  - we add this info to the message if necessary
         self.subscription_ind = 2
         self.subscriptions = {}         # subscription index -> Call
+        self.calls = {}                 # call name -> Call
         self.call_ids = {}              # call ID -> Call
 
     @property
@@ -86,117 +92,90 @@ class Client:
 
         msg_type = msg_dict["message"]["type"]
         if msg_type == "callListUpdate":
-            await self.call_manager.dump(msg_dict)
-            await self.on_calls_update(msg_dict)
+            await self.on_call_list_update(msg_dict)
         elif msg_type == "callInfoUpdate" or msg_type == "rosterUpdate":
             index = msg_dict["message"]["subscriptionIndex"]
             if index in self.subscriptions:
-                await self.call_manager.dump(msg_dict)
-                await self.publish(msg_dict, msg_type)
+                if msg_type == 'callInfoUpdate':
+                    await self.on_call_info_update(msg_dict)
+                else:
+                    await self.on_roster_update(msg_dict)
             else:
                 logging.warning(f'{self.TAG}: received update after "remove": {msg_dict}')
         elif "subscriptionUpdate" in msg_type:
-            await self.call_manager.dump(msg_dict)
+            pass
         else:
             logging.warning(f'{self.TAG}: unknown message type {msg_type}')
             return
 
         return msg_dict["message"]["messageId"]
 
-    async def publish(self, msg_dict: dict, msg_type: str):
-        # Add timestamp and missing info (call ID and call name) to the message
-        #  - callListUpdate - only "add" has both name and callId, others only have callId
-        #  - callInfoUpdate - only "add" has name, others have nothing
-        #  - rosterUpdate - have nothing
-        msg_dict['date'] = datetime.now().isoformat()
-
-        if msg_type == "callListUpdate":
-            updates = msg_dict["message"]["updates"]
-            if not updates:
-                logging.warning(f'{self.TAG}: "callListUpdate" message with empty "updates" list')
-                return
-
-            call_id = updates[0]["call"]
-            if call_id not in self.call_ids:
-                # Conference this client does not handle
-                return
-
-            call = self.call_ids[call_id]
-            for update in updates:
-                update['name'] = call.name
-        else:
-            index = msg_dict["message"]["subscriptionIndex"]
-            call = self.subscriptions[index]
-            if msg_type == 'callInfoUpdate':
-                msg_dict["message"]["callInfo"]["call"] = call.id
-                msg_dict["message"]["callInfo"]["name"] = call.name
-            else:
-                msg_dict["call"] = call.id
-                msg_dict["name"] = call.name
-
-        await self.call_manager.publish(msg_dict)
-
-    async def on_calls_update(self, msg_dict):
-        updates = msg_dict["message"]["updates"]
-        published = False
-
+    async def on_call_list_update(self, msg: dict):
+        # Add call name to "update" and "remove" messages (they only have call ID)
+        updates = msg["message"]["updates"]
         for update in updates:
             update_type = update["updateType"]
             call_id = update["call"]
 
             if update_type == 'add':
                 call_name = update["name"]
-                await self.call_manager.on_add_call(call_name, call_id, self)
-
-                if not published and call_id in self.call_ids:
-                    await self.publish(msg_dict, 'callListUpdate')
-                    published = True
-            elif update_type == 'update':
-                await self.call_manager.on_update_call(call_id, self)
-
-                if not published and call_id in self.call_ids:
-                    await self.publish(msg_dict, 'callListUpdate')
-                    published = True
-            elif update_type == 'remove':
-                if call_id in self.call_ids:
-                    if not published:
-                        await self.publish(msg_dict, 'callListUpdate')
-                        published = True
-
-                    call = self.call_ids[call_id]
-                    s_ind = call.ci_subscription_index
-
-                    del self.subscriptions[s_ind]
-                    del self.subscriptions[s_ind + 1]
-                    del self.call_ids[call_id]
-
-                    # TODO: should we subscribe again immediately?
-                    await self.call_manager.on_remove_call(call_id, self)
-                    logging.info(f'{self.TAG}: removed call {call.name} with ID {call_id}')
+                call = Call(name=call_name, id=call_id, ci_subscription_index=None)
+                self.calls[call_name] = self.call_ids[call_id] = call
             else:
-                logging.warning(f'{self.TAG}: received calls update of type {update_type}')
+                call_name = self.call_ids[call_id].name
+                update['name'] = call_name
 
-    async def on_connect_to(self, call_name, call_id):
+        await self.call_manager.on_call_list_update(msg, self)
+
+    async def on_call_info_update(self, msg: dict):
+        # Add call name and call ID (only "add" has name)
+        index = msg["message"]["subscriptionIndex"]
+        call = self.subscriptions[index]
+        msg["message"]["callInfo"]["call"] = call.id
+        msg["message"]["callInfo"]["name"] = call.name
+        await self.call_manager.on_call_info_update(msg, call.name)
+
+    async def on_roster_update(self, msg: dict):
+        # Add call name and call ID
+        index = msg["message"]["subscriptionIndex"]
+        call = self.subscriptions[index]
+        msg["call"] = call.id
+        msg["name"] = call.name
+        await self.call_manager.on_roster_update(msg, call.name)
+
+    async def on_connect_to(self, call_name):
         # Setup subscription indexes for call info and roster info
         s_ind = self.subscription_ind
         self.subscription_ind += 2
 
-        call = Client.Call(name=call_name, id=call_id, ci_subscription_index=s_ind)
+        call = self.calls[call_name]
+        call.ci_subscription_index = s_ind
         self.subscriptions[s_ind] = self.subscriptions[s_ind + 1] = call
-        self.call_ids[call_id] = call
 
         # Send server subscription
         await self._subscribe()
-        logging.info(f'{self.TAG}: subscribed to call {call_name} with ID {call_id}')
+        logging.info(f'{self.TAG}: subscribed to call {call.name} with ID {call.id}')
+
+    async def on_disconnect_from(self, call_name):
+        call = self.calls[call_name]
+        s_ind = call.ci_subscription_index
+
+        del self.subscriptions[s_ind]
+        del self.subscriptions[s_ind + 1]
+        del self.calls[call_name]
+        del self.call_ids[call.id]
+
+        logging.info(f'{self.TAG}: removed call {call_name} with ID {call.id}')
 
     async def _subscribe(self):
         subscriptions = [calls_subscription]
 
         for call_id, call in self.call_ids.items():
-            subscriptions.extend([
-                call_info_subscription(call_id, call.ci_subscription_index),
-                call_roster_subscription(call_id, call.ci_subscription_index + 1)
-            ])
+            if call.ci_subscription_index is not None:
+                subscriptions.extend([
+                    call_info_subscription(call_id, call.ci_subscription_index),
+                    call_roster_subscription(call_id, call.ci_subscription_index + 1)
+                ])
 
         request = subscription_request(subscriptions, self.message_id)
         await self.ws.send(json.dumps(request))

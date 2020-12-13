@@ -1,3 +1,4 @@
+from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
 from flask import request
@@ -5,27 +6,24 @@ from marshmallow import ValidationError
 from datetime import datetime
 from flask import send_from_directory
 import sys, os
-import io
-
-# sys.path.append(os.getcwd())
+import pandas as pd
 
 from .db import dao
+from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
+from .reports import RoomReportGenerator, MeetingReportGenerator
 from .schema import (
     anomaly_schema,
-    anomaly_request_schema,
     meeting_schema,
+    meeting_request_schema,
     report_request_schema,
 )
-from .reports import ReportGenerator
 
 
 class Meetings(Resource):
     @cross_origin()
     def get(self):
-        result = dao.get_conferences()
-        result["created"] = list(map(meeting_schema.dump, result["created"]))
-        return result
+        return {"meetings": bridge_dao.get_meetings()}
 
     @cross_origin()
     def put(self):
@@ -33,7 +31,7 @@ class Meetings(Resource):
         if not json_data:
             return {"message": "No input data provided"}, 400
         try:
-            data = meeting_schema.load(json_data)
+            data = meeting_request_schema.load(json_data)
         except ValidationError as err:
             return err.messages, 422
 
@@ -47,7 +45,7 @@ class Meetings(Resource):
             return {"message": f"conference to remove is not specified"}, 400
 
         try:
-            dao.remove_meeting(name)
+            dao.clear_meeting(name)
             return {
                 "message": f"successfully removed {name} from monitored conferences"
             }, 200
@@ -57,46 +55,86 @@ class Meetings(Resource):
 
 class MeetingDetails(Resource):
     @cross_origin()
-    def get(self, conf_name):
-        if meeting := dao.meeting_details(conf_name):
-            return meeting_schema.dump(meeting)
+    def get(self, meeting_name):
+        if meeting := dao.meeting_details(meeting_name):
+            return meeting
         else:
-            return {"message": f"no meeting {conf_name}"}, 404
+            return {"message": f"no meeting {meeting_name}"}, 404
+
+
+class Calls(Resource):
+    @cross_origin()
+    def get(self):
+        result = dao.get_conferences()
+        result["created"] = list(map(meeting_schema.dump, result["created"]))
+        return result
+
+
+class CallHistory(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
+
+        try:
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
+
+        result = dao.get_calls(meeting_name, start_date, end_date)
+        return {"calls": result}
 
 
 class Anomalies(Resource):
     @cross_origin()
-    def get(self):
-        try:
-            if errors := anomaly_request_schema.validate(request.args.to_dict()):
-                return {"message": f"invalid request: {errors}"}, 400
+    def get(self, meeting_name):
+        start_date = request.args.get("start", None)
+        end_date = request.args.get("end", None)
 
-            conf_name, count = request.args["name"], int(request.args["count"])
-            result = dao.get_anomalies(conf_name, count)
-            result["anomalies"] = list(map(anomaly_schema.dump, result["anomalies"]))
-            return result
-        except NotFoundError:
-            return {"message": f"no meeting {conf_name}"}, 404
+        try:
+            # TODO: timezone!
+            if start_date:
+                start_date = parse(start_date)
+            if end_date:
+                end_date = parse(end_date)
+        except ParserError:
+            return {"message": "invalid date format"}, 400
+
+        result = dao.get_anomalies(meeting_name, start_date, end_date)
+        result["anomalies"] = list(map(anomaly_schema.dump, result["anomalies"]))
+        return result
 
 
 class Report(Resource):
-    upload_folder = "/flask/rest/resources/output/"
-
     @cross_origin()
-    def get(self):
+    def get(self, meeting_name):
         if errors := report_request_schema.validate(request.args.to_dict()):
             return {"message": f"invalid request: {errors}"}, 400
 
-        pattern = "%Y-%m-%d"
-        name = request.args["name"]
-        start_date, end_date = (
-            datetime.strptime(request.args["start_date"], pattern).date(),
-            datetime.strptime(request.args["end_date"], pattern).date(),
-        )
-        raport_generator = ReportGenerator(dao, name, start_date, end_date)
-        pdf_file = raport_generator.generate_pdf_report()
+        try:
+            start_datetime = (
+                pd.Timestamp(request.args["start_datetime"])
+                if "start_datetime" in request.args
+                else None
+            )
+        except ParserError:
+            return {"message": f"invalid datetime format"}, 400
 
-        byte_file = io.BytesIO(pdf_file)
+        try:
+            raport_generator = (
+                MeetingReportGenerator(dao, meeting_name, start_datetime)
+                if start_datetime
+                else RoomReportGenerator(dao, meeting_name)
+            )
+            pdf_file = raport_generator.generate_pdf_report()
+        except NotFoundError:
+            return {
+                "message": f"No data found for given conditions, cannot create a report"
+            }, 400
 
         return (
             pdf_file,
@@ -110,7 +148,9 @@ class Report(Resource):
 
 def setup_resources(app):
     api = Api(app)
-    api.add_resource(Meetings, "/conferences")
-    api.add_resource(MeetingDetails, "/conferences/<string:conf_name>")
-    api.add_resource(Anomalies, "/anomalies")
-    api.add_resource(Report, "/reports")
+    api.add_resource(Report, "/reports/<string:meeting_name>")
+    api.add_resource(Meetings, "/meetings")
+    api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
+    api.add_resource(Calls, "/calls")
+    api.add_resource(CallHistory, "/calls/<string:meeting_name>")
+    api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")

@@ -11,4 +11,9 @@ class Config:
     call_info_table = os.environ["CALL_INFO_TABLE"]
     roster_table = os.environ["ROSTER_TABLE"]
     meetings_table = os.environ["MEETINGS_TABLE"]
-    template_folder = "/flask/rest/resources/output"
+    bridge_host = os.environ['BRIDGE_HOST']
+    bridge_port = os.environ['BRIDGE_PORT']
+    bridge_username = os.environ['BRIDGE_USER']
+    bridge_password = os.environ['BRIDGE_PASSWORD']
+    meetings_update_period_d = int(os.environ['MEETINGS_UPDATE_PERIOD_DAYS'])
+

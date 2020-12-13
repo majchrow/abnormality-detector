@@ -2,7 +2,7 @@ import json
 from marshmallow import fields, Schema, ValidationError
 from marshmallow.validate import Range
 
-from .validation import validate
+from .criteria import validate
 
 
 class JSONString(fields.Field):
@@ -12,7 +12,10 @@ class JSONString(fields.Field):
 
     # a JSON string to dict
     def _serialize(self, value, attr, obj, **kwargs):
-        return json.loads(value)
+        if value is not None:
+            return json.loads(value)
+        else:
+            return []
 
 
 def validate_criteria(data):
@@ -24,8 +27,14 @@ def validate_criteria(data):
 
 class MeetingSchema(Schema):
     id = fields.Int(dump_only=True)
+    meeting_name = fields.Str(required=True, data_key="name")
+    meeting_number = fields.Str(required=True)
+    criteria = JSONString(required=True, validate=validate_criteria)
+
+
+class MeetingRequestSchema(Schema):
     name = fields.Str(required=True)
-    criteria = JSONString(required=True, validate=validate_criteria)  # TODO: no better idea for now for a JSON field
+    criteria = JSONString(required=True, validate=validate_criteria)
 
 
 class AnomalySchema(Schema):
@@ -37,15 +46,17 @@ class AnomalySchema(Schema):
 
 class AnomalyRequestSchema(Schema):
     name = fields.Str(required=True)
-    count = fields.Int(required=True, validate=Range(min=1, error='count must be positive'))
+    count = fields.Int(
+        required=True, validate=Range(min=1, error="count must be positive")
+    )
+
 
 class ReportRequestSchema(Schema):
-    name = fields.Str(required=True)
-    start_date = fields.Date(required=True)
-    end_date = fields.Date(required=True)
+    start_datetime = fields.DateTime()
+
 
 anomaly_schema = AnomalySchema()
 meeting_schema = MeetingSchema()
-
+meeting_request_schema = MeetingRequestSchema()
 anomaly_request_schema = AnomalyRequestSchema()
 report_request_schema = ReportRequestSchema()

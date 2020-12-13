@@ -15,6 +15,11 @@ import datetime
 import pandas as pd
 import sys, os
 from flask import render_template
+import base64
+import unidecode
+from .exceptions import NotFoundError
+from flask import current_app
+from matplotlib.ticker import MaxNLocator
 
 sys.path.append(os.getcwd())
 
@@ -22,71 +27,76 @@ options = {"enable-local-file-access": None}
 
 
 class ReportGenerator:
-    def __init__(self, dao, name, start_date, end_date):
+    def __init__(self, dao, name, template):
         self.name = name
-        self.start_date = start_date
-        self.end_date = end_date
-        self.call_info_data_provider = CallInfoDataProvider(
-            name, dao, start_date, end_date
-        )
-        self.roster_data_provider = RosterDataProvider(name, dao, start_date, end_date)
-        self.calls_data_provider = CallsDataProvider(name, dao, start_date, end_date)
-        self.output_dir = "/flask/rest/resources/output/"
-        self.output_subdir = "/flask/rest/resources/output/"
+        self.call_info_data_provider = CallInfoDataProvider(name, dao)
+        self.roster_data_provider = RosterDataProvider(name, dao)
+        self.calls_data_provider = CallsDataProvider(name, dao)
         self.resources_dir = "/flask/rest/resources/"
+        self.template = template
         self.pg = PlotGenerator()
-        file_loader = FileSystemLoader(self.resources_dir)
-        self.env = Environment(loader=file_loader)
+        self.css = f"{self.resources_dir}mystyle.css"
+
+    def generate_plot_for_current_participants(self, start_datetime):
+        current_participants = self.call_info_data_provider.get_current_participants(
+            start_datetime
+        )
+        cp_filename = self.get_plot_filename(start_datetime, "current_participants")
+        plot = self.pg.generate_and_save_scatter_plot(
+            f"{self.resources_dir}{cp_filename}",
+            current_participants,
+            Titles.CURRENT_PARTICIPANTS.value,
+            "blue",
+        )
+        return plot
+
+    def generate_plot_for_active_speakers(self, start_datetime):
+        active_speakers = self.roster_data_provider.get_active_speakers(start_datetime)
+        as_filename = self.get_plot_filename(start_datetime, "active_speakers")
+        plot = self.pg.generate_and_save_scatter_plot(
+            f"{self.resources_dir}{as_filename}",
+            active_speakers,
+            Titles.ACTIVE_SPEAKERS.value,
+            "green",
+        )
+        return plot
+
+    def generate_plots_for_meeting(self, start_datetime):
+        cp_filepath = self.generate_plot_for_current_participants(start_datetime)
+        as_filepath = self.generate_plot_for_active_speakers(start_datetime)
+
+        return [cp_filepath, as_filepath]
+
+    def get_plot_filename(self, start_datetime, category):
+        name = unidecode.unidecode(self.name.replace(" ", ""))
+        meeting_time = (
+            int(start_datetime.timestamp())
+            if type(start_datetime) == pd.Timestamp
+            else start_datetime.astype(datetime.datetime)
+        )
+        return f"{name}_{meeting_time}_{category}.svg"
 
     def generate_pdf_report(self):
-        filename = self.__generate_html()
-        filepath = f"{self.output_dir}{filename}"
-        # pdfkit.from_file(f"{filepath}.html", f"{filepath}.pdf", options=options)
-        # self.__delete_all_plots()
-        # os.remove(f"{filepath}.html")
-        pdf_content = render_template(f"{filename}.html")
-        css = f"{self.resources_dir}mystyle.css"
-
-        pdf_file = pdfkit.from_string(pdf_content, False, css=css)
+        self.prepare_all_data()
+        pdf_content = self.get_pdf_content()
+        pdf_file = pdfkit.from_string(pdf_content, False, css=self.css)
 
         return pdf_file
 
-    def __get_plot_filename(self, start_datetime, category):
-        name = self.name.replace(" ", "")
-        timestamp = start_datetime.astype(datetime.datetime)
-        return f"{name}_{timestamp}_{category}.svg"
+    def get_pdf_content(self):
+        pass
 
-    def __get_html_filename(self):
-        current_time = datetime.datetime.now().timestamp()
-        name = self.name.replace(" ", "")
-        filename = f"{name}_{current_time}"
-        return filename
+    def prepare_all_data(self):
+        pass
 
-    def __prepare_all_data(self):
-        mpd = self.calls_data_provider.get_number_of_meetings_per_day()
-        self.general_stats_columns = mpd.columns
-        self.general_stats_records = mpd.to_dict("records")
-        self.daily_stats_columns = ["start_time", "end_time", "duration"]
-        self.daily_stats_records = self.calls_data_provider.get_daily_stats()
-        self.meetings = self.calls_data_provider.get_meetings()
-        self.plots = self.__generate_plots()
-        self.dates = self.calls_data_provider.get_dates()
 
-    def __save_html_file(self, filepath, output):
-        with open(filepath, "w") as f:
-            f.write(output)
+class RoomReportGenerator(ReportGenerator):
+    def __init__(self, dao, name):
+        ReportGenerator.__init__(self, dao, name, "basic_room.html")
 
-    def __delete_all_plots(self):
-        for date in self.plots:
-            for meeting in self.plots[date]:
-                for plot in self.plots[date][meeting]:
-                    os.remove(f"{self.output_dir}{plot}")
-
-    def __generate_html(self):
-        self.__prepare_all_data()
-        template = self.env.get_template("basic.html")
-        print(self.daily_stats_records)
-        output = template.render(
+    def get_pdf_content(self):
+        pdf_content = render_template(
+            self.template,
             meeting_name=self.name,
             start_date=str(self.start_date),
             end_date=str(self.end_date),
@@ -98,50 +108,60 @@ class ReportGenerator:
             meetings=self.meetings,
             plots=self.plots,
         )
-        filename = self.__get_html_filename()
-        self.__save_html_file(f"{self.output_dir}{filename}.html", output)
-        return f"{filename}"
 
-    def __generate_plot_for_current_participants(self, start_datetime):
-        current_participants = self.call_info_data_provider.get_current_participants(
-            start_datetime
-        )
-        cp_filename = self.__get_plot_filename(start_datetime, "current_participants")
-        self.pg.generate_and_save_scatter_plot(
-            f"{self.output_dir}{cp_filename}",
-            current_participants,
-            Titles.CURRENT_PARTICIPANTS.value,
-            "blue",
-        )
-        return f"{cp_filename}"
+        return pdf_content
 
-    def __generate_plot_for_active_speakers(self, start_datetime):
-        active_speakers = self.roster_data_provider.get_active_speakers(start_datetime)
-        as_filename = self.__get_plot_filename(start_datetime, "active_speakers")
-        self.pg.generate_and_save_scatter_plot(
-            f"{self.output_dir}{as_filename}",
-            active_speakers,
-            Titles.ACTIVE_SPEAKERS.value,
-            "green",
-        )
-        return f"{as_filename}"
-
-    def __generate_plots_for_meeting(self, start_datetime):
-        cp_filepath = self.__generate_plot_for_current_participants(start_datetime)
-        as_filepath = self.__generate_plot_for_active_speakers(start_datetime)
-
-        return [cp_filepath, as_filepath]
+    def prepare_all_data(self):
+        mpd = self.calls_data_provider.get_number_of_meetings_per_day()
+        self.general_stats_columns = mpd.columns
+        self.general_stats_records = mpd.to_dict("records")
+        self.daily_stats_columns = ["start_time", "end_time", "duration"]
+        self.daily_stats_records = self.calls_data_provider.get_daily_stats()
+        self.meetings = self.calls_data_provider.get_meetings()
+        self.plots = self.__generate_plots()
+        self.dates = self.calls_data_provider.get_dates()
+        self.start_date = self.dates[0]
+        self.end_date = self.dates[-1]
 
     def __generate_plots(self):
-        all_filepaths = dict()
+        all_plots = dict()
         meetings = self.calls_data_provider.get_meetings()
         for date in meetings.keys():
-            all_filepaths[date] = dict()
+            all_plots[date] = dict()
             for meeting in meetings[date]:
-                filepaths = self.__generate_plots_for_meeting(meeting)
-                all_filepaths[date][meeting] = filepaths
+                plots = self.generate_plots_for_meeting(meeting)
+                all_plots[date][meeting] = plots
 
-        return all_filepaths
+        return all_plots
+
+
+class MeetingReportGenerator(ReportGenerator):
+    def __init__(self, dao, name, start_datetime):
+        ReportGenerator.__init__(self, dao, name, "basic_meeting.html")
+        self.start_datetime = start_datetime
+
+    def get_pdf_content(self):
+        pdf_content = render_template(
+            self.template,
+            meeting_name=self.name,
+            date=self.date,
+            start_time=str(self.start_time)[:-7],
+            last_update_time=str(self.last_update_time)[:-7],
+            duration=self.duration,
+            plots=self.plots,
+            finished=self.finished,
+        )
+
+        return pdf_content
+
+    def prepare_all_data(self):
+        details = self.calls_data_provider.get_meeting_details(self.start_datetime)
+        self.date = details["date"]
+        self.start_time = details["start_time"]
+        self.last_update_time = details["last_update_time"]
+        self.duration = details["duration"]
+        self.finished = details["finished"]
+        self.plots = self.generate_plots_for_meeting(self.start_datetime)
 
 
 class Titles(Enum):
@@ -153,8 +173,8 @@ class Titles(Enum):
 
 class PlotGenerator:
     def generate_and_save_scatter_plot(self, filename, data, title, color):
-        data.plot(
-            figsize=(10, 5),
+        ax = data.plot(
+            figsize=(12, 6),
             grid=True,
             title=title,
             marker=".",
@@ -162,7 +182,20 @@ class PlotGenerator:
             markersize=10,
             color=color,
         )
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         plt.savefig(filename)
+        plot = self.image_file_path_to_base64_string(filename)
+        self.remove_plot(filename)
+        return plot
+
+    @staticmethod
+    def remove_plot(filepath):
+        os.remove(filepath)
+
+    @staticmethod
+    def image_file_path_to_base64_string(filepath):
+        with open(filepath, "rb") as f:
+            return base64.b64encode(f.read()).decode()
 
 
 class MeetingDataProvider:
@@ -170,19 +203,18 @@ class MeetingDataProvider:
         self.name = name
         self.data = data
 
-    def filter_by_start_datetime(self, start_datetime, df_type):
-        print(self.data.head())
+    def filter_by_start_datetime(self, start_datetime):
         return self.data[self.data["start_datetime"] == start_datetime]
 
 
 class CallInfoDataProvider(MeetingDataProvider):
-    def __init__(self, name, dao, start_date, end_date):
-        data = dao.get_call_info_data(name, start_date, end_date)
+    def __init__(self, name, dao):
+        data = dao.get_call_info_data(name)
         MeetingDataProvider.__init__(self, name, data)
 
     def get_current_participants(self, start_datetime):
         cp = pd.DataFrame(
-            self.filter_by_start_datetime(start_datetime, "info")[
+            self.filter_by_start_datetime(start_datetime)[
                 ["time", "current_participants"]
             ]
         )
@@ -190,22 +222,35 @@ class CallInfoDataProvider(MeetingDataProvider):
         return cp
 
     def get_streaming_intervals(self, start_datetime):
-        filtered = self.filter_by_start_datetime(start_datetime, "info")
+        filtered = self.filter_by_start_datetime(start_datetime)
         filtered["streaming"] = filtered["streaming"].apply(lambda x: 1 if x else 0)
         return pd.DataFrame(filtered[["datetime", "streaming"]])
 
     def get_recording_intervals(self, start_datetime):
-        filtered = self.filter_by_start_datetime(start_datetime, "info")
+        filtered = self.filter_by_start_datetime(start_datetime)
         filtered["recording"] = filtered["recording"].apply(lambda x: 1 if x else 0)
         return pd.DataFrame(filtered[["datetime", "recording"]])
 
 
 class CallsDataProvider(MeetingDataProvider):
-    def __init__(self, name, dao, start_date, end_date):
-        data = dao.get_calls_data(name, start_date, end_date)
+    def __init__(self, name, dao):
+        data = dao.get_calls_data(name)
         MeetingDataProvider.__init__(self, name, data)
         self.__init_dates()
         self.__init_meetings()
+
+    def get_meeting_details(self, start_datetime):
+        df = self.filter_by_start_datetime(start_datetime)
+        if df.empty:
+            raise NotFoundError
+        meeting = df.iloc[0]
+        return {
+            "date": meeting["date"],
+            "start_time": meeting["start_time"],
+            "last_update_time": meeting["last_update_time"],
+            "finished": meeting["finished"],
+            "duration": self.__convert_seconds_to_time_format(meeting["duration"]),
+        }
 
     def __init_dates(self):
         dates = list(pd.unique(self.data["date"]))
@@ -279,15 +324,13 @@ class CallsDataProvider(MeetingDataProvider):
 
 
 class RosterDataProvider(MeetingDataProvider):
-    def __init__(self, name, dao, start_date, end_date):
-        data = dao.get_roster_data(name, start_date, end_date)
+    def __init__(self, name, dao):
+        data = dao.get_roster_data(name)
         MeetingDataProvider.__init__(self, name, data)
 
     def get_active_speakers(self, start_datetime):
         asp = pd.DataFrame(
-            self.filter_by_start_datetime(start_datetime, "roster")[
-                ["time", "active_speaker"]
-            ]
+            self.filter_by_start_datetime(start_datetime)[["time", "active_speaker"]]
         )
         asp.index = asp["time"]
         asp.rename(columns={"active_speaker": "active_speakers"}, inplace=True)
