@@ -23,18 +23,18 @@ async def send(messages):
 
 messages = {
     'preprocessed_callListUpdate': [
-        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": False, "start_datetime": "2020-06-02 07:35:31.701000+0000", 
-         "name": "[UJ] Chemia (GZ-B)", "last_update": "2020-06-02 07:35:31.701000+0000"},
-        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": True, "start_datetime": "2020-06-02 07:35:31.701000+0000", 
-         "name": "[UJ] Chemia (GZ-B)", "last_update": "2020-06-02 07:35:31.623000+0000"}
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": False, "start_datetime": "2020-12-08 23:30:49.032000+0000", 
+            "meeting_name": "[UJ] Biologia (GZ-B)", "last_update": "2020-12-08 23:30:57.403000+0000", "duration": 100},
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", "finished": True, "start_datetime": "2020-12-08 23:30:49.032000+0000", 
+            "meeting_name": "[UJ] Biologia (GZ-B)", "last_update": "2020-12-08 23:30:57.403000+0000", "duration": 100}
     ],
     'preprocessed_callInfoUpdate': [
-        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", 'datetime': '2020-06-02T00:42:47.984Z', 'time_diff': 123, 'name': 'Fizyka', 'recording': 1},
-        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", 'datetime': '2020-06-02T00:47:47.984Z', 'time_diff': 123, 'name': 'Fizyka', 'recording': 1}
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", 'datetime': '2020-06-02T00:42:47.984Z', 'time_diff': 123, 'meeting_name': 'Fizyka', 'recording': 1},
+        {"call_id": "f53615a1-cfa9-45b8-a62d-a1cd15ac606a", 'datetime': '2020-06-02T00:47:47.984Z', 'time_diff': 123, 'meeting_name': 'Fizyka', 'recording': 1}
     ],
     'preprocessed_rosterUpdate': [
         {'initial': 1, 'connected': 0, 'onhold': 0, 'ringing': 0, 'presenter': 1, 'active_speaker': 1, 'endpoint_recording': 1, 
-         'datetime': '2020-06-02T00:46:47.984Z', 'call_id': 'who-cares', 'name': 'Elektryczność', 'week_day_number': 2, 'hour': 0}
+         'datetime': '2020-06-02T00:46:47.984Z', 'call_id': 'who-cares', 'meeting_name': 'Elektryczność', 'week_day_number': 2, 'hour': 0}
     ],
 }
 

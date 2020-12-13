@@ -245,9 +245,11 @@ class DaysCriterion(StrictModel, Criterion):
 
 
 class TimeCriterion(NumericCriterion):
+    parameter: Literal['time_diff']
+
     @validator('conditions')
     def is_dict(cls, v):
-        assert isinstance(v, dict), f'value {v} is not a dictionary'
+        assert isinstance(v, ThresholdCondition), f'value {v} must be a dictionary'
         return v
 
     def verify(self, message, msg_type):
