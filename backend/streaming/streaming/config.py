@@ -14,6 +14,8 @@ class Config:
     cassandra_user: str = os.environ["CASSANDRA_USER"]
     cassandra_passwd: str = os.environ["CASSANDRA_PASSWD"]
     keyspace: str = os.environ["KEYSPACE"]
+
+    calls_table: str = os.environ['CALLS_TABLE']
     call_info_table: str = os.environ["CALL_INFO_TABLE"]
     roster_table: str = os.environ["ROSTER_TABLE"]
     meetings_table: str = os.environ["MEETINGS_TABLE"]

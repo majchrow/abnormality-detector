@@ -15,6 +15,7 @@ class StrictModel(BaseModel):
 
 
 class MsgType(Enum):
+    CALLS = 'callListUpdate'
     CALL_INFO = 'callInfoUpdate'
     ROSTER = 'rosterUpdate'
 
@@ -22,6 +23,8 @@ class MsgType(Enum):
 class Anomaly(BaseModel):
     parameter: str
     value: Union[bool, float, str]
+    condition_type: str
+    condition_value: Union[bool, float, str, List]
 
 
 class Criterion(ABC):
@@ -32,7 +35,11 @@ class Criterion(ABC):
 
 class Condition(ABC):
     @abstractmethod
-    def satisfies(self, value: Union[bool, str, float]) -> bool:
+    def min_satisfies(self, value: Union[bool, str, float]) -> bool:
+        pass
+
+    @abstractmethod
+    def max_satisfies(self, value: Union[bool, str, float]) -> bool:
         pass
 
 
@@ -52,7 +59,9 @@ class BooleanCriterion(StrictModel, Criterion):
         if msg_type != MsgType.CALL_INFO:
             return
         if (value := message[self.parameter]) != self.conditions:
-            return Anomaly(parameter=self.parameter, value=value)
+            return Anomaly(
+                parameter=self.parameter, value=value, condition_type='eq', condition_value=self.conditions
+            )
 
 
 class ThresholdCondition(StrictModel, Condition):
@@ -84,22 +93,26 @@ class ThresholdCondition(StrictModel, Condition):
             assert mn <= mx, '"min" value must be <= "max" value'
         return values
 
-    def satisfies(self, value):
+    def min_satisfies(self, value):
         if self.min is not None and value < self.min:
             return False
+        return True
+
+    def max_satisfies(self, value):
         if self.max is not None and value > self.max:
             return False
         return True
 
 
 nc_msg_params = {
-    MsgType.CALL_INFO: {'time_diff', 'max_participants'},
+    MsgType.CALLS: {},
+    MsgType.CALL_INFO: {'max_participants'},
     MsgType.ROSTER: {'active_speaker'}
 }
 
 
 class NumericCriterion(StrictModel, Criterion):
-    parameter: Literal['time_diff', 'max_participants', 'active_speaker']
+    parameter: Literal['max_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, int]
 
     @validator('conditions', pre=True)
@@ -120,10 +133,24 @@ class NumericCriterion(StrictModel, Criterion):
             return
         value = message[self.parameter]
         if isinstance(self.conditions, ThresholdCondition):
-            if not self.conditions.satisfies(value):
-                return Anomaly(parameter=self.parameter, value=value)
+            if not self.conditions.max_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
+            if not self.conditions.min_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='min',
+                    condition_value=self.conditions.min
+                )
         elif value != self.conditions:
-            return Anomaly(parameter=self.parameter, value=value)
+            return Anomaly(
+                parameter=self.parameter, value=value, condition_type='eq', condition_value=self.conditions
+            )
 
 
 def validate_time(time_str):
@@ -163,9 +190,12 @@ class DayCondition(StrictModel, Condition):
             assert min_h <= max_h, '"min_hour" value must be <= "max_hour" value'
         return values
 
-    def satisfies(self, date_time):
+    def min_satisfies(self, date_time):
         if self.min_hour is not None and date_time < self.min_hour:
             return False
+        return True
+
+    def max_satisfies(self, date_time):
         if self.max_hour is not None and date_time > self.max_hour:
             return False
         return True
@@ -185,22 +215,77 @@ class DaysCriterion(StrictModel, Criterion):
         assert len(v) == len({d.day for d in v}), '"days" cannot contain duplicate day values'
         return v
 
-    def verify(self, message, _):
+    def verify(self, message, msg_type):
+        if msg_type == MsgType.CALLS:
+            return
         week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
 
         for c in self.conditions:
             if week_day == c.day:
-                if not c.satisfies(date_time):
-                    return Anomaly(parameter='datetime', value=str(date_time))
+                if not c.min_satisfies(date_time):
+                    return Anomaly(
+                        parameter='datetime',
+                        value=str(date_time),
+                        condition_type='min',
+                        condition_value=c.min_hour
+                    )
+                if not c.max_satisfies(date_time):
+                    return Anomaly(
+                        parameter='datetime',
+                        value=str(date_time),
+                        condition_type='max',
+                        condition_value=c.max_hour
+                    )
                 break
         else:
-            return Anomaly(parameter='day', value=week_day)
+            return Anomaly(
+                parameter='day',
+                value=week_day,
+                condition_type='in',
+                condition_value=[c.day for c in self.conditions]
+            )
+
+
+class TimeCriterion(NumericCriterion):
+    parameter: Literal['time_diff']
+
+    @validator('conditions')
+    def is_dict(cls, v):
+        assert isinstance(v, ThresholdCondition), f'value {v} must be a dictionary'
+        return v
+
+    def verify(self, message, msg_type):
+        if msg_type == MsgType.CALLS:
+            value = message['duration']
+            if message['finished'] and not self.conditions.min_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='min',
+                    condition_value=self.conditions.min
+                )
+            elif not self.conditions.max_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
+        elif msg_type == MsgType.CALL_INFO:
+            value = message['time_diff']
+            if not self.conditions.max_satisfies(value):
+                return Anomaly(
+                    parameter=self.parameter,
+                    value=value,
+                    condition_type='max',
+                    condition_value=self.conditions.max
+                )
 
 
 param_types = {
     'recording': BooleanCriterion,
     'streaming': BooleanCriterion,
-    'time_diff': NumericCriterion,
+    'time_diff': TimeCriterion,
     'max_participants': NumericCriterion,
     'active_speaker': NumericCriterion,
     'days': DaysCriterion
