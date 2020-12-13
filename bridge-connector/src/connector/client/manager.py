@@ -166,6 +166,7 @@ class ClientManager:
         for update in updates:
             update_type = update["updateType"]
             call_name = update["name"]
+            finished = False
 
             if update_type == 'add':
                 if not (call := self.calls.get(call_name, None)):
@@ -180,8 +181,10 @@ class ClientManager:
                 await call.remove(client_endpoint)
                 if call.done:
                     del self.calls[call_name]
+                    finished = True
             else:
                 call = self.calls[call_name]
+            update['finished'] = finished
 
         if call:
             msg['startDatetime'] = call.start_datetime
