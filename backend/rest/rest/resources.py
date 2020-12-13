@@ -3,17 +3,27 @@ from flask_cors import cross_origin
 from flask_restful import Resource, Api
 from flask import request
 from marshmallow import ValidationError
+from datetime import datetime
+from flask import send_from_directory
+import sys, os
+import pandas as pd
 
 from .db import dao
 from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
-from .schema import anomaly_schema, meeting_schema, meeting_request_schema
+from .reports import RoomReportGenerator, MeetingReportGenerator
+from .schema import (
+    anomaly_schema,
+    meeting_schema,
+    meeting_request_schema,
+    report_request_schema,
+)
 
 
 class Meetings(Resource):
     @cross_origin()
     def get(self):
-        return {'meetings': bridge_dao.get_meetings()}
+        return {"meetings": bridge_dao.get_meetings()}
 
     @cross_origin()
     def put(self):
@@ -25,7 +35,7 @@ class Meetings(Resource):
         except ValidationError as err:
             return err.messages, 422
 
-        dao.update_meeting(data['name'], data['criteria'])
+        dao.update_meeting(data["name"], data["criteria"])
         return {"message": f"successfully updated {data['name']}"}, 200
 
     @cross_origin()
@@ -36,7 +46,9 @@ class Meetings(Resource):
 
         try:
             dao.clear_meeting(name)
-            return {"message": f"successfully removed {name} from monitored conferences"}, 200
+            return {
+                "message": f"successfully removed {name} from monitored conferences"
+            }, 200
         except NotFoundError:
             return {"message": f"no meeting {name}"}, 404
 
@@ -54,7 +66,7 @@ class Calls(Resource):
     @cross_origin()
     def get(self):
         result = dao.get_conferences()
-        result['created'] = list(map(meeting_schema.dump, result['created']))
+        result["created"] = list(map(meeting_schema.dump, result["created"]))
         return result
 
 
@@ -74,7 +86,7 @@ class CallHistory(Resource):
             return {"message": "invalid date format"}, 400
 
         result = dao.get_calls(meeting_name, start_date, end_date)
-        return {'calls': result}
+        return {"calls": result}
 
 
 class Anomalies(Resource):
@@ -93,12 +105,50 @@ class Anomalies(Resource):
             return {"message": "invalid date format"}, 400
 
         result = dao.get_anomalies(meeting_name, start_date, end_date)
-        result['anomalies'] = list(map(anomaly_schema.dump, result['anomalies']))
+        result["anomalies"] = list(map(anomaly_schema.dump, result["anomalies"]))
         return result
+
+
+class Report(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        if errors := report_request_schema.validate(request.args.to_dict()):
+            return {"message": f"invalid request: {errors}"}, 400
+
+        try:
+            start_datetime = (
+                pd.Timestamp(request.args["start_datetime"])
+                if "start_datetime" in request.args
+                else None
+            )
+        except ParserError:
+            return {"message": f"invalid datetime format"}, 400
+
+        try:
+            raport_generator = (
+                MeetingReportGenerator(dao, meeting_name, start_datetime)
+                if start_datetime
+                else RoomReportGenerator(dao, meeting_name)
+            )
+            pdf_file = raport_generator.generate_pdf_report()
+        except NotFoundError:
+            return {
+                "message": f"No data found for given conditions, cannot create a report"
+            }, 400
+
+        return (
+            pdf_file,
+            200,
+            {
+                "Content-Type": "application/pdf",
+                "Content-Disposition": 'inline; filename="report.pdf"',
+            },
+        )
 
 
 def setup_resources(app):
     api = Api(app)
+    api.add_resource(Report, "/reports/<string:meeting_name>")
     api.add_resource(Meetings, "/meetings")
     api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
     api.add_resource(Calls, "/calls")

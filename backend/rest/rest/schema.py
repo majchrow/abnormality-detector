@@ -27,7 +27,7 @@ def validate_criteria(data):
 
 class MeetingSchema(Schema):
     id = fields.Int(dump_only=True)
-    meeting_name = fields.Str(required=True, data_key='name')
+    meeting_name = fields.Str(required=True, data_key="name")
     meeting_number = fields.Str(required=True)
     criteria = JSONString(required=True, validate=validate_criteria)
 
@@ -44,7 +44,19 @@ class AnomalySchema(Schema):
     anomaly_reason = JSONString(required=True)
 
 
+class AnomalyRequestSchema(Schema):
+    name = fields.Str(required=True)
+    count = fields.Int(
+        required=True, validate=Range(min=1, error="count must be positive")
+    )
+
+
+class ReportRequestSchema(Schema):
+    start_datetime = fields.DateTime()
+
+
 anomaly_schema = AnomalySchema()
 meeting_schema = MeetingSchema()
 meeting_request_schema = MeetingRequestSchema()
-
+anomaly_request_schema = AnomalyRequestSchema()
+report_request_schema = ReportRequestSchema()

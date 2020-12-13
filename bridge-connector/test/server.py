@@ -43,11 +43,11 @@ class Server:
         self.credentials = (username, password)
         self.dumpfile = dumpfile
         self.msg_interval_s = msg_interval_s
-        self.auth_token = 'Token-of-eternal-prosperity'
+        self.auth_token = "Token-of-eternal-prosperity"
         self.loop = None
 
-        self.clients: Dict[str, Client] = {}            # IP address -> Client
-        self.streams: Dict[str, asyncio.Task] = {}      # IP address -> `stream_log` Task
+        self.clients: Dict[str, Client] = {}  # IP address -> Client
+        self.streams: Dict[str, asyncio.Task] = {}  # IP address -> `stream_log` Task
 
         self.messages = []
         self._prepare_data(run_forever)
@@ -59,9 +59,9 @@ class Server:
         messages = []
         for message in data:
             # ignore server acknowledgements and subscriptionUpdates in the log
-            if 'message' not in message:
+            if "message" not in message:
                 continue
-            if message['message']['type'] == 'subscriptionUpdate':
+            if message["message"]["type"] == "subscriptionUpdate":
                 continue
 
             messages.append(message)
@@ -74,10 +74,10 @@ class Server:
             self.messages = messages
 
     async def token(self, request):
-        credentials = aiohttp.BasicAuth.decode(request.headers['Authorization'])
+        credentials = aiohttp.BasicAuth.decode(request.headers["Authorization"])
         if self.credentials == (credentials.login, credentials.password):
             resp = web.Response()
-            resp.headers['X-Cisco-CMS-Auth-Token'] = self.auth_token
+            resp.headers["X-Cisco-CMS-Auth-Token"] = self.auth_token
             return resp
         else:
             raise web.HTTPUnauthorized()
@@ -86,13 +86,13 @@ class Server:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
-        if request.rel_url.query['authToken'] != self.auth_token:
+        if request.rel_url.query["authToken"] != self.auth_token:
             raise web.HTTPUnauthorized()
 
         await self.register(request.remote, ws)
         await self.handle_ws(request.remote, ws)
         await self.unregister(request.remote)
-        logging.info('WebSocket connection closed')
+        logging.info("WebSocket connection closed")
 
         return ws
 
@@ -105,67 +105,75 @@ class Server:
     async def handle_ws(self, remote_address, ws):
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == 'close':
+                if msg.data == "close":
                     await ws.close()
                 else:
                     msg_dict = json.loads(msg.data)
                     await self.handle_msg(remote_address, msg_dict)
                     logging.info(f"RECV FROM {remote_address}:\n{pformat(msg_dict)}")
             elif msg.type == aiohttp.WSMsgType.ERROR:
-                print(f'WebSocket connection closed with exception {ws.exception()}')
+                print(f"WebSocket connection closed with exception {ws.exception()}")
 
     async def handle_msg(self, remote_address, msg_dict):
-        if 'message' not in msg_dict:
+        if "message" not in msg_dict:
             # ignore acknowledgements
             return
 
         client = self.clients[remote_address]
         client.clear()
 
-        msg = msg_dict['message']
-        if msg['type'] == "subscribeRequest":
-            subscriptions = msg['subscriptions']
+        msg = msg_dict["message"]
+        if msg["type"] == "subscribeRequest":
+            subscriptions = msg["subscriptions"]
             for subscription in subscriptions:
-                if subscription['type'] == 'calls':
-                    client.calls.append(subscription['index'])
-                elif subscription['type'] == "callRoster":
-                    sub = DetailSubscription(subscription['index'], subscription['call'])
+                if subscription["type"] == "calls":
+                    client.calls.append(subscription["index"])
+                elif subscription["type"] == "callRoster":
+                    sub = DetailSubscription(
+                        subscription["index"], subscription["call"]
+                    )
                     client.roster_info.append(sub)
-                elif subscription['type'] == "callInfo":
-                    sub = DetailSubscription(subscription['index'], subscription['call'])
+                elif subscription["type"] == "callInfo":
+                    sub = DetailSubscription(
+                        subscription["index"], subscription["call"]
+                    )
                     client.call_info.append(sub)
 
             # Only start streaming once we have some subscription
             if remote_address not in self.streams:
-                self.streams[remote_address] = self.loop.create_task(self.stream_log(client))
+                self.streams[remote_address] = self.loop.create_task(
+                    self.stream_log(client)
+                )
 
     async def stream_log(self, client) -> None:
         try:
             for message in self.messages:
                 if message['message']['type'] == "callListUpdate":
                     for s_ind in client.calls:
-                        message['message']['subscriptionIndex'] = s_ind
+                        message["message"]["subscriptionIndex"] = s_ind
                         await client.ws.send_json(message)
-                elif message['message']['type'] == "callInfoUpdate":
-                    call_id = message['message']['callInfo']['call']
+                elif message["message"]["type"] == "callInfoUpdate":
+                    call_id = message["message"]["callInfo"]["call"]
                     for subscription in client.call_info:
                         if subscription.call_id == call_id:
-                            message['message']['subscriptionIndex'] = subscription.index
+                            message["message"]["subscriptionIndex"] = subscription.index
                             await client.ws.send_json(message)
-                elif message['message']['type'] == "rosterUpdate":
+                elif message["message"]["type"] == "rosterUpdate":
                     for subscription in client.roster_info:
-                        if subscription.call_id == message['call']:
-                            message['message']['subscriptionIndex'] = subscription.index
+                        if subscription.call_id == message["call"]:
+                            message["message"]["subscriptionIndex"] = subscription.index
                             await client.ws.send_json(message)
                 else:
-                    logging.error(f'Unhandled message type in provided log file: {pformat(message)}')
+                    logging.error(
+                        f"Unhandled message type in provided log file: {pformat(message)}"
+                    )
                     continue
 
-                logging.info(f'SENT:\n{pformat(message)}')
+                logging.info(f"SENT:\n{pformat(message)}")
                 await asyncio.sleep(self.msg_interval_s)
 
         except asyncio.CancelledError:
-            logging.info(f'Event stream for {client.ip_address} stopped.')
+            logging.info(f"Event stream for {client.ip_address} stopped.")
 
     async def unregister(self, remote_address) -> None:
         if task := self.streams.get(remote_address, None):
@@ -178,7 +186,7 @@ class Server:
 
 
 async def setup_server(app):
-    app['server'].loop = asyncio.get_running_loop()
+    app["server"].loop = asyncio.get_running_loop()
 
 
 def main(host, port, username, password, dumpfile, msg_interval_s, run_forever):
@@ -189,8 +197,8 @@ def main(host, port, username, password, dumpfile, msg_interval_s, run_forever):
     app['server'] = server
 
     app.on_startup.append(setup_server)
-    app.add_routes([web.post('/api/v1/authTokens', server.token)])
-    app.add_routes([web.get('/events/v1', server.serve)])
+    app.add_routes([web.post("/api/v1/authTokens", server.token)])
+    app.add_routes([web.get("/events/v1", server.serve)])
     web.run_app(app, host=host, port=port)
 
 
@@ -219,7 +227,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
     except KeyError:

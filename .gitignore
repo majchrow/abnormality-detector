@@ -5,4 +5,5 @@
 out/
 venv/
 logs-preprocessing/kafka/resources/
+logs-preprocessing/app/main/resources/in_dfs.ipynb
 __pycache__/
