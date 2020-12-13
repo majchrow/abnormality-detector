@@ -3,6 +3,7 @@ import json
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, dict_factory
+from dateutil.parser import isoparse
 
 from . import STREAM_FINISHED
 from .criteria import check, validate, MsgType
@@ -13,6 +14,7 @@ from ...config import Config
 class Worker:
 
     def __init__(self, config, cassandra_session,data_consumer, config_consumer, producer):
+        self.calls_table = config.calls_table
         self.call_info_table = config.call_info_table
         self.roster_table = config.roster_table
         self.meetings_table = config.meetings_table
@@ -38,7 +40,7 @@ class Worker:
 
     async def bootstrap(self):
         meetings = await self.get_monitored_meetings()
-        self.monitoring_criteria = {m['name']: m['criteria'] for m in meetings}
+        self.monitoring_criteria = {m['name']: validate(m['criteria']) for m in meetings}
         report(f'bootstrapped from {len(meetings)} meetings')
 
     async def process_config(self):
@@ -74,7 +76,7 @@ class Worker:
                 payload = json.dumps({'meeting': meeting_name, 'anomalies': [a.dict() for a in anomalies]})
                 # TODO: create task?
                 await self.kafka_producer.send("monitoring-results-anomalies", payload.encode())
-                self.set_anomaly(msg_dict['meeting_name'], msg_dict['datetime'], msg.topic, anomalies)
+                self.set_anomaly(msg_dict, msg.topic, anomalies)
                 report(f'detected {len(anomalies)} anomalies')
 
     def get_monitored_meetings(self):
@@ -97,22 +99,34 @@ class Worker:
         result.add_callbacks(on_success, on_error)
         return future
 
-    def set_anomaly(self, meeting_name, datetime, topic, anomalies):
-        if topic == 'preprocessed_callInfoUpdate':
-            table = self.call_info_table
-        else:
-            table = self.roster_table
-
+    def set_anomaly(self, msg_dict, topic, anomalies):
         reason = json.dumps([a.dict() for a in anomalies])
-        future = self.session.execute_async(
-            f'UPDATE {table} '
-            f'SET anomaly=true, anomaly_reason=%s '
-            f'WHERE meeting_name=%s AND datetime=%s;',
-        (reason, meeting_name, datetime))
+        meeting_name = msg_dict['meeting_name']
+
+        if topic == 'preprocessed_callListUpdate':
+            table = self.calls_table
+            start_datetime, datetime = map(isoparse, [msg_dict['start_datetime'], msg_dict['last_update']])
+            future = self.session.execute_async(
+                f'UPDATE {table} '
+                f'SET anomaly=true, anomaly_reason=%s '
+                f'WHERE meeting_name=%s AND start_datetime=%s;',
+            (reason, meeting_name, start_datetime))
+        else:
+            if topic == 'preprocessed_callInfoUpdate':
+                table = self.call_info_table
+            else:
+                table = self.roster_table
+
+            datetime = isoparse(msg_dict['datetime'])
+            future = self.session.execute_async(
+                f'UPDATE {table} '
+                f'SET anomaly=true, anomaly_reason=%s '
+                f'WHERE meeting_name=%s AND datetime=%s;',
+            (reason, meeting_name, datetime))
 
         future.add_callbacks(
-            lambda _: report(f'set anomaly status for call {meeting_name} at {datetime}'),
-            lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} failed with {e}')
+            lambda _: report(f'set anomaly status for call {meeting_name} at {datetime} in {table}'),
+            lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} in {table} failed with {e}')
         )
 
 
@@ -121,7 +135,7 @@ async def setup(config: Config):
     await producer.start()
 
     data_consumer = AIOKafkaConsumer(
-        'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
+        'preprocessed_callListUpdate', 'preprocessed_callInfoUpdate', 'preprocessed_rosterUpdate',
         bootstrap_servers=config.kafka_bootstrap_server, group_id='monitoring-workers'
     )
 

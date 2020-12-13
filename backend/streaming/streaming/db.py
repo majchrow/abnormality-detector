@@ -14,9 +14,6 @@ from .config import Config
 from .exceptions import DBFailureError, MeetingNotExistsError
 
 
-# TODO:
-#  - once we have more than just "threshold" monitoring we'll need to update methods below
-#
 class CassandraDAO:
 
     TAG = 'CassandraDAO'
@@ -33,12 +30,15 @@ class CassandraDAO:
         self.session = self.cluster.connect(self.keyspace)
         self.session.row_factory = dict_factory
 
-    async def async_exec(self, query, args=None):
+    async def async_exec(self, name, query, args=None):
         def callback(result):
+            if result is not None:
+                result = list(result)
             future.set_result(result)
 
         def errback(e):
-            future.set_exception(e)
+            logging.error(f'{self.TAG}: "{name}" failed with {e}'),
+            future.set_exception(DBFailureError(f'"{name}" failed with {e}'))
 
         if args:
             promise = self.session.execute_async(query, args)
@@ -53,167 +53,100 @@ class CassandraDAO:
     ############
     # thresholds
     ############
-    def get_monitored_meetings(self):
-        result = self.session.execute_async(
+    async def get_monitored_meetings(self):
+        meetings = await self.async_exec(
+            'get_monitored_meetings',
             f'SELECT meeting_name as name, criteria FROM {self.meetings_table} '
             f'WHERE monitored=true ALLOW FILTERING;'
         )
+        logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings')
+        for m in meetings:
+            m['criteria'] = json.loads(m['criteria'])
+        return meetings
 
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_success(meetings):
-            logging.info(f'{self.TAG}: fetched {len(meetings)} monitoring meetings')
-            for m in meetings:
-                m['criteria'] = json.loads(m['criteria'])
-            future.set_result(meetings)
-
-        def on_error(e):
-            logging.error(f'{self.TAG}: "get monitored meetings" failed with {e}'),
-            future.set_exception(
-                DBFailureError(f'"get monitored meetings" failed with {e}')
-            )
-
-        result.add_callbacks(on_success, on_error)
-        return future
-
-    def is_monitored(self, call_name: str):
-        result = self.session.execute_async(
+    async def is_monitored(self, call_name: str):
+        result = await self.async_exec(
+            'is_monitored',
             f'SELECT monitored FROM {self.meetings_table} '
             f'WHERE meeting_name=%s;',
             (call_name,)
         )
+        logging.info(f'{self.TAG}: fetched monitoring status for {call_name}')
+        return result[0]['monitored'] if result else False
 
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_success(result):
-            logging.info(f'{self.TAG}: fetched monitoring status for {call_name}')
-            status = result[0]['monitored'] if result else False
-            future.set_result(status)
-
-        def on_error(e):
-            logging.error(f'{self.TAG}: "is monitored" failed with {e}'),
-            future.set_exception(
-                DBFailureError(f'"is monitored" failed with {e}')
-            )
-
-        result.add_callbacks(on_success, on_error)
-        return future
-
-    def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]] = None):
+    async def set_monitoring_status(self, call_name: str, monitored: bool, criteria: Optional[List[dict]] = None):
         if criteria is None:
-            result = self.session.execute_async(
+            result = await self.async_exec(
+                'set_monitoring_status',
                 f'UPDATE {self.meetings_table} '
                 f'SET monitored=%s '
-                f'WHERE meeting_name=%s IF EXISTS;', 
-            (monitored, call_name))
+                f'WHERE meeting_name=%s IF EXISTS;',
+                (monitored, call_name)
+            )
         else:
-            result = self.session.execute_async(
+            result = await self.async_exec(
+                'set_monitoring_status',
                 f'UPDATE {self.meetings_table} '
                 f'SET monitored=%s, criteria=%s'
-                f'WHERE meeting_name=%s IF EXISTS;', 
-            (monitored, json.dumps(criteria), call_name))
-
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_success(response):
-            applied = response[0]['[applied]']
-            if applied:
-                logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
-                future.set_result(None)
-            else:
-                logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
-                future.set_exception(MeetingNotExistsError())
-
-        def on_error(e):
-            logging.error(f'{self.TAG}: "set monitoring status" for call {call_name} failed with {e}'),
-            future.set_exception(
-                DBFailureError(f'"set monitoring status" for {call_name} failed with {e}')
+                f'WHERE meeting_name=%s IF EXISTS;',
+                (monitored, json.dumps(criteria), call_name)
             )
-
-        result.add_callbacks(on_success, on_error)
-        return future
+        if result[0]['[applied]']:
+            logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
+        else:
+            logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
+            raise MeetingNotExistsError
 
     ###################
     # anomaly detection
     ###################
-    def add_training_job(self, meeting_name: str, calls: List[str]):
-        logging.info(calls)
+    async def add_training_job(self, meeting_name: str, calls: List[str]):
         uid = str(uuid4())
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        result = self.session.execute_async(
+        await self.async_exec(
+            'add_training_job',
             f"INSERT INTO training_jobs (job_id, meeting_name, submission_datetime, training_call_starts, status) "
             f"VALUES (%s, %s, %s, %s, %s);",
             (uid, meeting_name, now, calls, 'pending')
         )
-
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_success(_):
-            logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
-            future.set_result(uid)
-
-        def on_error(e):
-            logging.error(f'{self.TAG}: "add training job" failed with {e}'),
-            future.set_exception(
-                DBFailureError(f'"add training job" failed with {e}')
-            )
-
-        result.add_callbacks(on_success, on_error)
-        return future
+        logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
+        return uid
 
     async def meeting_exists(self, meeting_name):
         result = await self.async_exec(
+            'meeting_exists',
             f'SELECT * FROM meetings '
             f'WHERE meeting_name=%s '
             f'LIMIT 1;',
             (meeting_name,)
         )
-        return bool(list(result))
+        return bool(result)
 
     async def model_exists(self, meeting):
         result = await self.async_exec(
+            'model_exists',
             f'SELECT * FROM models '
             f'WHERE meeting_name=%s '
             f'LIMIT 1;',
             (meeting,)
         )
-        return bool(list(result))
-
-    async def get_anomaly_monitoring_status(self, meeting_name):
-        result = await self.async_exec(
-            f'SELECT anomaly_monitored '
-            f'FROM anomaly_monitoring '
-            f'WHERE meeting_name=%s;',
-            (meeting_name,)
-        )
-        return list(result)
-
-    async def get_anomaly_monitoring_instance(self, meeting_name):
-        result = list(await self.async_exec(
-            f'SELECT monitored '
-            f'FROM anomaly_monitoring '
-            f'WHERE meeting_name=%s;',
-            (meeting_name,)
-        ))
-        return result[0] if result else None
+        return bool(result)
 
     async def set_anomaly_monitoring_status(self, meeting_name, status):
         # TODO: races (lock again?)
         result = await self.async_exec(
+            'set_anomaly_monitoring_status',
             f'UPDATE meetings '
             f'SET anomaly_monitored=%s '
             f'WHERE meeting_name=%s '
             f'IF EXISTS;',
             (status, meeting_name)
         )
-        return next(iter(result))['[applied]'] if result else False
+        return result[0]['[applied]'] if result else False
 
     async def get_anomaly_monitored_meetings(self):
         result = await self.async_exec(
+            'get_anomaly_monitored_meetings',
             f'SELECT meeting_name FROM meetings '
             f'WHERE anomaly_monitored=true ALLOW FILTERING;'
         )
@@ -222,6 +155,7 @@ class CassandraDAO:
     async def get_last_inferences(self, monitored_meetings):
         # TODO: use execute_concurrent?
         jobs = [self.async_exec(
+            'get_last_inferences',
             f'SELECT meeting_name, end_datetime as end '
             f'FROM inference_jobs '
             f'WHERE meeting_name=%s '
@@ -234,6 +168,7 @@ class CassandraDAO:
 
     async def add_inference_job(self, meeting_name, start, end, status='pending'):
         await self.async_exec(
+            'add_inference_job',
             f"INSERT INTO inference_jobs (meeting_name, start_datetime, end_datetime, status) "
             f"VALUES (%s, %s, %s, %s);",
             (meeting_name, start, end, status)
@@ -246,14 +181,16 @@ class CassandraDAO:
             now = datetime.now()
             uid = str(uuid4())
             result = await self.async_exec(
+                'try_lock',
                 f'UPDATE locks SET lock_id=%s, last_locked=%s '
                 f'WHERE resource_name=%s '
                 f'IF lock_id=null;',
                 (uid, now, resource)
             )
-            yield next(iter(result))['[applied]']
+            yield result[0]['[applied]']
         finally:
             await self.async_exec(
+                'try_lock',
                 'UPDATE locks SET lock_id=null '
                 'WHERE resource_name=%s;',
                 (resource,)
