@@ -160,37 +160,38 @@ class ClientManager:
 
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
-        current_ts = datetime.now().isoformat()
+        current_ts = msg["date"]  # datetime.now().isoformat()
         call = None
 
         for update in updates:
             update_type = update["updateType"]
             call_name = update["name"]
+            call_id = update["call"]
 
             if update_type == 'add':
-                if not (call := self.calls.get(call_name, None)):
-                    call = self.calls[call_name] = Call(manager=self, call_name=call_name, start_datetime=current_ts)
+                if not (call := self.calls.get(call_id, None)):
+                    call = self.calls[call_id] = Call(manager=self, call_name=call_name, call_id=call_id, start_datetime=current_ts)
                 await call.add(client_endpoint)
             elif update_type == 'remove':
-                if call_name not in self.calls:
-                    logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
+                if call_id not in self.calls:
+                    logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name} {call_id}')
                     continue
 
-                call = self.calls[call_name]
+                call = self.calls[call_id]
                 await call.remove(client_endpoint)
                 if call.done:
-                    del self.calls[call_name]
+                    del self.calls[call_id]
             else:
-                call = self.calls[call_name]
+                call = self.calls[call_id]
 
         if call:
             msg['startDatetime'] = call.start_datetime
-            msg['date'] = current_ts
+            # msg['date'] = current_ts
             await self.publish(msg)
             await self.dump(msg)
 
-    async def on_call_info_update(self, msg: dict, call_name: str):
-        if not (call := self.calls.get(call_name, None)):
+    async def on_call_info_update(self, msg: dict, call_id: str):
+        if not (call := self.calls.get(call_id, None)):
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
 
@@ -198,8 +199,8 @@ class ClientManager:
         await self.publish(msg)
         await self.dump(msg)
 
-    async def on_roster_update(self, msg: dict, call_name: str):
-        if not (call := self.calls.get(call_name, None)):
+    async def on_roster_update(self, msg: dict, call_id: str):
+        if not (call := self.calls.get(call_id, None)):
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
         
@@ -210,13 +211,14 @@ class ClientManager:
     @staticmethod
     def timestamp(msg, call):
         msg['startDatetime'] = call.start_datetime
-        msg['date'] = datetime.now().isoformat()
+        # msg['date'] = datetime.now().isoformat()
         
 
 class Call:
-    def __init__(self, manager, call_name, start_datetime):
+    def __init__(self, manager, call_name, call_id, start_datetime):
         self.manager = manager
         self.call_name = call_name
+        self.call_id = call_id
         self.handler = None
         self.clients = set()
         self.start_datetime = start_datetime 
@@ -237,7 +239,7 @@ class Call:
         else:
             # No one's been listening so this client will
             self.handler = client
-            await client.on_connect_to(self.call_name)
+            await client.on_connect_to(self.call_name, self.call_id)
             logging.info(f'{self.manager.TAG}: {self.call_name} running on 1 server')
 
     async def remove(self, client):
@@ -245,14 +247,16 @@ class Call:
             # All clients left server we've been listening to so far,
             # we need a new client to take over
             try:
-                await self.handler.on_disconnect_from(self.call_name)
+                await self.handler.on_disconnect_from(self.call_name, self.call_id)
                 self.handler = next(iter(self.clients))
                 self.clients.discard(self.handler)
-                await self.handler.on_connect_to(self.call_name)
+                logging.info(f'{self.manager.TAG}: handler swap for {self.call_name}')
+                await self.handler.on_connect_to(self.call_name, self.call_id)
             except StopIteration:
                 # No other clients
                 self.handler = None
         else:
+            logging.info(f'{self.manager.TAG}: secondary client disconnected for {self.call_name}')
             self.clients.remove(client)
 
         if self.handler:
