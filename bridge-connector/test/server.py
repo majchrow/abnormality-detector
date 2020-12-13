@@ -67,8 +67,10 @@ class Server:
             messages.append(message)
 
         if run_forever:
+            logging.info('setup to run forever')
             self.messages = cycle(messages)
         else:
+            logging.info(f'setup with {len(messages)} messages')
             self.messages = messages
 
     async def token(self, request):
@@ -139,7 +141,7 @@ class Server:
 
     async def stream_log(self, client) -> None:
         try:
-            for message in cycle(self.messages):
+            for message in self.messages:
                 if message['message']['type'] == "callListUpdate":
                     for s_ind in client.calls:
                         message['message']['subscriptionIndex'] = s_ind
@@ -210,7 +212,7 @@ def parse_args():
                         type=float,
                         default=1,
                         help='interval between  sent messages [s]')
-    parser.add_argument('--forever',
+    parser.add_argument('--run-forever',
                         type=bool,
                         default=False,
                         help='serve messages in a cycle forever')
