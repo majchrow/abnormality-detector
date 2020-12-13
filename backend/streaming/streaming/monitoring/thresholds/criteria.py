@@ -24,7 +24,7 @@ class Anomaly(BaseModel):
     parameter: str
     value: Union[bool, float, str]
     condition_type: str
-    condition_value: Union[bool, float, str]
+    condition_value: Union[bool, float, str, List]
 
 
 class Criterion(ABC):
@@ -215,7 +215,9 @@ class DaysCriterion(StrictModel, Criterion):
         assert len(v) == len({d.day for d in v}), '"days" cannot contain duplicate day values'
         return v
 
-    def verify(self, message, _):
+    def verify(self, message, msg_type):
+        if msg_type == MsgType.CALLS:
+            return
         week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
 
         for c in self.conditions:

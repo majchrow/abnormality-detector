@@ -104,9 +104,10 @@ class Worker:
         meeting_name = msg_dict['meeting_name']
 
         if topic == 'preprocessed_callListUpdate':
+            table = self.calls_table
             start_datetime, datetime = map(isoparse, [msg_dict['start_datetime'], msg_dict['last_update']])
             future = self.session.execute_async(
-                f'UPDATE {self.calls_table} '
+                f'UPDATE {table} '
                 f'SET anomaly=true, anomaly_reason=%s '
                 f'WHERE meeting_name=%s AND start_datetime=%s;',
             (reason, meeting_name, start_datetime))
@@ -124,8 +125,8 @@ class Worker:
             (reason, meeting_name, datetime))
 
         future.add_callbacks(
-            lambda _: report(f'set anomaly status for call {meeting_name} at {datetime}'),
-            lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} failed with {e}')
+            lambda _: report(f'set anomaly status for call {meeting_name} at {datetime} in {table}'),
+            lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} in {table} failed with {e}')
         )
 
 

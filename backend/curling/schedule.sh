@@ -4,4 +4,4 @@ if [ -z  "$1" ]; then
     exit
 fi
 
-curl -X PUT -d '{"type": "threshold", "criteria": [{"parameter": "time_diff", "conditions": {"min": 200}}]}' localhost:5001/monitoring/$1
+curl -X PUT -d '{"type": "threshold", "criteria": [{"parameter": "time_diff", "conditions": {"min": 200}}, {"parameter": "days", "conditions": [{"day": 3}]}]}' localhost:5001/monitoring/$1

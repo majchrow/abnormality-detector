@@ -34,7 +34,7 @@ messages = {
     ],
     'preprocessed_rosterUpdate': [
         {'initial': 1, 'connected': 0, 'onhold': 0, 'ringing': 0, 'presenter': 1, 'active_speaker': 1, 'endpoint_recording': 1, 
-         'datetime': '2020-06-02T00:46:47.984Z', 'call_id': 'who-cares', 'meeting_name': 'Elektryczność', 'week_day_number': 2, 'hour': 0}
+         'datetime': '2020-06-02T00:46:47.984Z', 'call_id': 'who-cares', 'meeting_name': '[UJ] Biologia (GZ-B)', 'week_day_number': 2, 'hour': 0}
     ],
 }
 
