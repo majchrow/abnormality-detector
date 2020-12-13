@@ -171,7 +171,9 @@ class ClientManager:
 
             if update_type == 'add':
                 if not (call := self.calls.get(call_id, None)):
-                    call = self.calls[call_id] = Call(manager=self, call_name=call_name, call_id=call_id, start_datetime=current_ts)
+                    call = self.calls[call_id] = Call(
+                        manager=self, call_name=call_name, call_id=call_id, start_datetime=current_ts
+                    )
                 await call.add(client_endpoint)
             elif update_type == 'remove':
                 if call_id not in self.calls:
@@ -195,7 +197,7 @@ class ClientManager:
 
     async def on_call_info_update(self, msg: dict, call_id: str):
         if not (call := self.calls.get(call_id, None)):
-            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
+            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_id}')
             return
 
         self.timestamp(msg, call)
@@ -204,7 +206,7 @@ class ClientManager:
 
     async def on_roster_update(self, msg: dict, call_id: str):
         if not (call := self.calls.get(call_id, None)):
-            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
+            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_id}')
             return
         
         self.timestamp(msg, call)
