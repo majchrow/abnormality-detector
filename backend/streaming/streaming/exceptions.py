@@ -1,9 +1,25 @@
-class MeetingNotExistsError(Exception):
-    "Attempted to access inexistent meeting"
+class DataMissingError(Exception):
+    """Attempted to train on empty dataset."""
     pass
+
+
+class MeetingNotExistsError(Exception):
+    """Attempted to access non-existent meeting."""
+    pass
+
+
+class ModelNotExistsError(Exception):
+    """Attempted to access non-existent model."""
+    pass
+
 
 class UnmonitoredError(Exception):
     """Attempted to access meeting that is not monitored"""
+    pass
+
+
+class MonitoredAlreadyError(Exception):
+    """Attempted to schedule anomaly inference multiple times."""
     pass
 
 

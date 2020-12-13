@@ -160,12 +160,13 @@ class ClientManager:
 
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
-        current_ts = msg['date']  # datetime.now().isoformat()
+        current_ts = datetime.now().isoformat()
         call = None
 
         for update in updates:
             update_type = update["updateType"]
             call_name = update["name"]
+            finished = False
 
             if update_type == 'add':
                 if not (call := self.calls.get(call_name, None)):
@@ -180,12 +181,14 @@ class ClientManager:
                 await call.remove(client_endpoint)
                 if call.done:
                     del self.calls[call_name]
+                    finished = True
             else:
                 call = self.calls[call_name]
+            update['finished'] = finished
 
         if call:
             msg['startDatetime'] = call.start_datetime
-            # msg['date'] = current_ts
+            msg['date'] = current_ts
             await self.publish(msg)
             await self.dump(msg)
 
@@ -210,7 +213,7 @@ class ClientManager:
     @staticmethod
     def timestamp(msg, call):
         msg['startDatetime'] = call.start_datetime
-        # msg['date'] = datetime.now().isoformat()
+        msg['date'] = datetime.now().isoformat()
         
 
 class Call:

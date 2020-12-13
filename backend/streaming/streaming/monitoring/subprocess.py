@@ -1,28 +1,23 @@
 import asyncio
-import dataclasses
-import json
 import logging
+from typing import List
 
-from ...config import Config
 
+class BaseWorkerManager:
 
-class ThresholdManager:
+    TAG = 'BaseWorkerManager'
 
-    TAG = 'ThresholdManager'
+    def __init__(self):
+        self.cmd = []
+        self.num_workers = None
+        self.worker_id = None
 
-    def __init__(self, config: Config):
-        self.config = config
-        self.num_workers = config.num_workers
         self.workers = []
         self.started = asyncio.Event()
-        self.kafka_producer = None
-
-    def init(self, kafka_producer):
-        self.kafka_producer = kafka_producer
 
     async def run(self):
         for i in range(self.num_workers):
-            worker = ChildProcess(f'worker-{i}', self.config)
+            worker = ChildProcess(f'{self.worker_id}-{i}', self.cmd)
             self.workers.append(worker)
         asyncio.create_task(self.set_started())
         await asyncio.gather(*[w.run() for w in self.workers], return_exceptions=True)
@@ -32,30 +27,15 @@ class ThresholdManager:
         await asyncio.sleep(3)
         self.started.set()
 
-    async def schedule(self, meeting_name, criteria):
-        payload = json.dumps({
-            'type': 'update',
-            'meeting_name': meeting_name,
-            'criteria': criteria
-        }).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-config', value=payload)
-
-    async def unschedule(self, meeting_name):
-        payload = json.dumps({
-            'type': 'delete',
-            'meeting_name': meeting_name
-        }).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-config', value=payload)
-
     async def shutdown(self):
         await asyncio.gather(*[w.stop() for w in self.workers])
         logging.info(f'{self.TAG}: shutdown')
 
 
 class ChildProcess:
-    def __init__(self, uid: str, config: Config):
+    def __init__(self, uid: str, cmd: List[str]):
         self.uid = uid
-        self.config = config
+        self.cmd = cmd
         self.running = True
         self.worker = None
         self.task = None
@@ -77,9 +57,8 @@ class ChildProcess:
                 backoff = 1
 
     async def run_once(self):
-        serialized = json.dumps(dataclasses.asdict(self.config))
         self.worker = await asyncio.create_subprocess_exec(
-            'python3', '-m', 'streaming.monitoring.thresholds.monitor', serialized,
+            *self.cmd,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -98,13 +77,40 @@ class ChildProcess:
         fst_line = (await stream.readline()).decode()
         if 'started' in fst_line:
             self.started.set()
-            logging.info(f'{self.uid}: {fst_line}')
+            logging.info(f'{self.uid}: {fst_line.strip()}')
 
         while self.worker.returncode is None:
-            line = (await stream.readline()).decode()
+            line = (await stream.readline()).decode().strip()
             if not line:
                 await asyncio.sleep(1)
             else:
                 logging.info(f'{self.uid}: {line}')
 
         logging.info(f'{self.uid}: {what} listener stopped')
+
+
+async def run_for_result(uid: str, cmd: List[str]):
+    async def listen(stream, what):
+        while worker.returncode is None:
+            line = (await stream.readline()).decode().strip()
+            if not line:
+                await asyncio.sleep(1)
+            else:
+                logging.info(f'{uid}: {line}')
+
+        logging.info(f'{uid}: {what} listener stopped')
+
+    worker = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    out_task = asyncio.create_task(listen(worker.stdout, 'OUT'))
+    err_task = asyncio.create_task(listen(worker.stderr, 'ERR'))
+
+    await worker.wait()
+    out_task.cancel()
+    err_task.cancel()
+    await out_task
+    await err_task

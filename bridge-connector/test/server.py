@@ -39,9 +39,7 @@ class Client:
 
 
 class Server:
-    def __init__(
-        self, username: str, password: str, dumpfile: str, msg_interval_s: int
-    ) -> None:
+    def __init__(self, username: str, password: str, dumpfile: str, msg_interval_s: int, run_forever: bool) -> None:
         self.credentials = (username, password)
         self.dumpfile = dumpfile
         self.msg_interval_s = msg_interval_s
@@ -52,12 +50,13 @@ class Server:
         self.streams: Dict[str, asyncio.Task] = {}  # IP address -> `stream_log` Task
 
         self.messages = []
-        self._prepare_data()
+        self._prepare_data(run_forever)
 
-    def _prepare_data(self) -> None:
+    def _prepare_data(self, run_forever: bool) -> None:
         with open(self.dumpfile) as json_file:
             data = json.load(json_file)
 
+        messages = []
         for message in data:
             # ignore server acknowledgements and subscriptionUpdates in the log
             if "message" not in message:
@@ -65,7 +64,14 @@ class Server:
             if message["message"]["type"] == "subscriptionUpdate":
                 continue
 
-            self.messages.append(message)
+            messages.append(message)
+
+        if run_forever:
+            logging.info('setup to run forever')
+            self.messages = cycle(messages)
+        else:
+            logging.info(f'setup with {len(messages)} messages')
+            self.messages = messages
 
     async def token(self, request):
         credentials = aiohttp.BasicAuth.decode(request.headers["Authorization"])
@@ -142,7 +148,7 @@ class Server:
     async def stream_log(self, client) -> None:
         try:
             for message in self.messages:
-                if message["message"]["type"] == "callListUpdate":
+                if message['message']['type'] == "callListUpdate":
                     for s_ind in client.calls:
                         message["message"]["subscriptionIndex"] = s_ind
                         await client.ws.send_json(message)
@@ -183,12 +189,12 @@ async def setup_server(app):
     app["server"].loop = asyncio.get_running_loop()
 
 
-def main(host, port, username, password, dumpfile, msg_interval_s):
+def main(host, port, username, password, dumpfile, msg_interval_s, run_forever):
     logging.basicConfig(level=logging.DEBUG)
 
     app = web.Application()
-    server = Server(username, password, dumpfile, msg_interval_s)
-    app["server"] = server
+    server = Server(username, password, dumpfile, msg_interval_s, run_forever)
+    app['server'] = server
 
     app.on_startup.append(setup_server)
     app.add_routes([web.post("/api/v1/authTokens", server.token)])
@@ -198,22 +204,26 @@ def main(host, port, username, password, dumpfile, msg_interval_s):
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--host", type=str, default="localhost", help="host")
-    parser.add_argument(
-        "--port", type=int, default=8080, help="default file for logging module"
-    )
-    parser.add_argument(
-        "--dumpfile",
-        type=str,
-        default="test/full_log.json",
-        help="JSON file with raw server messages",
-    )
-    parser.add_argument(
-        "--interval_s",
-        type=float,
-        default=1,
-        help="interval between  sent messages [s]",
-    )
+    parser.add_argument('--host',
+                        type=str,
+                        default='localhost',
+                        help='host')
+    parser.add_argument('--port',
+                        type=int,
+                        default=8080,
+                        help='default file for logging module')
+    parser.add_argument('--dumpfile',
+                        type=str,
+                        default='test/full_log.json',
+                        help='JSON file with raw server messages')
+    parser.add_argument('--interval_s',
+                        type=float,
+                        default=1,
+                        help='interval between  sent messages [s]')
+    parser.add_argument('--run-forever',
+                        type=bool,
+                        default=False,
+                        help='serve messages in a cycle forever')
     return parser.parse_args()
 
 
@@ -225,4 +235,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     args = parse_args()
-    main(args.host, args.port, login, password, args.dumpfile, args.interval_s)
+    main(args.host, args.port, login, password, args.dumpfile, args.interval_s, args.run_forever)

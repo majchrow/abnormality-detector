@@ -1,3 +1,4 @@
+import re
 import requests
 import urllib3
 from datetime import datetime, timedelta
@@ -57,12 +58,21 @@ class BridgeDao:
     def init(self, bridge_client, db_dao):
         self.client = bridge_client
         self.dao = db_dao
-       
+
+    @staticmethod
+    def filter_private_meetings(meetings):
+        return [m for m in meetings if 'wirtualny pokój' not in m['meeting_name']]
+
+    @staticmethod
+    def filter_by_square_prefix(meetings):
+        return [m for m in meetings if re.search(r'^\[\w+\]', m['meeting_name'])]
+
     def update_meetings(self):
         cospaces = self.client.get_cospaces()
         meetings = [
             {'meeting_name': cs['name'], 'meeting_number': cs['secondaryUri']} for cs in cospaces
         ]
+        meetings = self.filter_by_square_prefix(meetings)
         self.dao.add_meetings(meetings)
         return meetings
 
