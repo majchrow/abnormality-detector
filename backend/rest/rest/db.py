@@ -47,7 +47,7 @@ class CassandraDAO:
             meeting['meeting_name']: meeting['meeting_number'] for meeting in meetings
         }
         
-        monitored = [m for m in meetings if m['monitored']]
+        monitored = [m for m in meetings if m['criteria']]
         [m.pop('monitored') for m in meetings]
         current = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, current))
         recent = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, recent))
@@ -114,9 +114,9 @@ class CassandraDAO:
 
     def get_anomalies(self, name, start_date, end_date):
         ci_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
-                    f"WHERE meeting_name = %s AND anomaly=true ")
+                    f"WHERE meeting_name=%s AND anomaly=true ")
         roster_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
-                        f"WHERE meeting_name = %s AND anomaly=true ")
+                        f"WHERE meeting_name=%s AND anomaly=true ")
         args = [name]
 
         if start_date:
@@ -129,7 +129,6 @@ class CassandraDAO:
             args.append(end_date)
         ci_query += ' ALLOW FILTERING;'
         roster_query += ' ALLOW FILTERING;'
-
         ci_results = self.session.execute(ci_query, args).all()
         roster_results = self.session.execute(roster_query, args).all()
         return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])}
