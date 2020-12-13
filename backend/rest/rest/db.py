@@ -137,7 +137,7 @@ class CassandraDAO:
             args.append(end_date)
         queries = append([calls_query, *queries], ' ALLOW FILTERING;')
 
-        results = list(chain(map(lambda q: self.session.execute(q, args).all(), queries)))
+        results = list(chain(*map(lambda q: self.session.execute(q, args).all(), queries)))
         return {'anomalies': sorted(results, key=lambda r: r['datetime'])}
     
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
