@@ -1,8 +1,9 @@
+import datetime
 from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
-import datetime
+from itertools import chain
 
 from .config import Config
 
@@ -113,25 +114,31 @@ class CassandraDAO:
         return {}
 
     def get_anomalies(self, name, start_date, end_date):
+        calls_query = (f"SELECT meeting_name, last_update as datetime, anomaly_reason FROM {self.calls_table} "
+                       f"WHERE meeting_name=%s AND anomaly=true ")
         ci_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
                     f"WHERE meeting_name=%s AND anomaly=true ")
         roster_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
                         f"WHERE meeting_name=%s AND anomaly=true ")
         args = [name]
 
+        def append(qs, suf):
+            return [q + suf for q in qs]
+
+        queries = [ci_query, roster_query]
+
         if start_date:
-            ci_query += ' AND datetime >= %s'
-            roster_query += ' AND datetime >= %s'
+            queries = append(queries, ' AND datetime >= %s')
+            calls_query += ' AND last_update >= %s'
             args.append(start_date)
         if end_date:
-            ci_query += ' AND datetime <= %s'
-            roster_query += ' AND datetime <= %s'
+            queries = append(queries, ' AND datetime <= %s')
+            calls_query += ' AND last_update <= %s'
             args.append(end_date)
-        ci_query += ' ALLOW FILTERING;'
-        roster_query += ' ALLOW FILTERING;'
-        ci_results = self.session.execute(ci_query, args).all()
-        roster_results = self.session.execute(roster_query, args).all()
-        return {'anomalies': sorted(ci_results + roster_results, key=lambda r: r['datetime'])}
+        queries = append([calls_query, *queries], ' ALLOW FILTERING;')
+
+        results = list(chain(*map(lambda q: self.session.execute(q, args).all(), queries)))
+        return {'anomalies': sorted(results, key=lambda r: r['datetime'])}
     
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
