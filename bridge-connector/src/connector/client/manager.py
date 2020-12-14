@@ -185,9 +185,9 @@ class ClientManager:
             else:
                 call = self.calls[call_name]
             update['finished'] = finished
+            update['startDatetime'] = call.start_datetime
 
         if call:
-            msg['startDatetime'] = call.start_datetime
             msg['date'] = current_ts
             await self.publish(msg)
             await self.dump(msg)
