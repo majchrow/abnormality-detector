@@ -22,8 +22,6 @@ services:
       - ./backend/rest:/flask
     environment:
       FLASK_DEBUG: 1
-    env_file:
-      - .env
     ports:
       - 5000:5000
     networks:

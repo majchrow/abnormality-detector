@@ -132,7 +132,7 @@ class CallInfoPreprocessor(Preprocessor):
             info.streaming.alias("streaming"),
             info.joinAudioMuteOverride.alias("joinAudioMute"),
             "date",
-        )
+        ).filter(func.col("name").startswith("["))
 
         grouped = selected.groupBy("name", "startDatetime").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),
@@ -262,7 +262,7 @@ class RosterPreprocessor(Preprocessor):
             update_col.state.alias("state"),
             update_col.updateType.alias("updateType"),
             update_col.uri.alias("uri"),
-        )
+        ).filter(func.col("name").startswith("["))
 
         selected.printSchema()
 
@@ -338,11 +338,16 @@ class CallsPreprocessor(Preprocessor):
             "date", "startDatetime", func.explode("message.updates")
         )
 
-        selected = self.df.select("date", "startDatetime", "col.updateType", "col.name")
+        selected = self.df.select(
+            "date", "startDatetime", "col.updateType", "col.name", "col.finished"
+        ).filter(func.col("name").startswith("["))
 
         grouped = selected.groupBy("name", "startDatetime").agg(
             func.sort_array(func.collect_list("date")).alias("date_array"),
             func.collect_list("updateType").alias("updateType_array"),
+            func.reverse(func.collect_list("finished"))
+            .getItem(0)
+            .alias("finished"),
         )
 
         preprocessed = (
@@ -352,9 +357,7 @@ class CallsPreprocessor(Preprocessor):
             .withColumn(
                 "last_update", self.helper.get_last_date_udf(grouped.date_array)
             )
-            .withColumn(
-                "finished", self.helper.get_if_finished_udf(grouped.updateType_array)
-            )
+            .withColumn("finished", func.col("finished").cast(BooleanType()))
             .withColumn("meeting_name", func.col("name"))
             .select("start_datetime", "last_update", "finished", "meeting_name")
             .withColumn(

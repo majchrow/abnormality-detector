@@ -32,7 +32,9 @@ class CassandraDAO:
 
     async def async_exec(self, name, query, args=None):
         def callback(result):
-            future.set_result(list(result))
+            if result is not None:
+                result = list(result)
+            future.set_result(result)
 
         def errback(e):
             logging.error(f'{self.TAG}: "{name}" failed with {e}'),

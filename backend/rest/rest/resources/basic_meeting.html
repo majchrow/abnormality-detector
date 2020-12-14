@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <meta http-equiv="Content-Language" content="pl" >
+    <meta charset="UTF-8" >
+    <title>{{meeting_name}}</title>
+    <link rel="stylesheet" href="mystyle.css" />
+  </head>
+  <body>
+    <h1>{{meeting_name}}</h1>
+    <h2>DATE: {{date}}</h2>
+    {% if finished %}
+        <h2>FINISHED: True</h2>
+    {% else %}
+        <h2>FINISHED: False</h2>
+    {% endif %}
+    <h2>START TIME: {{start_time}}</h2>
+    {% if finished %}
+    <h2>END TIME: {{last_update_time}}</h2>
+    <h2>DURATION: {{duration}}</h2>
+    {% else %}
+    <h2>LAST UPDATE: {{last_update_time}}</h2>
+    <h2>CURRENT DURATION: {{duration}}</h2>
+    {% endif %} {% for plot in plots %}
+    <img src="data:image/png;base64,{{ plot }}" class="center"/>
+    {% endfor %}
+  </body>
+</html>

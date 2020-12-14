@@ -6,6 +6,11 @@ Flask-CORS==3.0.9
 Flask-Cassandra==0.14
 cassandra-driver==3.24.0
 marshmallow==3.9.1
+pyfunctional==1.4.2
+matplotlib==3.3.3
+pdfkit==0.6.1
+pandas==1.1.2
 apscheduler==3.6.3
 python-dateutil==2.8.1
 pydantic==1.7.2
+unidecode==1.1.1

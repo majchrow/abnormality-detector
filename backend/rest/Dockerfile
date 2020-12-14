@@ -6,6 +6,10 @@ COPY requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN apt-get update -qy && \
+    apt-get upgrade -qy && \
+    apt-get install wkhtmltopdf -y
+
 COPY rest rest/
 
 ENV CASSANDRA_HOST=cassandra
