@@ -1,2 +1,2 @@
 #!/bin/bash
-docker-compose -f docker-compose-dev.yml up -d --force-recreate --build preprocessing-calls preprocessing-roster preprocessing-info
+docker-compose -f docker-compose-dev.yml up -d --force-recreate preprocessing-calls preprocessing-roster preprocessing-info

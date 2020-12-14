@@ -6,6 +6,7 @@ import os
 import signal
 from aiokafka import AIOKafkaProducer
 from asyncio import Queue
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
@@ -44,6 +45,8 @@ class ClientManager:
         self.session = aiohttp.ClientSession()
 
         self.calls = {}
+        self.call_starts = {}
+        self.call_counts = defaultdict(int)
         self.dump_queue = Queue()
         self.publish_queue = Queue()
 
@@ -168,6 +171,7 @@ class ClientManager:
             call_name = update["name"]
             call_id = update["call"]
             finished = False
+            start_datetime = None
 
             if update_type == 'add':
                 if not (call := self.calls.get(call_id, None)):
@@ -175,6 +179,11 @@ class ClientManager:
                         manager=self, call_name=call_name, call_id=call_id, start_datetime=current_ts
                     )
                 await call.add(client_endpoint)
+
+                self.call_counts[call_name] += 1
+                if self.call_counts[call_name] == 1:
+                    self.call_starts[call_name] = current_ts
+                start_datetime = self.call_starts[call_name]
             elif update_type == 'remove':
                 if call_id not in self.calls:
                     logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name} {call_id}')
@@ -182,13 +191,21 @@ class ClientManager:
 
                 call = self.calls[call_id]
                 await call.remove(client_endpoint)
+
+                start_datetime = self.call_starts[call_name]
+                self.call_counts[call_name] -= 1
+                if self.call_counts[call_name] == 0:
+                    del self.call_starts[call_name]
+
                 if call.done:
                     del self.calls[call_id]
                     finished = True
             else:
                 call = self.calls[call_id]
+                start_datetime = self.call_starts[call_name]
+
             update['finished'] = finished
-            update['startDatetime'] = call.start_datetime
+            update['startDatetime'] = start_datetime
 
         if call:
             # msg['date'] = current_ts
@@ -213,9 +230,8 @@ class ClientManager:
         await self.publish(msg)
         await self.dump(msg)
 
-    @staticmethod
-    def timestamp(msg, call):
-        msg['startDatetime'] = call.start_datetime
+    def timestamp(self, msg, call):
+        msg['startDatetime'] = self.call_starts[call.call_name]
         # msg['date'] = datetime.now().isoformat()
         
 
