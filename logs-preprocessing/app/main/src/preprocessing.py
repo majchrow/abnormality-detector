@@ -330,16 +330,16 @@ class CallsPreprocessor(Preprocessor):
     @staticmethod
     def do_basic_preprocessing(input_stream, schema):
         return input_stream.withColumn("event", func.from_json("value", schema)).select(
-            "event.date", "event.message", "event.startDatetime"
+            "event.date", "event.message"
         )
 
     def prepare_final_df(self):
         self.df = self.df.select(
-            "date", "startDatetime", func.explode("message.updates")
+            "date", func.explode("message.updates")
         )
 
         selected = self.df.select(
-            "date", "startDatetime", "col.updateType", "col.name", "col.finished"
+            "date", "col.startDatetime", "col.updateType", "col.name", "col.finished"
         ).filter(func.col("name").startswith("["))
 
         grouped = selected.groupBy("name", "startDatetime").agg(
