@@ -42,6 +42,8 @@ class Worker:
                 return filter_anomalies(meeting_name, df)
 
             ci_results, roster_results = map(anomaly_filter, [ci_predictions, roster_predictions])
+            report(f'{len(ci_results) + len(roster_results)} anomalies found')
+
             self.dao.save_anomalies(ci_results, roster_results)
             self.dao.complete_inference_job(meeting_name, end)
 
@@ -51,7 +53,7 @@ class Worker:
 def filter_anomalies(meeting, scores_df):
     anomalies = []
     for ts, p in scores_df.iterrows():
-        if p[1] > 0.5:  # TODO: configurable threshold?
+        if p[1] > 0.90:  # TODO: configurable threshold?
             anomalies.append((meeting, ts))
     return anomalies
 
