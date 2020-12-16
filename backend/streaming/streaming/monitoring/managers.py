@@ -6,7 +6,7 @@ from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from .kafka import KafkaListener
 from .thresholds import STREAM_FINISHED, validate
@@ -60,6 +60,10 @@ class Manager:
 
     async def unschedule_inference(self, meeting_name: str):
         await self.anomaly_manager.unschedule(meeting_name)
+        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
+
+    async def run_inference(self, meeting_name: str, start: Optional[datetime], end: Optional[datetime]):
+        await self.anomaly_manager.fire(meeting_name, start, end)
         logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
 
     ############
@@ -220,6 +224,24 @@ class AnomalyManager(BaseWorkerManager):
     async def unschedule(self, meeting_name):
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, False):
             raise MeetingNotExistsError
+
+    async def fire(self, meeting_name, start, end):
+        if not await self.dao.model_exists(meeting_name):
+            raise ModelNotExistsError
+        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+            raise MeetingNotExistsError
+        if not start:
+            start = await self.dao.earliest_observation(meeting_name)
+        if not end:
+            end = datetime.now()
+        job = {
+            'meeting_name': meeting_name,
+            'start': start,
+            'end': end,
+            'status': 'pending'
+        }
+        await self.dao.add_inference_job(**job)
+        await self.push_inference_job(job)
 
     async def periodic_dispatch(self):
         while True:

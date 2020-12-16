@@ -2,14 +2,15 @@ import json
 from json import JSONDecodeError
 from aiohttp import web
 from aiohttp_sse import sse_response
+from dateutil.parser import ParserError, parse
 from pydantic import ValidationError
 
 from .exceptions import (
-    DBFailureError, ModelNotExistsError, MeetingNotExistsError, MeetingNotExistsError, UnmonitoredError
+    DBFailureError, ModelNotExistsError, MeetingNotExistsError, UnmonitoredError
 )
 
 __all__ = [
-    'schedule_training', 'schedule_inference', 'unschedule_inference',
+    'schedule_training', 'schedule_inference', 'unschedule_inference', 'run_inference',
     'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored',
     'get_call_info_notifications', 'get_monitoring_notifications'
 ]
@@ -67,6 +68,31 @@ async def unschedule_inference(request):
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} is not monitored')
+
+
+async def run_inference(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='no meeting name given')
+    start_date = request.rel_url.query.get('start', None)
+    end_date = request.rel_url.query.get('end', None)
+
+    try:
+        # TODO: timezone!
+        if start_date:
+            start_date = parse(start_date)
+        if end_date:
+            end_date = parse(end_date)
+    except ParserError:
+        return web.HTTPBadRequest(reason=f'invalid date format')
+
+    manager = request.app['monitoring']
+    try:
+        await manager.run_inference(conf_name, start_date, end_date)
+        return web.Response()
+    except MeetingNotExistsError:
+        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
+    except ModelNotExistsError:
+        raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
 
 
 async def schedule_monitoring(request):
