@@ -5,7 +5,7 @@ services:
       context: ./bridge-connector/test
     networks:
       - preprocessing
-    command: python server.py --host 0.0.0.0 --port 8888 --interval_s 0.001 --dumpfile log-4-bridges-1204-1211.json 
+    command: python server.py --host 0.0.0.0 --run-forever --port 8888 --interval_s 0.001 --dumpfile log-4-bridges-1204-1211.json 
 
   bridge-connector:
     build:
@@ -97,7 +97,7 @@ services:
       - preprocessing
 
   kafka:
-    image: wurstmeister/kafka
+    build: ./kafka
     restart: on-failure
     ports:
       - "9092:9092"
@@ -108,11 +108,32 @@ services:
       KAFKA_LISTENERS: LISTENER_DOCKER://0.0.0.0:29092,LISTENER_HOST://kafka:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_OPTS: -javaagent:/usr/app/jmx_prometheus_javaagent.jar=7072:/usr/app/prom-jmx-agent-config.yml
     depends_on:
       - zookeeper
     networks:
       - backend
       - preprocessing
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./kafka/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+#    volumes:
+#      - ./grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - backend
 
   preprocessing-info:
     build:

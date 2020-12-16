@@ -15,6 +15,7 @@ def setup_routes(app: web.Application):
     cors.add(app.router.add_put('/anomaly-detection/train/{conf_name}', schedule_training))
     cors.add(app.router.add_put('/anomaly-detection/{conf_name}', schedule_inference))
     cors.add(app.router.add_delete('/anomaly-detection/{conf_name}', unschedule_inference))
+    cors.add(app.router.add_put('/anomaly-detection/inference/{conf_name}', run_inference))
 
     cors.add(app.router.add_put('/monitoring/{conf_name}', schedule_monitoring))
     cors.add(app.router.add_delete('/monitoring/{conf_name}', cancel_monitoring))

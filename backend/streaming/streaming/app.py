@@ -3,6 +3,7 @@ from aiohttp import web
 
 from .config import Config
 from .db import setup_db
+from .exceptions import error_middleware
 from .monitoring.managers import setup_monitoring
 from .routes import setup_routes
 
@@ -12,7 +13,7 @@ def create_app():
 
     config = Config()
 
-    app = web.Application()
+    app = web.Application(middlewares=[error_middleware])
     setup_routes(app)
     setup_db(app, config)
     setup_monitoring(app, config)
