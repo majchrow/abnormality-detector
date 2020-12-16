@@ -72,6 +72,8 @@ class CallHistory(Resource):
     def get(self, meeting_name):
         start_date = request.args.get("start", None)
         end_date = request.args.get("end", None)
+        min_duration = request.args.get("min_duration", None)
+        max_participants = request.args.get("max_participants", None)
 
         try:
             # TODO: timezone!
@@ -82,7 +84,7 @@ class CallHistory(Resource):
         except ParserError:
             return {"message": "invalid date format"}, 400
 
-        result = dao.get_calls(meeting_name, start_date, end_date)
+        result = dao.get_calls(meeting_name, start_date, end_date, min_duration, max_participants)
         return {"calls": result}
 
 
