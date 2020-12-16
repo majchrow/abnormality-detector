@@ -38,10 +38,11 @@ def seed_calls(meetings, count):
         start_dt = datetime(2020, 12, randint(10, 20), randint(8, 18), randint(0, 5) * 10, 0)
         for _ in range(count):
             duration = timedelta(minutes=randint(2, 30))
-            calls.append((m[0], start_dt, start_dt + duration))
+            calls.append((m[0], start_dt, start_dt + duration, int(duration.total_seconds())))
             start_dt += duration + timedelta(minutes=randint(2, 30))
+            
     stmt = session.prepare(
-        'INSERT INTO calls(meeting_name, start_datetime, last_update, finished) VALUES (?, ?, ?, true);'
+        'INSERT INTO calls(meeting_name, start_datetime, last_update, finished, duration) VALUES (?, ?, ?, true,?);'
     )
     execute_concurrent_with_args(session, stmt, calls)
     print(f'-> inserted calls')
@@ -99,8 +100,8 @@ def seed_call_info_roster(calls, length):
     call_info = []
     roster = []
 
-    for meeting, start, end in calls:
-        duration = (end - start).total_seconds()
+    for meeting, start, end, duration in calls:
+        #duration = (end - start).total_seconds()
         step = int(duration / length)
         cur_dt = start
         for _ in range(length):

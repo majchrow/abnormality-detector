@@ -70,9 +70,14 @@ class CassandraDAO:
 
         return {"current": current, "recent": recent, "created": monitored}
 
-    def get_calls(self, meeting_name, start_date, end_date):
+    def get_calls(self, meeting_name, start_date, end_date, min_duration=None, max_participants=None):
+
+        # if min_duration:
+        #     query =(f"SELECT start_datetime as start, last_update, finished, duration FROM {self.calls_table} "
+        #             f"Where meeting_name = 'police' and duration>200 ALLOW FILTERING ;")
+        # else:
         query = (
-            f"SELECT start_datetime AS start, last_update, finished "
+            f"SELECT start_datetime AS start, last_update, finished, duration "
             f"FROM {self.calls_table} WHERE meeting_name = %s"
         )
         args = [meeting_name]
@@ -83,13 +88,40 @@ class CassandraDAO:
         if end_date:
             query += " AND start_datetime <= %s"
             args.append(end_date)
+        if min_duration:
+            query += " AND duration >= %s"
+            args.append(int(min_duration))
         query += " ALLOW FILTERING;"
 
         result = self.session.execute(query, args).all()
-        return [
-            {"start": c["start"], "end": c["last_update"] if c["finished"] else None}
-            for c in result
-        ]
+        if max_participants and len(result)>0:
+            maxes=[]
+            from flask import current_app
+            current_app.logger.info(result[0]["start"])
+            for r in result:
+                query_pom = (
+                    f"SELECT MAX(max_participants) AS m FROM {self.call_info_table} "
+                    f"WHERE meeting_name = %s AND datetime >= %s AND datetime <= %s ALLOW FILTERING;"
+                )
+                args_pom = [meeting_name, r["start"], r["last_update"]]
+                result_pom = self.session.execute(query_pom, args_pom).all()
+                maxes.append(int(result_pom[0]["m"]))
+            current_app.logger.info("Max participants in each meeting")
+            current_app.logger.info(maxes)
+            current_app.logger.info("min "+str(max_participants))
+            ret=[]
+            for i in range(len(result)):
+                if maxes[i]>=int(max_participants):
+                    ret.append({"start": result[i]["start"], "end": result[i]["last_update"] if result[i]["finished"] else None}) #, "duration": result[i]["duration"]})
+                else:
+                    continue
+
+            return ret
+        else:
+            return [
+                {"start": c["start"], "end": c["last_update"]if c["finished"] else None}
+                for c in result
+            ]
 
     def get_meetings(self):
         result = self.session.execute(

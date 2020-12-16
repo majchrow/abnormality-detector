@@ -75,7 +75,12 @@ class CallHistory(Resource):
     def get(self, meeting_name):
         start_date = request.args.get("start", None)
         end_date = request.args.get("end", None)
-
+        min_duration = request.args.get("min_duration", None)
+        max_participants = request.args.get("max_participants", None)
+        from flask import current_app
+        current_app.logger.info("##############")
+        current_app.logger.info("duration: "+str(min_duration)+" , participants: "+ str(max_participants))
+        current_app.logger.info("##############")
         try:
             # TODO: timezone!
             if start_date:
@@ -85,7 +90,11 @@ class CallHistory(Resource):
         except ParserError:
             return {"message": "invalid date format"}, 400
 
-        result = dao.get_calls(meeting_name, start_date, end_date)
+        if min_duration or max_participants:
+            result = dao.get_calls(meeting_name, start_date, end_date, min_duration, max_participants)
+        else:
+            result = dao.get_calls(meeting_name, start_date, end_date)
+            current_app.logger.info("NO")
         return {"calls": result}
 
 
