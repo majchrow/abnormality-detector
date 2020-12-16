@@ -221,8 +221,7 @@ def parse_args():
                         default=1,
                         help='interval between  sent messages [s]')
     parser.add_argument('--run-forever',
-                        type=bool,
-                        default=False,
+                        action='store_true',
                         help='serve messages in a cycle forever')
     return parser.parse_args()
 
