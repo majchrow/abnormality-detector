@@ -11,7 +11,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError
+from .exceptions import AppException
 
 
 class CassandraDAO:
@@ -38,7 +38,7 @@ class CassandraDAO:
 
         def errback(e):
             logging.error(f'{self.TAG}: "{name}" failed with {e}'),
-            future.set_exception(DBFailureError(f'"{name}" failed with {e}'))
+            future.set_exception(AppException.db_error())
 
         if args:
             promise = self.session.execute_async(query, args)
@@ -95,7 +95,7 @@ class CassandraDAO:
             logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
         else:
             logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
 
     ###################
     # anomaly detection
