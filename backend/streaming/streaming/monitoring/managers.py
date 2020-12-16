@@ -13,7 +13,7 @@ from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import AppException, ModelNotExistsError, UnmonitoredError
+from ..exceptions import AppException
 
 
 class Manager:
@@ -105,7 +105,7 @@ class Manager:
 
     async def monitoring_receiver(self, call_name):
         if not (await self.is_monitored(call_name)):
-            raise UnmonitoredError()
+            raise AppException.not_monitored()
 
         @contextmanager
         def _listen_manager():
@@ -216,7 +216,7 @@ class AnomalyManager(BaseWorkerManager):
 
     async def schedule(self, meeting_name):
         if not await self.dao.model_exists(meeting_name):
-            raise ModelNotExistsError
+            raise AppException.model_not_found()
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
             raise AppException.meeting_not_found()
         await self.dao.add_inference_job(meeting_name, datetime.now(), datetime.now(), 'completed')
@@ -227,7 +227,7 @@ class AnomalyManager(BaseWorkerManager):
 
     async def fire(self, meeting_name, start, end):
         if not await self.dao.model_exists(meeting_name):
-            raise ModelNotExistsError
+            raise AppException.model_not_found()
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
             raise AppException.meeting_not_found()
         if not start:

@@ -5,9 +5,6 @@ from aiohttp_sse import sse_response
 from dateutil.parser import ParserError, parse
 from pydantic import ValidationError
 
-from .exceptions import (
-    DBFailureError, ModelNotExistsError, UnmonitoredError
-)
 
 __all__ = [
     'schedule_training', 'schedule_inference', 'unschedule_inference', 'run_inference',
@@ -19,7 +16,6 @@ __all__ = [
 # TODO:
 #  - TEST CASES, no manual curling!
 #  - reasons for HTTP 400
-#  - MonitoringNotSupportedError for all endpoints?
 async def schedule_training(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='no conference name given')
@@ -45,11 +41,8 @@ async def schedule_inference(request):
         raise web.HTTPBadRequest(reason='no conference name given')
 
     manager = request.app['monitoring']
-    try:
-        await manager.schedule_inference(conf_name)
-        return web.Response()
-    except ModelNotExistsError:
-        raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
+    await manager.schedule_inference(conf_name)
+    return web.Response()
 
 
 async def unschedule_inference(request):
@@ -57,11 +50,8 @@ async def unschedule_inference(request):
         raise web.HTTPBadRequest(reason='No conference name given')
 
     manager = request.app['monitoring']
-    try:
-        await manager.unschedule_inference(conf_name)
-        return web.Response()
-    except UnmonitoredError:
-        raise web.HTTPBadRequest(reason=f'meeting {conf_name} is not monitored')
+    await manager.unschedule_inference(conf_name)
+    return web.Response()
 
 
 async def run_inference(request):
@@ -80,11 +70,8 @@ async def run_inference(request):
         return web.HTTPBadRequest(reason=f'invalid date format')
 
     manager = request.app['monitoring']
-    try:
-        await manager.run_inference(conf_name, start_date, end_date)
-        return web.Response()
-    except ModelNotExistsError:
-        raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
+    await manager.run_inference(conf_name, start_date, end_date)
+    return web.Response()
 
 
 async def schedule_monitoring(request):
@@ -107,8 +94,6 @@ async def schedule_monitoring(request):
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
-    except DBFailureError:
-        return web.HTTPInternalServerError(reason='DB operation failed')
 
 
 async def cancel_monitoring(request):
@@ -116,13 +101,8 @@ async def cancel_monitoring(request):
         raise web.HTTPBadRequest(reason='No conference name given')
 
     manager = request.app['monitoring']
-    try:
-        await manager.unschedule_monitoring(conf_name)
-        return web.Response()
-    except UnmonitoredError:
-        raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
-    except DBFailureError:
-        return web.HTTPInternalServerError(reason='DB operation failed')
+    await manager.unschedule_monitoring(conf_name)
+    return web.Response()
 
 
 async def get_all_monitoring(request):
@@ -144,16 +124,12 @@ async def get_monitoring_notifications(request):
 
     manager = request.app['monitoring']
 
-    try:
-        monitoring_receiver = await manager.monitoring_receiver(conf_name)
-        async with sse_response(request) as resp:
-            with monitoring_receiver() as receiver:
-                async for anomalies in receiver():
-                    await resp.send(json.dumps(anomalies))
-        return resp
-
-    except UnmonitoredError:
-        raise web.HTTPBadRequest(reason=f'{conf_name} not monitored!')
+    monitoring_receiver = await manager.monitoring_receiver(conf_name)
+    async with sse_response(request) as resp:
+        with monitoring_receiver() as receiver:
+            async for anomalies in receiver():
+                await resp.send(json.dumps(anomalies))
+    return resp
 
 
 async def get_call_info_notifications(request: web.Request):

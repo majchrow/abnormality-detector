@@ -12,6 +12,8 @@ async def error_middleware(request, handler):
 
 
 class AppException(Exception):
+    """Inspired by flask-realworld-example-app."""
+
     def __init__(self, message, status_code):
         super().__init__(message)
         self.status_code = status_code
@@ -21,32 +23,14 @@ class AppException(Exception):
     def meeting_not_found(cls):
         return cls('meeting not found', 404)
 
+    @classmethod
+    def model_not_found(cls):
+        return cls('model not found', 404)
 
-class DataMissingError(Exception):
-    """Attempted to train on empty dataset."""
-    pass
+    @classmethod
+    def not_monitored(cls):
+        return cls('meeting is not monitored', 400)
 
-
-class ModelNotExistsError(Exception):
-    """Attempted to access non-existent model."""
-    pass
-
-
-class UnmonitoredError(Exception):
-    """Attempted to access meeting that is not monitored"""
-    pass
-
-
-class MonitoredAlreadyError(Exception):
-    """Attempted to schedule anomaly inference multiple times."""
-    pass
-
-
-class MonitoringNotSupportedError(Exception):
-    """Asked for unsupported monitoring type"""
-    pass
-
-
-class DBFailureError(Exception):
-    """Generic app-level exception for Cassandra read/write failures."""
-    pass
+    @classmethod
+    def db_error(cls):
+        return cls('database operation failed', 500)
