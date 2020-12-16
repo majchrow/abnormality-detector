@@ -101,7 +101,6 @@ def seed_call_info_roster(calls, length):
     roster = []
 
     for meeting, start, end, duration in calls:
-        #duration = (end - start).total_seconds()
         step = int(duration / length)
         cur_dt = start
         for _ in range(length):

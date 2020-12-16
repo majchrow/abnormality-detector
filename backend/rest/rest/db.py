@@ -91,7 +91,7 @@ class CassandraDAO:
         result = self.session.execute(query, args).all()
         if max_participants is None:
             return [
-                {"start": c["start"], "end": c["last_update"]if c["finished"] else None}
+                {"start": c["start"], "end": c["last_update"] if c["finished"] else None}
                 for c in result
             ]
 
