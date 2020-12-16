@@ -110,7 +110,7 @@ export class MeetingSettingComponent implements OnInit {
         checked: false,
         conditions: {
           min: 0,
-          max: 0
+          max: 1
         }
       },
       recording: {
@@ -187,6 +187,7 @@ export class MeetingSettingComponent implements OnInit {
       .afterClosed().subscribe(res => {
         this.meetingsService.putMeeting(new Meeting(
           this.meeting.name,
+          this.meeting.meeting_number,
           this.preparePayload()
         )).subscribe(
           () => {

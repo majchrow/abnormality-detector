@@ -22,7 +22,7 @@ export class NewMeetingDialogComponent implements OnInit {
   }
 
   meetingControl = new FormControl('', Validators.required);
-  meetings: Meeting[];
+  meetings: string[];
   selectedName = '';
 
   ngOnInit(): void {
@@ -30,9 +30,9 @@ export class NewMeetingDialogComponent implements OnInit {
   }
 
   fetchMeetings() {
-    this.meetingsService.fetchMeetings().subscribe(
+    this.meetingsService.fetchPublicMeetings().subscribe(
       next => {
-        this.meetings = next.recent.filter(el => !next.created.some(sub => sub.name === el.name));
+        this.meetings = next.meetings.meetings.map(meeting => meeting.name);
       },
       error => {
         console.log(error);
@@ -59,7 +59,7 @@ export class NewMeetingDialogComponent implements OnInit {
       .afterClosed().subscribe(res => {
         if (res) {
           this.meetingsService.putMeeting(
-            new Meeting(this.selectedName, [])
+            new Meeting(this.selectedName, -1, [])
           ).subscribe(
             result => {
               this.notificationService.success(

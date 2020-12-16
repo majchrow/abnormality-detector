@@ -1,10 +1,10 @@
 import {Injectable} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpHeaders} from '@angular/common/http';
 import {environment} from '../../environments/environment';
 import {Observable} from 'rxjs';
 import {AllMeetings} from '../components/meetings/class/all-meetings';
 import {Meeting} from '../components/meetings/class/meeting';
-import {HistorySpec} from '../components/meetings/meeting-history/class/history';
+import {HistoryMeeting} from '../components/meetings/meeting-history/class/history-meeting';
 
 @Injectable({
   providedIn: 'root'
@@ -19,8 +19,25 @@ export class MeetingsService {
 
 
   putMeeting(meeting: Meeting): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.meetings}`;
-    return this.http.put(url, meeting);
+    const url = `${this.backend.url}/${this.backend.public_meetings}`;
+    return this.http.put(url, {
+      name: meeting.name,
+      criteria: meeting.criteria,
+    });
+  }
+
+  getAllReports(meeting: Meeting): Observable<any> {
+    let headers = new HttpHeaders();
+    headers = headers.set('Accept', 'application/pdf');
+    const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}`;
+    return this.http.get(url, {headers, responseType: 'blob' as 'json'});
+  }
+
+  getReports(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
+    let headers = new HttpHeaders();
+    headers = headers.set('Accept', 'application/pdf');
+    const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}?start_datetime=${historyMeeting.start}`;
+    return this.http.get(url, {headers, responseType: 'blob' as 'json'});
   }
 
   deleteMeeting(meeting: Meeting): Observable<any> {
@@ -33,13 +50,28 @@ export class MeetingsService {
     return this.http.get<Meeting>(url);
   }
 
+  fetchMeetingHistory(name: string): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.meetings}/${name}`;
+    return this.http.get<any>(url);
+  }
+
   fetchMeetings(): Observable<AllMeetings> {
     const url = `${this.backend.url}/${this.backend.meetings}`;
     return this.http.get<AllMeetings>(url);
   }
 
-  fetchAnomalies(meeting: Meeting, count: number): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.anomalies}?name=${meeting.name}&count=${count}`;
+  fetchPublicMeetings(): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.public_meetings}`;
+    return this.http.get<any>(url);
+  }
+
+  fetchAnomalies(meeting: Meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}`;
+    return this.http.get<any>(url);
+  }
+
+  fetchAnomaliesHistory(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start}&?end=${historyMeeting.end}`;
     return this.http.get<any>(url);
   }
 
