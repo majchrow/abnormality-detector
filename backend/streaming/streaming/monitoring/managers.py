@@ -13,7 +13,7 @@ from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import MeetingNotExistsError, ModelNotExistsError, UnmonitoredError
+from ..exceptions import AppException, ModelNotExistsError, UnmonitoredError
 
 
 class Manager:
@@ -205,7 +205,7 @@ class AnomalyManager(BaseWorkerManager):
 
     async def train(self, meeting_name, calls):
         if not await self.dao.meeting_exists(meeting_name):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
         job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
         #  - kill worker on shutdown smh

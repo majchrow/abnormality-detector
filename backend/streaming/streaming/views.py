@@ -6,7 +6,7 @@ from dateutil.parser import ParserError, parse
 from pydantic import ValidationError
 
 from .exceptions import (
-    DBFailureError, ModelNotExistsError, MeetingNotExistsError, UnmonitoredError
+    DBFailureError, ModelNotExistsError, UnmonitoredError
 )
 
 __all__ = [
@@ -38,8 +38,6 @@ async def schedule_training(request):
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
-    except MeetingNotExistsError:
-        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
 
 
 async def schedule_inference(request):
@@ -50,8 +48,6 @@ async def schedule_inference(request):
     try:
         await manager.schedule_inference(conf_name)
         return web.Response()
-    except MeetingNotExistsError:
-        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except ModelNotExistsError:
         raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
 
@@ -64,8 +60,6 @@ async def unschedule_inference(request):
     try:
         await manager.unschedule_inference(conf_name)
         return web.Response()
-    except MeetingNotExistsError:
-        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except UnmonitoredError:
         raise web.HTTPBadRequest(reason=f'meeting {conf_name} is not monitored')
 
@@ -89,8 +83,6 @@ async def run_inference(request):
     try:
         await manager.run_inference(conf_name, start_date, end_date)
         return web.Response()
-    except MeetingNotExistsError:
-        raise web.HTTPBadRequest(reason=f'meeting {conf_name} does not exist')
     except ModelNotExistsError:
         raise web.HTTPBadRequest(reason=f'no model found for {conf_name}')
 
@@ -115,8 +107,6 @@ async def schedule_monitoring(request):
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
-    except MeetingNotExistsError:
-        raise web.HTTPBadRequest(reason=f'room {conf_name} does not exist')
     except DBFailureError:
         return web.HTTPInternalServerError(reason='DB operation failed')
 
