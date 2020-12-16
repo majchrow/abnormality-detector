@@ -166,6 +166,23 @@ class CassandraDAO:
         results = await asyncio.gather(*jobs)
         return [res[0] for res in results if res]
 
+    async def earliest_observation(self, meeting_name):
+        ci_result = await self.async_exec(
+            'earliest_call_info_observation',
+            f'SELECT datetime FROM call_info_update '
+            f'WHERE meeting_name=%s '
+            f'ORDER BY datetime ASC LIMIT 1;',
+            (meeting_name,)
+        )
+        roster_result = await self.async_exec(
+            'earliest_call_info_observation',
+            f'SELECT datetime FROM roster_update '
+            f'WHERE meeting_name=%s '
+            f'ORDER BY datetime ASC LIMIT 1;',
+            (meeting_name,)
+        )
+        return min(roster_result[0]['datetime'], ci_result[0]['datetime'])
+
     async def add_inference_job(self, meeting_name, start, end, status='pending'):
         await self.async_exec(
             'add_inference_job',
