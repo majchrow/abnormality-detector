@@ -264,13 +264,15 @@ class AnomalyManager(BaseWorkerManager):
                         inf['start'], inf['end'] = inf['end'], now
                         jobs.append(inf)
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
-                logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
+                if jobs:
+                    logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
 
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
             # actually schedule them (lock not necessary anymore)
-            await asyncio.gather(*map(self.push_inference_job, jobs))
-            logging.info(f'{self.TAG}: pushed to workers')
+            if jobs:
+                await asyncio.gather(*map(self.push_inference_job, jobs))
+                logging.info(f'{self.TAG}: pushed to workers')
 
     async def push_inference_job(self, job):
         # transform date for json to serialize
