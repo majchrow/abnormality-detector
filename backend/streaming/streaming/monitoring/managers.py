@@ -218,18 +218,18 @@ class AnomalyManager(BaseWorkerManager):
         if not await self.dao.model_exists(meeting_name):
             raise ModelNotExistsError
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
         await self.dao.add_inference_job(meeting_name, datetime.now(), datetime.now(), 'completed')
 
     async def unschedule(self, meeting_name):
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, False):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
 
     async def fire(self, meeting_name, start, end):
         if not await self.dao.model_exists(meeting_name):
             raise ModelNotExistsError
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
         if not start:
             start = await self.dao.earliest_observation(meeting_name)
         if not end:

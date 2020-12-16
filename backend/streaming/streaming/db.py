@@ -11,7 +11,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError
+from .exceptions import AppException, DBFailureError
 
 
 class CassandraDAO:
@@ -95,7 +95,7 @@ class CassandraDAO:
             logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
         else:
             logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
 
     ###################
     # anomaly detection
