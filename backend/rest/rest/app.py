@@ -21,7 +21,7 @@ def create_app():
     config = Config()
     setup_resources(app)
     setup_db(config)
-    setup_bridge_dao(app, config)
+    # setup_bridge_dao(app, config)
     CORS(app)
 
     app.scheduler.start()
