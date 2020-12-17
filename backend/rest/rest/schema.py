@@ -28,7 +28,7 @@ def validate_criteria(data):
 class MeetingSchema(Schema):
     id = fields.Int(dump_only=True)
     meeting_name = fields.Str(required=True, data_key="name")
-    meeting_number = fields.Str(required=True)
+    meeting_number = fields.Str(required=True, dump_only=True)
     criteria = JSONString(required=True, validate=validate_criteria)
 
 
