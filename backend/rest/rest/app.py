@@ -1,12 +1,13 @@
 import atexit
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask
 from flask.json import JSONEncoder
 from flask_cors import CORS
 import os
 import jinja2
+import pytz
 
 from .bridge import setup_bridge_dao
 from .config import Config
@@ -16,7 +17,7 @@ from .resources import setup_resources
 class ISODateJSONEncoder(JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
-            return o.isoformat()
+            return o.replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw')).isoformat()
 
         return super().default(o)
 

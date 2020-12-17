@@ -17,7 +17,7 @@ class KafkaListener:
 
     async def run(self):
         self.consumer = AIOKafkaConsumer(
-            self.call_list_topic, 'monitoring-results-anomalies', bootstrap_servers='kafka:29092',
+            self.call_list_topic, 'monitoring-results-anomalies', 'anomalies-training', bootstrap_servers='kafka:29092',
         )
         await self.consumer.start()
 
@@ -38,6 +38,14 @@ class KafkaListener:
                         logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
                         for queue in self.call_event_listeners:
                             queue.put_nowait(msg)
+                    continue
+
+                if msg.topic == 'anomalies-training' and self.call_event_listeners:
+                    call_name, status = msg_dict['meeting_name'], msg_dict['status']
+                    msg = {'name': call_name, 'event': f'Training job finished with status: {status}'}
+                    logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
+                    for queue in self.call_event_listeners:
+                        queue.put_nowait(msg)
                     continue
 
                 if not (listeners := self.anomaly_listeners.get(msg_dict['meeting'], None)):
