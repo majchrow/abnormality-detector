@@ -1,7 +1,9 @@
 import atexit
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
 from flask import Flask
+from flask.json import JSONEncoder
 from flask_cors import CORS
 import os
 import jinja2
@@ -11,11 +13,18 @@ from .config import Config
 from .db import setup_db
 from .resources import setup_resources
 
+class ISODateJSONEncoder(JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+
+        return super().default(o)
 
 def create_app():
     app = Flask(__name__)
     app.jinja_loader = jinja2.FileSystemLoader('/flask/rest/resources')
     app.config['JSON_AS_ASCII'] = False
+    app.json_encoder = ISODateJSONEncoder
     app.scheduler = BackgroundScheduler()
 
     config = Config()

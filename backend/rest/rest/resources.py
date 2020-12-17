@@ -54,7 +54,7 @@ class MeetingDetails(Resource):
     @cross_origin()
     def get(self, meeting_name):
         if meeting := dao.meeting_details(meeting_name):
-            return meeting
+            return meeting_schema.dump(meeting)
         else:
             return {"message": f"no meeting {meeting_name}"}, 404
 
