@@ -50,8 +50,8 @@ class Manager:
     ###################
     # anomaly detection
     ###################
-    async def schedule_training(self, meeting_name: str, calls: List[str]):
-        await self.anomaly_manager.train(meeting_name, calls)
+    async def schedule_training(self, meeting_name: str, calls: List[str], threshold: float):
+        await self.anomaly_manager.train(meeting_name, calls, threshold)
         logging.info(f'{self.TAG}: scheduled model training for meeting {meeting_name} on calls {calls}')
 
     async def schedule_inference(self, meeting_name: str):
@@ -203,10 +203,10 @@ class AnomalyManager(BaseWorkerManager):
                 logging.exception(f'{self.TAG}: {name} failed with {e}!')
                 await asyncio.sleep(1)
 
-    async def train(self, meeting_name, calls):
+    async def train(self, meeting_name, calls, threshold):
         if not await self.dao.meeting_exists(meeting_name):
             raise AppException.meeting_not_found()
-        job_id = await self.dao.add_training_job(meeting_name, calls)
+        job_id = await self.dao.add_training_job(meeting_name, calls, threshold)
         # TODO:
         #  - kill worker on shutdown smh
 

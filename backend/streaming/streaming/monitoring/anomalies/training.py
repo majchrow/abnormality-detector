@@ -52,7 +52,7 @@ def main(job_id):
     roster_model.train(roster_df)
     report('roster training finished')
 
-    dao.save_models(ci_model, roster_model, job['training_call_starts'])
+    dao.save_models(ci_model, roster_model, job['training_call_starts'], job['threshold'])
     report('models saved')
 
     dao.complete_training_job(job_id)

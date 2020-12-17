@@ -100,14 +100,14 @@ class CassandraDAO:
     ###################
     # anomaly detection
     ###################
-    async def add_training_job(self, meeting_name: str, calls: List[str]):
+    async def add_training_job(self, meeting_name: str, calls: List[str], threshold: float):
         uid = str(uuid4())
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         await self.async_exec(
             'add_training_job',
-            f"INSERT INTO training_jobs (job_id, meeting_name, submission_datetime, training_call_starts, status) "
-            f"VALUES (%s, %s, %s, %s, %s);",
-            (uid, meeting_name, now, calls, 'pending')
+            f"INSERT INTO training_jobs (job_id, meeting_name, submission_datetime, training_call_starts, threshold, status) "
+            f"VALUES (%s, %s, %s, %s, %s, %s);",
+            (uid, meeting_name, now, calls, threshold, 'pending')
         )
         logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
         return uid
