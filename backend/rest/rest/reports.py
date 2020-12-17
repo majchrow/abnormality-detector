@@ -18,10 +18,10 @@ from flask import render_template
 import base64
 import unidecode
 from .exceptions import NotFoundError
-from flask import current_app
 import random
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
+from flask import current_app
 
 sys.path.append(os.getcwd())
 
@@ -45,21 +45,38 @@ class ReportGenerator:
         data["current_participants"] = self.call_info_data_provider.get_data_for_column(
             start_datetime, "current_participants", parameter="participant"
         )
+
         data["streaming"] = self.call_info_data_provider.get_data_for_column(
-            start_datetime, "streaming", parameter="streaming", apply_func=bin_to_zero_one
+            start_datetime,
+            "streaming",
+            parameter="streaming",
+            apply_func=bin_to_zero_one,
         )
         data["recording"] = self.call_info_data_provider.get_data_for_column(
-            start_datetime, "recording", parameter="recording", apply_func=bin_to_zero_one 
+            start_datetime,
+            "recording",
+            parameter="recording",
+            apply_func=bin_to_zero_one,
         )
         data["active_speakers"] = self.roster_data_provider.get_data_for_column(
-            start_datetime, "active_speaker", "active_speakers", parameter="active_speaker"
+            start_datetime,
+            "active_speaker",
+            "active_speakers",
+            parameter="active_speaker",
         )
         data["presenters"] = self.roster_data_provider.get_data_for_column(
             start_datetime, "presenter", "presenters", parameter="presenter"
         )
         data["anomalies"] = self.get_anomalies(start_datetime)
+
+        start = min(data["streaming"].index[0], data["presenters"].index[0])
+        end = max(data["streaming"].index[-1], data["presenters"].index[-1])
+
         plot = self.pg.create_plot(
-            data, f"{self.resources_dir}{self.get_plot_filename(start_datetime)}"
+            data,
+            f"{self.resources_dir}{self.get_plot_filename(start_datetime)}",
+            start,
+            end,
         )
         return plot
 
@@ -70,7 +87,7 @@ class ReportGenerator:
             if type(start_datetime) == pd.Timestamp
             else start_datetime.astype(datetime.datetime)
         )
-        return f"{name}_{meeting_time}.svg"
+        return f"{name}_{meeting_time}.png"
 
     def generate_pdf_report(self):
         self.prepare_all_data()
@@ -206,10 +223,7 @@ class PlotGenerator:
     def get_start_and_end(self, anomalies):
         start_date = anomalies["datetime"][0]
         end_date = anomalies["datetime"][-1]
-        return {
-            "start": start_date,
-            "end": end_date
-        }
+        return {"start": start_date, "end": end_date}
 
     def create_intervals(self, data, column, color):
         inxval = mdates.date2num(
@@ -263,8 +277,11 @@ class PlotGenerator:
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
 
-    def create_plot(self, data, filename):
-        fig = plt.figure(figsize=(20, 15))
+    def plot_line(self, timestamp):
+        plt.axvline(pd.Timestamp(timestamp), c="black", linewidth=1.5, linestyle="--")
+
+    def create_plot(self, data, filename, start, end):
+        fig = plt.figure(figsize=(17, 12))
         gs = gridspec.GridSpec(6, 1, height_ratios=[4, 3, 1, 1, 1, 1])
 
         interval = 5  # TODO: duration (in min) / 20 ???
@@ -276,8 +293,12 @@ class PlotGenerator:
             "royalblue",
             gs,
             interval,
+            start,
+            end,
         )
         lines.append(line0)
+
+        is_last = True if data["anomalies"].empty else False
 
         data_dict = [
             {
@@ -285,42 +306,52 @@ class PlotGenerator:
                 "column": "active_speakers",
                 "color": "mediumseagreen",
                 "is_binary": False,
+                "is_last": False,
             },
             {
                 "data": data["presenters"],
                 "column": "presenters",
                 "color": "gold",
                 "is_binary": False,
+                "is_last": False,
             },
             {
                 "data": data["streaming"],
                 "column": "streaming",
                 "color": "darkorange",
                 "is_binary": True,
+                "is_last": False,
             },
             {
                 "data": data["recording"],
                 "column": "recording",
                 "color": "purple",
                 "is_binary": True,
+                "is_last": is_last,
             },
         ]
 
-        for i, el in enumerate(data_dict):
-            lines.append(
-                self.add_line(
-                    el["data"],
-                    el["column"],
-                    el["color"],
-                    gs,
-                    i + 1,
-                    interval,
-                    ax0,
-                    el["is_binary"],
-                )
-            )
+        axes = []
 
-        lines.append(self.add_anomalies(data["anomalies"], gs, 5, interval, ax0))
+        for i, el in enumerate(data_dict):
+            line, ax = self.add_line(
+                el["data"],
+                el["column"],
+                el["color"],
+                gs,
+                i + 1,
+                interval,
+                ax0,
+                start,
+                end,
+                el["is_binary"],
+                el["is_last"],
+            )
+            lines.append(line)
+            axes.append(ax)
+
+        if not data["anomalies"].empty:
+            self.add_anomalies(data["anomalies"], gs, 5, interval, ax0, start, end)
 
         ax0.legend(
             tuple(lines),
@@ -330,7 +361,6 @@ class PlotGenerator:
                 "number of presenters",
                 "streaming",
                 "recording",
-                "anomalies detected by ML model",
             ),
             loc="upper left",
         )
@@ -340,60 +370,103 @@ class PlotGenerator:
         plt.savefig(filename)
 
         plot = self.image_file_path_to_base64_string(filename)
+
         self.remove_plot(filename)
 
         return plot
 
-    def create_first_line(self, data, column, color, gs, interval):
-        myFmt = mdates.DateFormatter("%H:%M")
+    def create_first_line(
+        self, data, column, color, gs, interval, start_time, end_time
+    ):
+        diff = (data.index[-1] - data.index[0]).total_seconds()
+        if diff > 6 * 60:
+            myFmt = mdates.DateFormatter("%H:%M")
+        else:
+            myFmt = mdates.DateFormatter("%H:%M:%S")
         ax0 = plt.subplot(gs[0])
         lc0 = self.create_intervals(data, column, color)
         line0 = ax0.add_collection(lc0)
-        ax0.xaxis.set_major_locator(mdates.MinuteLocator(interval=interval))
+        # ax0.xaxis.set_major_locator(mdates.MinuteLocator(interval=interval))
         ax0.xaxis.set_major_formatter(myFmt)
         ax0.yaxis.set_major_locator(MaxNLocator(integer=True))
         ax0.xaxis_date()
         ax0.autoscale_view()
         ax0.grid(True)
+        plt.setp(ax0.get_xticklabels(), visible=False)
+
+        start, end = ax0.get_ylim()
+
+        max_value = data[column].max()
+
+        ax0.set_ylim(-0.5, max(1, max_value) + 0.5)
+        ax0.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, 1))
+
+        self.plot_line(start_time)
+        self.plot_line(end_time)
+
         return line0, ax0
 
     def add_line(
-        self, data, column, color, gs, index, interval, ax, is_binary=False, limit=False
+        self,
+        data,
+        column,
+        color,
+        gs,
+        index,
+        interval,
+        ax,
+        start_time,
+        end_time,
+        is_binary=False,
+        is_last=False,
     ):
-        myFmt = mdates.DateFormatter("%H:%M")
+        diff = (data.index[-1] - data.index[0]).total_seconds()
+        if diff > 6 * 60:
+            myFmt = mdates.DateFormatter("%H:%M")
+        else:
+            myFmt = mdates.DateFormatter("%H:%M:%S")
         ax1 = plt.subplot(gs[index], sharex=ax)
         lc1 = self.create_intervals(data, column, color)
         line1 = ax1.add_collection(lc1)
-        ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
-        ax1.xaxis.set_major_formatter(myFmt)
         ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax1.xaxis.set_major_formatter(myFmt)
         ax1.xaxis_date()
         ax1.autoscale_view()
         ax1.grid(True)
 
-        if limit:
-            ax1.set_ylim((-0.2, 1.2))
+        start, end = ax1.get_ylim()
+
+        max_value = data[column].max()
+
+        ax1.set_ylim(-0.2, max(1, max_value) + 0.2)
+        ax1.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, 1))
 
         if is_binary:
             labels = [item.get_text() for item in ax1.get_yticklabels()]
-
-            labels[1] = "OFF"
-            labels[2] = "ON"
-
+            labels[0] = "OFF"
+            labels[1] = "ON"
             ax1.set_yticklabels(labels)
 
-        return line1
+        if not is_last:
+            plt.setp(ax1.get_xticklabels(), visible=False)
 
-    def add_anomalies(self, anomalies, gs, index, interval, ax):
+        self.plot_line(start_time)
+        self.plot_line(end_time)
+
+        return line1, ax1
+
+    def add_anomalies(self, anomalies, gs, index, interval, ax, start_time, end_time):
         ax1 = plt.subplot(gs[index], sharex=ax)
         myFmt = mdates.DateFormatter("%H:%M")
-        ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
+        # ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
         ax1.xaxis.set_major_formatter(myFmt)
         ax1.grid(True)
         line1 = ax1.plot(
             anomalies.index, anomalies["ml_anomaly"], marker="x", c="r", linestyle=""
         )
-        return line1
+        self.plot_line(start_time)
+        self.plot_line(end_time)
+        return line1, ax1
 
 
 class MeetingDataProvider:
