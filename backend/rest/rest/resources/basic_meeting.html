@@ -20,8 +20,7 @@
     {% else %}
     <h2>LAST UPDATE: {{last_update_time}}</h2>
     <h2>CURRENT DURATION: {{duration}}</h2>
-    {% endif %} {% for plot in plots %}
+    {% endif %}
     <img src="data:image/png;base64,{{ plot }}" class="center"/>
-    {% endfor %}
   </body>
 </html>

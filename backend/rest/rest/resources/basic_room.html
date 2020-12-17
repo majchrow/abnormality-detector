@@ -45,9 +45,7 @@
     <div class="pagebreak"></div>
     {% for meeting in meetings[date] %}
     <h4>Meeting {{loop.index0+1}}</h4>
-    {% for plot in plots[date][meeting] %}
-    <img src="data:image/png;base64,{{ plot }}" class="center" />
-    {% endfor %}
+    <img src="data:image/png;base64,{{ plots[date][meeting] }}" class="center" />
     <div class="pagebreak"></div>
     {% endfor %} {% endfor %}
   </body>
