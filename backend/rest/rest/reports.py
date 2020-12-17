@@ -19,7 +19,9 @@ import base64
 import unidecode
 from .exceptions import NotFoundError
 from flask import current_app
+import random
 from matplotlib.ticker import MaxNLocator
+from matplotlib import gridspec
 
 sys.path.append(os.getcwd())
 
@@ -37,44 +39,38 @@ class ReportGenerator:
         self.pg = PlotGenerator()
         self.css = f"{self.resources_dir}mystyle.css"
 
-    def generate_plot_for_current_participants(self, start_datetime):
-        current_participants = self.call_info_data_provider.get_current_participants(
-            start_datetime
+    def generate_plot_for_meeting(self, start_datetime):
+        bin_to_zero_one = lambda x: 1 if x else 0
+        data = dict()
+        data["current_participants"] = self.call_info_data_provider.get_data_for_column(
+            start_datetime, "current_participants", parameter="participant"
         )
-        cp_filename = self.get_plot_filename(start_datetime, "current_participants")
-        plot = self.pg.generate_and_save_scatter_plot(
-            f"{self.resources_dir}{cp_filename}",
-            current_participants,
-            Titles.CURRENT_PARTICIPANTS.value,
-            "blue",
+        data["streaming"] = self.call_info_data_provider.get_data_for_column(
+            start_datetime, "streaming", parameter="streaming", apply_func=bin_to_zero_one
+        )
+        data["recording"] = self.call_info_data_provider.get_data_for_column(
+            start_datetime, "recording", parameter="recording", apply_func=bin_to_zero_one 
+        )
+        data["active_speakers"] = self.roster_data_provider.get_data_for_column(
+            start_datetime, "active_speaker", "active_speakers", parameter="active_speaker"
+        )
+        data["presenters"] = self.roster_data_provider.get_data_for_column(
+            start_datetime, "presenter", "presenters", parameter="presenter"
+        )
+        data["anomalies"] = self.get_anomalies(start_datetime)
+        plot = self.pg.create_plot(
+            data, f"{self.resources_dir}{self.get_plot_filename(start_datetime)}"
         )
         return plot
 
-    def generate_plot_for_active_speakers(self, start_datetime):
-        active_speakers = self.roster_data_provider.get_active_speakers(start_datetime)
-        as_filename = self.get_plot_filename(start_datetime, "active_speakers")
-        plot = self.pg.generate_and_save_scatter_plot(
-            f"{self.resources_dir}{as_filename}",
-            active_speakers,
-            Titles.ACTIVE_SPEAKERS.value,
-            "green",
-        )
-        return plot
-
-    def generate_plots_for_meeting(self, start_datetime):
-        cp_filepath = self.generate_plot_for_current_participants(start_datetime)
-        as_filepath = self.generate_plot_for_active_speakers(start_datetime)
-
-        return [cp_filepath, as_filepath]
-
-    def get_plot_filename(self, start_datetime, category):
+    def get_plot_filename(self, start_datetime):
         name = unidecode.unidecode(self.name.replace(" ", ""))
         meeting_time = (
             int(start_datetime.timestamp())
             if type(start_datetime) == pd.Timestamp
             else start_datetime.astype(datetime.datetime)
         )
-        return f"{name}_{meeting_time}_{category}.svg"
+        return f"{name}_{meeting_time}.svg"
 
     def generate_pdf_report(self):
         self.prepare_all_data()
@@ -82,6 +78,15 @@ class ReportGenerator:
         pdf_file = pdfkit.from_string(pdf_content, False, css=self.css)
 
         return pdf_file
+
+    def get_anomalies(self, start_datetime):
+        info_anomalies = self.call_info_data_provider.get_anomalies(start_datetime)
+        roster_anomalies = self.roster_data_provider.get_anomalies(start_datetime)
+        anomalies = pd.concat([info_anomalies, roster_anomalies]).sort_index()
+        anomalies = anomalies[~anomalies["ml_anomaly"].isna()]
+        if not anomalies.empty:
+            anomalies["ml_anomaly"] = "anomaly"
+        return anomalies
 
     def get_pdf_content(self):
         pass
@@ -129,8 +134,7 @@ class RoomReportGenerator(ReportGenerator):
         for date in meetings.keys():
             all_plots[date] = dict()
             for meeting in meetings[date]:
-                plots = self.generate_plots_for_meeting(meeting)
-                all_plots[date][meeting] = plots
+                all_plots[date][meeting] = self.generate_plot_for_meeting(meeting)
 
         return all_plots
 
@@ -161,7 +165,7 @@ class MeetingReportGenerator(ReportGenerator):
         self.last_update_time = details["last_update_time"]
         self.duration = details["duration"]
         self.finished = details["finished"]
-        self.plots = self.generate_plots_for_meeting(self.start_datetime)
+        self.plots = self.generate_plot_for_meeting(self.start_datetime)
 
 
 class Titles(Enum):
@@ -172,9 +176,20 @@ class Titles(Enum):
 
 
 class PlotGenerator:
+    @dataclass
+    class Point:
+        x: int
+        y: int
+
+    @dataclass
+    class Segment:
+        xa: int
+        xb: int
+        y: int
+
     def generate_and_save_scatter_plot(self, filename, data, title, color):
         ax = data.plot(
-            figsize=(12, 6),
+            figsize=(8, 4),
             grid=True,
             title=title,
             marker=".",
@@ -188,6 +203,57 @@ class PlotGenerator:
         self.remove_plot(filename)
         return plot
 
+    def get_start_and_end(self, anomalies):
+        start_date = anomalies["datetime"][0]
+        end_date = anomalies["datetime"][-1]
+        return {
+            "start": start_date,
+            "end": end_date
+        }
+
+    def create_intervals(self, data, column, color):
+        inxval = mdates.date2num(
+            np.array([t.to_pydatetime() for t in list(data.index)])
+        )
+        inyval = data[column]
+
+        points = []
+        for x, y in zip(inxval, inyval):
+            points.append(self.Point(x, y))
+
+        init = seq(points).init()
+        tail = seq(points).tail()
+
+        lines: List[List[Tuple[int, int]]] = (
+            init.zip(tail)
+            .map(lambda ab: self.make_good_segment(ab[0], ab[1]))
+            .filter_not(lambda x: x is None)
+            .map(self.segment_array)
+            .to_list()
+        )
+
+        point = points[-1]
+        segment = self.segment_array(self.make_good_segment(point, point))
+        lines.append(segment)
+
+        colors = []
+
+        for anomaly in data["anomaly_reason"]:
+            if anomaly:
+                colors.append("red")
+            else:
+                colors.append(color)
+
+        lc = mc.LineCollection(lines, linewidths=2, colors=colors)
+
+        return lc
+
+    def make_good_segment(self, a: Point, b: Point) -> Optional[Segment]:
+        return self.Segment(xa=a.x, xb=b.x, y=a.y)
+
+    def segment_array(self, s: Segment) -> List[Tuple[int, int]]:
+        return [(s.xa, s.y), (s.xb, s.y)]
+
     @staticmethod
     def remove_plot(filepath):
         os.remove(filepath)
@@ -196,6 +262,138 @@ class PlotGenerator:
     def image_file_path_to_base64_string(filepath):
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
+
+    def create_plot(self, data, filename):
+        fig = plt.figure(figsize=(20, 15))
+        gs = gridspec.GridSpec(6, 1, height_ratios=[4, 3, 1, 1, 1, 1])
+
+        interval = 5  # TODO: duration (in min) / 20 ???
+
+        lines = []
+        line0, ax0 = self.create_first_line(
+            data["current_participants"],
+            "current_participants",
+            "royalblue",
+            gs,
+            interval,
+        )
+        lines.append(line0)
+
+        data_dict = [
+            {
+                "data": data["active_speakers"],
+                "column": "active_speakers",
+                "color": "mediumseagreen",
+                "is_binary": False,
+            },
+            {
+                "data": data["presenters"],
+                "column": "presenters",
+                "color": "gold",
+                "is_binary": False,
+            },
+            {
+                "data": data["streaming"],
+                "column": "streaming",
+                "color": "darkorange",
+                "is_binary": True,
+            },
+            {
+                "data": data["recording"],
+                "column": "recording",
+                "color": "purple",
+                "is_binary": True,
+            },
+        ]
+
+        for i, el in enumerate(data_dict):
+            lines.append(
+                self.add_line(
+                    el["data"],
+                    el["column"],
+                    el["color"],
+                    gs,
+                    i + 1,
+                    interval,
+                    ax0,
+                    el["is_binary"],
+                )
+            )
+
+        lines.append(self.add_anomalies(data["anomalies"], gs, 5, interval, ax0))
+
+        ax0.legend(
+            tuple(lines),
+            (
+                "number of participants",
+                "number of active speakers",
+                "number of presenters",
+                "streaming",
+                "recording",
+                "anomalies detected by ML model",
+            ),
+            loc="upper left",
+        )
+
+        plt.subplots_adjust(hspace=0.0)
+
+        plt.savefig(filename)
+
+        plot = self.image_file_path_to_base64_string(filename)
+        self.remove_plot(filename)
+
+        return plot
+
+    def create_first_line(self, data, column, color, gs, interval):
+        myFmt = mdates.DateFormatter("%H:%M")
+        ax0 = plt.subplot(gs[0])
+        lc0 = self.create_intervals(data, column, color)
+        line0 = ax0.add_collection(lc0)
+        ax0.xaxis.set_major_locator(mdates.MinuteLocator(interval=interval))
+        ax0.xaxis.set_major_formatter(myFmt)
+        ax0.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax0.xaxis_date()
+        ax0.autoscale_view()
+        ax0.grid(True)
+        return line0, ax0
+
+    def add_line(
+        self, data, column, color, gs, index, interval, ax, is_binary=False, limit=False
+    ):
+        myFmt = mdates.DateFormatter("%H:%M")
+        ax1 = plt.subplot(gs[index], sharex=ax)
+        lc1 = self.create_intervals(data, column, color)
+        line1 = ax1.add_collection(lc1)
+        ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
+        ax1.xaxis.set_major_formatter(myFmt)
+        ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax1.xaxis_date()
+        ax1.autoscale_view()
+        ax1.grid(True)
+
+        if limit:
+            ax1.set_ylim((-0.2, 1.2))
+
+        if is_binary:
+            labels = [item.get_text() for item in ax1.get_yticklabels()]
+
+            labels[1] = "OFF"
+            labels[2] = "ON"
+
+            ax1.set_yticklabels(labels)
+
+        return line1
+
+    def add_anomalies(self, anomalies, gs, index, interval, ax):
+        ax1 = plt.subplot(gs[index], sharex=ax)
+        myFmt = mdates.DateFormatter("%H:%M")
+        ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
+        ax1.xaxis.set_major_formatter(myFmt)
+        ax1.grid(True)
+        line1 = ax1.plot(
+            anomalies.index, anomalies["ml_anomaly"], marker="x", c="r", linestyle=""
+        )
+        return line1
 
 
 class MeetingDataProvider:
@@ -212,24 +410,28 @@ class CallInfoDataProvider(MeetingDataProvider):
         data = dao.get_call_info_data(name)
         MeetingDataProvider.__init__(self, name, data)
 
-    def get_current_participants(self, start_datetime):
-        cp = pd.DataFrame(
+    def get_data_for_column(
+        self, start_datetime, column, parameter=None, apply_func=None
+    ):
+        filtered = pd.DataFrame(
             self.filter_by_start_datetime(start_datetime)[
-                ["time", "current_participants"]
+                ["datetime", column, "anomaly_reason"]
             ]
         )
-        cp.index = cp["time"]
-        return cp
+        filtered["anomaly_reason"] = filtered["anomaly_reason"].apply(
+            lambda x: x and parameter in x
+        )
+        filtered.index = filtered["datetime"]
+        del filtered["datetime"]
+        return filtered
 
-    def get_streaming_intervals(self, start_datetime):
-        filtered = self.filter_by_start_datetime(start_datetime)
-        filtered["streaming"] = filtered["streaming"].apply(lambda x: 1 if x else 0)
-        return pd.DataFrame(filtered[["datetime", "streaming"]])
-
-    def get_recording_intervals(self, start_datetime):
-        filtered = self.filter_by_start_datetime(start_datetime)
-        filtered["recording"] = filtered["recording"].apply(lambda x: 1 if x else 0)
-        return pd.DataFrame(filtered[["datetime", "recording"]])
+    def get_anomalies(self, start_datetime):
+        filtered = self.filter_by_start_datetime(start_datetime)[
+            ["datetime", "ml_anomaly"]
+        ]
+        filtered.index = filtered["datetime"]
+        del filtered["datetime"]
+        return pd.DataFrame(filtered)
 
 
 class CallsDataProvider(MeetingDataProvider):
@@ -328,10 +530,24 @@ class RosterDataProvider(MeetingDataProvider):
         data = dao.get_roster_data(name)
         MeetingDataProvider.__init__(self, name, data)
 
-    def get_active_speakers(self, start_datetime):
-        asp = pd.DataFrame(
-            self.filter_by_start_datetime(start_datetime)[["time", "active_speaker"]]
+    def get_data_for_column(self, start_datetime, column, rename, parameter):
+        filtered = pd.DataFrame(
+            self.filter_by_start_datetime(start_datetime)[
+                ["datetime", column, "anomaly_reason"]
+            ]
         )
-        asp.index = asp["time"]
-        asp.rename(columns={"active_speaker": "active_speakers"}, inplace=True)
-        return asp
+        filtered.index = filtered["datetime"]
+        filtered.rename(columns={column: rename}, inplace=True)
+        filtered["anomaly_reason"] = filtered["anomaly_reason"].apply(
+            lambda x: x and parameter in x
+        )
+        del filtered["datetime"]
+        return filtered
+
+    def get_anomalies(self, start_datetime):
+        filtered = self.filter_by_start_datetime(start_datetime)[
+            ["datetime", "ml_anomaly"]
+        ]
+        filtered.index = filtered["datetime"]
+        del filtered["datetime"]
+        return pd.DataFrame(filtered)
