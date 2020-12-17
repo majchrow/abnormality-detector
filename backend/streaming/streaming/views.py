@@ -23,14 +23,15 @@ async def schedule_training(request):
     try:
         payload = await request.json()
         calls = payload['calls']
+        threshold = float(payload['threshold'])
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
     except KeyError:
-        raise web.HTTPBadRequest(reason='field "calls" is mandatory')
+        raise web.HTTPBadRequest(reason='fields "calls" and "threshold" are mandatory')
 
     manager = request.app['monitoring']
     try:
-        await manager.schedule_training(conf_name, calls)
+        await manager.schedule_training(conf_name, calls, threshold)
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))

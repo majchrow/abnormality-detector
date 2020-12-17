@@ -1,5 +1,5 @@
 import json
-from marshmallow import fields, Schema, ValidationError
+from marshmallow import fields, INCLUDE, Schema, ValidationError
 from marshmallow.validate import Range
 
 from .criteria import validate
@@ -16,6 +16,10 @@ class JSONString(fields.Field):
             return json.loads(value)
         else:
             return []
+
+class DateTime(fields.DateTime):
+    def _serialize(self, value, attr, obj, **kwargs):
+        return value
 
 
 def validate_criteria(data):
@@ -38,10 +42,15 @@ class MeetingRequestSchema(Schema):
 
 
 class AnomalySchema(Schema):
+    class Meta:
+        unknown = INCLUDE
+    
     id = fields.Int(dump_only=True)
     meeting_name = fields.Str(required=True)
-    datetime = fields.DateTime(required=True)
-    anomaly_reason = JSONString(required=True)
+    datetime = DateTime(required=True)  # don't include - breaks Flask timezone conversion!
+    anomaly_reason = JSONString()
+    ml_anomaly_score = fields.Float()
+    ml_threshold = fields.Float()
 
 
 class AnomalyRequestSchema(Schema):
