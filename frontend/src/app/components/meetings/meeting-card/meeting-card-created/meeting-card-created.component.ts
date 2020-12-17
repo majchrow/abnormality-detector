@@ -15,6 +15,7 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
   @Output() deleteEmitter = new EventEmitter<Meeting>();
   @Output() historyEmitter = new EventEmitter<Meeting>();
   @Output() settingEmitter = new EventEmitter<Meeting>();
+  @Output() modelEmitter = new EventEmitter<Meeting>();
 
   constructor(
     private meetingSSEService: MeetingSSEService,
@@ -73,6 +74,11 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
     }
     this.monitoring = null;
   }
+
+  onModelClick() {
+    this.modelEmitter.emit(this.meeting);
+  }
+
 
   onSettingClick() {
     this.settingEmitter.emit(this.meeting);

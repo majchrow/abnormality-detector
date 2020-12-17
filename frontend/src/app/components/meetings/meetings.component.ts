@@ -27,6 +27,7 @@ export class MeetingsComponent implements OnInit {
   id: string;
   settingMeeting: Meeting;
   historyMeeting: Meeting;
+  modelMeeting: Meeting;
   paginatorSize = 1;
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
@@ -58,6 +59,11 @@ export class MeetingsComponent implements OnInit {
   onHistoryClick(meeting: Meeting) {
     this.historyMeeting = meeting;
     this.selected = 'history';
+  }
+
+  onModelClick(meeting: Meeting) {
+    this.modelMeeting = meeting;
+    this.selected = 'model';
   }
 
   resetMeetings() {

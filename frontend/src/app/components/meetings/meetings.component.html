@@ -12,6 +12,12 @@
         (exitClick)="initAllMeetings()"
       ></app-meeting-setting>
     </ng-container>
+    <ng-container *ngSwitchCase="'model'">
+      <app-meeting-model
+        [meeting]="modelMeeting"
+        (exitClick)="initAllMeetings()"
+      ></app-meeting-model>
+    </ng-container>
     <ng-container *ngSwitchDefault>
       <mat-card>
         <mat-card-header style="justify-content: center">
@@ -51,6 +57,7 @@
               >
                 <app-meeting-card-created
                   [meeting]="meeting"
+                  (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
                   (deleteEmitter)="onDeleteClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
@@ -64,6 +71,7 @@
               >
                 <app-meeting-card-current
                   [meeting]="meeting"
+                  (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
                 >
