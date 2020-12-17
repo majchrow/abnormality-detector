@@ -4,9 +4,9 @@ from cassandra.cluster import Cluster, dict_factory
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import ValueSequence
 
+from .exceptions import MissingDataError
 from .model import Model
 from ...config import Config
-from ...exceptions import DataMissingError
 
 
 class CassandraDAO:
@@ -26,7 +26,7 @@ class CassandraDAO:
 
     def load_calls_data(self, meeting_name, call_starts):
         if not call_starts:
-            raise DataMissingError
+            raise MissingDataError
 
         calls = self.session.execute(
             f'SELECT start_datetime as start, last_update as end '

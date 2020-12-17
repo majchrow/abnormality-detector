@@ -32,6 +32,10 @@
   width: 98%;
 }
 
+.search-engine {
+  padding-left: 100px;
+}
+
 #meeting {
   width: 500px;
   height: 500px;
@@ -42,8 +46,9 @@
   justify-content: center;
   align-items: center;
   flex-direction: column;
+  opacity: 100%;
   background-color: darkcyan;
-  opacity: 60%;
-  width: 450px;
-  height: 150px;
+  width: 447px;
+  font-size: 13px;
+  height: 140px;
 }

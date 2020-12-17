@@ -11,7 +11,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from .config import Config
-from .exceptions import DBFailureError, MeetingNotExistsError
+from .exceptions import AppException
 
 
 class CassandraDAO:
@@ -38,7 +38,7 @@ class CassandraDAO:
 
         def errback(e):
             logging.error(f'{self.TAG}: "{name}" failed with {e}'),
-            future.set_exception(DBFailureError(f'"{name}" failed with {e}'))
+            future.set_exception(AppException.db_error())
 
         if args:
             promise = self.session.execute_async(query, args)
@@ -95,7 +95,7 @@ class CassandraDAO:
             logging.info(f'{self.TAG}: set monitoring status for call {call_name} to {monitored}')
         else:
             logging.info(f'"set monitoring status" ignored - {call_name} does not exist')
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
 
     ###################
     # anomaly detection
@@ -165,6 +165,23 @@ class CassandraDAO:
         ) for meeting in monitored_meetings]
         results = await asyncio.gather(*jobs)
         return [res[0] for res in results if res]
+
+    async def earliest_observation(self, meeting_name):
+        ci_result = await self.async_exec(
+            'earliest_call_info_observation',
+            f'SELECT datetime FROM call_info_update '
+            f'WHERE meeting_name=%s '
+            f'ORDER BY datetime ASC LIMIT 1;',
+            (meeting_name,)
+        )
+        roster_result = await self.async_exec(
+            'earliest_call_info_observation',
+            f'SELECT datetime FROM roster_update '
+            f'WHERE meeting_name=%s '
+            f'ORDER BY datetime ASC LIMIT 1;',
+            (meeting_name,)
+        )
+        return min(roster_result[0]['datetime'], ci_result[0]['datetime'])
 
     async def add_inference_job(self, meeting_name, start, end, status='pending'):
         await self.async_exec(

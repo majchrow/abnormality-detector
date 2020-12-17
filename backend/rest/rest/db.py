@@ -70,9 +70,9 @@ class CassandraDAO:
 
         return {"current": current, "recent": recent, "created": monitored}
 
-    def get_calls(self, meeting_name, start_date, end_date):
+    def get_calls(self, meeting_name, start_date, end_date, min_duration=None, max_participants=None):
         query = (
-            f"SELECT start_datetime AS start, last_update, finished "
+            f"SELECT start_datetime AS start, last_update, finished, duration "
             f"FROM {self.calls_table} WHERE meeting_name = %s"
         )
         args = [meeting_name]
@@ -83,12 +83,31 @@ class CassandraDAO:
         if end_date:
             query += " AND start_datetime <= %s"
             args.append(end_date)
+        if min_duration:
+            query += " AND duration >= %s"
+            args.append(int(min_duration))
         query += " ALLOW FILTERING;"
 
         result = self.session.execute(query, args).all()
+        if max_participants is None:
+            return [
+                {"start": c["start"], "end": c["last_update"] if c["finished"] else None}
+                for c in result
+            ]
+
+        maxes = []
+        query_aux = self.session.prepare(
+            f"SELECT MAX(max_participants) AS m FROM {self.call_info_table} "
+            f"WHERE meeting_name = %s AND datetime >= %s AND datetime <= %s ALLOW FILTERING;"
+        )
+        args_aux = [(meeting_name, r["start"], r["last_update"]) for r in result]
+        maxes = execute_concurrent_with_args(self.session, query_aux, args_aux)
+        maxes = [int(r[0]["m"]) for r in maxes]
+        
         return [
-            {"start": c["start"], "end": c["last_update"] if c["finished"] else None}
-            for c in result
+            {"start": res["start"], "end": res["last_update"] if res["finished"] else None}
+            for res, m in zip(result, maxes) 
+            if m >= int(max_participants)
         ]
 
     def get_meetings(self):

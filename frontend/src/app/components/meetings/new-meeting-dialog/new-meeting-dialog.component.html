@@ -17,8 +17,8 @@
         <mat-card-content class="entire">
           <mat-form-field>
             <mat-select [(ngModel)]="selectedName" required>
-              <mat-option *ngFor="let meeting of meetings" [value]="meeting.name">
-                {{meeting.name}}
+              <mat-option *ngFor="let meeting of meetings" [value]="meeting">
+                {{meeting}}
               </mat-option>
             </mat-select>
             <mat-error *ngIf="meetingControl.hasError('required')">Please choose an meeting</mat-error>

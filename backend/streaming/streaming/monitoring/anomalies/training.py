@@ -1,10 +1,10 @@
 import sys
 
 from .db import build_dao
+from .exceptions import MissingDataError
 from .model import Model
 from ..workers import report
 from ...config import Config
-from ...exceptions import DataMissingError
 
 
 # TODO:
@@ -20,7 +20,7 @@ def main(job_id):
     try:
         ci_df, roster_df = dao.load_calls_data(job['meeting_name'], job['training_call_starts'])
         report(f'loaded training data for {job_id}: call-info {ci_df.shape}, roster {roster_df.shape}')
-    except DataMissingError:
+    except MissingDataError:
         dao.complete_training_job(job_id, 'invalid - no data')
         report('job invalid - no data')
         report('all done')

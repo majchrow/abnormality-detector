@@ -10,6 +10,7 @@ import {Observable} from 'rxjs';
 export class MeetingCardCurrentComponent implements OnInit {
 
   @Input() meeting: Meeting;
+  @Output() modelEmitter = new EventEmitter<Meeting>();
   @Output() historyEmitter = new EventEmitter<Meeting>();
   @Output() settingEmitter = new EventEmitter<Meeting>();
 
@@ -22,6 +23,9 @@ export class MeetingCardCurrentComponent implements OnInit {
   ngOnInit(): void {
   }
 
+  onModelClick() {
+    this.modelEmitter.emit(this.meeting);
+  }
 
   onSettingClick() {
     this.settingEmitter.emit(this.meeting);

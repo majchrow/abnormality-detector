@@ -3,7 +3,7 @@ table {
 }
 
 .history-body {
-  width: 800px;
+  width: 1200px;
 }
 
 #green {
@@ -11,9 +11,30 @@ table {
 }
 
 .history-card {
-  width: 70%;
+  width: 100%;
 }
 
 .subanomaly {
-  background-color: gold
+}
+
+.report {
+  position: relative;
+  right: 40px;
+  bottom: 50px;
+}
+
+//.subanomaly table {
+//  border: 0;
+//}
+
+td.mat-cell{
+  border-bottom-style: none;
+}
+
+:not(.subanomaly) > td{
+  border-top: 2px solid #878787;
+}
+
+.second {
+  padding-left: 30px;
 }

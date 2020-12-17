@@ -8,9 +8,9 @@ import {SettingsComponent} from './components/settings/settings.component';
 
 const routes: Routes = [
   {path: 'home', component: HomeComponent},
-  {path: 'logs', component: LogsComponent},
+  // {path: 'logs', component: LogsComponent},
   {path: 'meetings', component: MeetingsComponent},
-  {path: 'settings', component: SettingsComponent},
+  // {path: 'settings', component: SettingsComponent},
   {path: '', redirectTo: '/home', pathMatch: 'full'},
   {path: '**', redirectTo: '/home'},
 ];

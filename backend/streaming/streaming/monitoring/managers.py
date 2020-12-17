@@ -6,14 +6,14 @@ from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from .kafka import KafkaListener
 from .thresholds import STREAM_FINISHED, validate
 from .subprocess import BaseWorkerManager, run_for_result
 from ..db import CassandraDAO
 from ..config import Config
-from ..exceptions import MeetingNotExistsError, ModelNotExistsError, UnmonitoredError
+from ..exceptions import AppException
 
 
 class Manager:
@@ -62,6 +62,10 @@ class Manager:
         await self.anomaly_manager.unschedule(meeting_name)
         logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
 
+    async def run_inference(self, meeting_name: str, start: Optional[datetime], end: Optional[datetime]):
+        await self.anomaly_manager.fire(meeting_name, start, end)
+        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
+
     ############
     # monitoring
     ############
@@ -101,7 +105,7 @@ class Manager:
 
     async def monitoring_receiver(self, call_name):
         if not (await self.is_monitored(call_name)):
-            raise UnmonitoredError()
+            raise AppException.not_monitored()
 
         @contextmanager
         def _listen_manager():
@@ -201,7 +205,7 @@ class AnomalyManager(BaseWorkerManager):
 
     async def train(self, meeting_name, calls):
         if not await self.dao.meeting_exists(meeting_name):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
         job_id = await self.dao.add_training_job(meeting_name, calls)
         # TODO:
         #  - kill worker on shutdown smh
@@ -212,14 +216,32 @@ class AnomalyManager(BaseWorkerManager):
 
     async def schedule(self, meeting_name):
         if not await self.dao.model_exists(meeting_name):
-            raise ModelNotExistsError
+            raise AppException.model_not_found()
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
         await self.dao.add_inference_job(meeting_name, datetime.now(), datetime.now(), 'completed')
 
     async def unschedule(self, meeting_name):
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, False):
-            raise MeetingNotExistsError
+            raise AppException.meeting_not_found()
+
+    async def fire(self, meeting_name, start, end):
+        if not await self.dao.model_exists(meeting_name):
+            raise AppException.model_not_found()
+        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+            raise AppException.meeting_not_found()
+        if not start:
+            start = await self.dao.earliest_observation(meeting_name)
+        if not end:
+            end = datetime.now()
+        job = {
+            'meeting_name': meeting_name,
+            'start': start,
+            'end': end,
+            'status': 'pending'
+        }
+        await self.dao.add_inference_job(**job)
+        await self.push_inference_job(job)
 
     async def periodic_dispatch(self):
         while True:
@@ -242,13 +264,15 @@ class AnomalyManager(BaseWorkerManager):
                         inf['start'], inf['end'] = inf['end'], now
                         jobs.append(inf)
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
-                logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
+                if jobs:
+                    logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
 
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
             # actually schedule them (lock not necessary anymore)
-            await asyncio.gather(*map(self.push_inference_job, jobs))
-            logging.info(f'{self.TAG}: pushed to workers')
+            if jobs:
+                await asyncio.gather(*map(self.push_inference_job, jobs))
+                logging.info(f'{self.TAG}: pushed to workers')
 
     async def push_inference_job(self, job):
         # transform date for json to serialize

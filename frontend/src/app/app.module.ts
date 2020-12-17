@@ -48,6 +48,9 @@ import {MeetingHistoryComponent} from './components/meetings/meeting-history/mee
 import {MatTableModule} from '@angular/material/table';
 import {NotificationDialogComponent} from './components/shared/notification/notification-dialog/notification-dialog.component';
 import {MatBadgeModule} from '@angular/material/badge';
+import {MeetingModelComponent} from './components/meetings/meeting-model/meeting-model.component';
+import {MatDatepickerModule} from '@angular/material/datepicker';
+import {SatDatepickerModule, SatNativeDateModule} from 'saturn-datepicker';
 
 @NgModule({
   declarations: [
@@ -73,7 +76,8 @@ import {MatBadgeModule} from '@angular/material/badge';
     NewMeetingDialogComponent,
     SelectMeetingTypeComponent,
     MeetingHistoryComponent,
-    NotificationDialogComponent
+    NotificationDialogComponent,
+    MeetingModelComponent
   ],
   imports: [
     BrowserModule,
@@ -101,7 +105,10 @@ import {MatBadgeModule} from '@angular/material/badge';
     MatSliderModule,
     MatTableModule,
     MatBadgeModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    MatDatepickerModule,
+    SatNativeDateModule,
+    SatDatepickerModule
   ],
   providers: [],
   bootstrap: [AppComponent]

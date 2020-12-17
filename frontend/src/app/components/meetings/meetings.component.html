@@ -12,14 +12,20 @@
         (exitClick)="initAllMeetings()"
       ></app-meeting-setting>
     </ng-container>
+    <ng-container *ngSwitchCase="'model'">
+      <app-meeting-model
+        [meeting]="modelMeeting"
+        (exitClick)="initAllMeetings()"
+      ></app-meeting-model>
+    </ng-container>
     <ng-container *ngSwitchDefault>
       <mat-card>
         <mat-card-header style="justify-content: center">
           <mat-card-title>
-            <h2>Meetings</h2>
+            <h2>Rooms</h2>
           </mat-card-title>
         </mat-card-header>
-        <ng-container *ngIf="selectedMeetings; then spinnerOff; else spinner">
+        <ng-container *ngIf="viewMeetings; then spinnerOff; else spinner">
         </ng-container>
         <ng-template #spinnerOff>
           <app-meeting-type-select
@@ -27,6 +33,18 @@
             [selected]="meetingType"
           >
           </app-meeting-type-select>
+          <span class="search-engine">
+            <mat-form-field>
+              <mat-label>Filter by name</mat-label>
+              <input matInput [ngModel]="val" (ngModelChange)="filterNames($event)">
+            </mat-form-field>
+          </span>
+          <span class="search-engine">
+            <mat-form-field>
+              <mat-label>Filter by id</mat-label>
+              <input matInput [ngModel]="id" (ngModelChange)="filterIds($event)">
+            </mat-form-field>
+          </span>
           <mat-card-content>
             <div
               fxLayout="row wrap"
@@ -34,11 +52,12 @@
               class="card-deck-container mat-elevation-z3"
             >
               <div
-                *ngFor="let meeting of selectedMeetings.created"
+                *ngFor="let meeting of viewMeetings.created"
                 class="card-item"
               >
                 <app-meeting-card-created
                   [meeting]="meeting"
+                  (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
                   (deleteEmitter)="onDeleteClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
@@ -47,11 +66,12 @@
               </div>
 
               <div
-                *ngFor="let meeting of selectedMeetings.current"
+                *ngFor="let meeting of viewMeetings.current"
                 class="card-item"
               >
                 <app-meeting-card-current
                   [meeting]="meeting"
+                  (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
                 >
@@ -59,7 +79,7 @@
               </div>
 
               <div
-                *ngFor="let meeting of selectedMeetings.recent"
+                *ngFor="let meeting of viewMeetings.recent"
                 class="card-item"
               >
                 <app-meeting-card-recent
