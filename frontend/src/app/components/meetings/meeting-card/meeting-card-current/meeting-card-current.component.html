@@ -1,9 +1,11 @@
 <mat-card>
   <mat-card-header style="justify-content: left">
     <mat-card-title>
-
       <div>
         Name: {{ meeting.name }}
+      </div>
+      <div>
+        Id: {{ meeting.meeting_number }}
       </div>
     </mat-card-title>
   </mat-card-header>
@@ -19,6 +21,7 @@
 
 <!--    </mat-slide-toggle>-->
     <span class="app-spacer"></span>
+    <i class="app-icon fa fa-lightbulb-o" (click)="onModelClick()"></i>
     <i class="app-icon fa fa-cog" (click)="onSettingClick()"></i>
     <i class="app-icon fa fa-history" (click)="onHistoryClick()"></i>
   </mat-card-actions>

@@ -4,7 +4,6 @@ import {MatDialog} from '@angular/material/dialog';
 import {ConfirmationDialogService} from '../../services/confirmation-dialog.service';
 import {NotificationService} from '../../services/notification.service';
 import {MeetingsService} from '../../services/meetings.service';
-import {MeetingSSEService} from '../../services/meeting-sse.service';
 import {AllMeetings} from './class/all-meetings';
 import {NewMeetingDialogComponent} from './new-meeting-dialog/new-meeting-dialog.component';
 
@@ -24,13 +23,17 @@ export class MeetingsComponent implements OnInit {
   }
 
   selected: string;
+  val: string;
+  id: string;
   settingMeeting: Meeting;
   historyMeeting: Meeting;
+  modelMeeting: Meeting;
   paginatorSize = 1;
   numberOfProductsDisplayedInPage = 24;
   pageSizeOptions = [12, 24];
   allMeetings: AllMeetings;
   selectedMeetings: AllMeetings;
+  viewMeetings: AllMeetings;
   meetingType = 'current';
 
 
@@ -40,21 +43,12 @@ export class MeetingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.initAllMeetings();
-    this.subscribeRest();
   }
 
   initAllMeetings() {
+    this.resetMeetings();
     this.selected = 'None';
-    this.initHistoryMeeting();
-    this.initSettingMeeting();
-  }
-
-  initSettingMeeting() {
-    this.settingMeeting = null;
-  }
-
-  initHistoryMeeting() {
-    this.historyMeeting = null;
+    this.subscribeRest();
   }
 
   onSettingClick(meeting: Meeting) {
@@ -67,9 +61,15 @@ export class MeetingsComponent implements OnInit {
     this.selected = 'history';
   }
 
+  onModelClick(meeting: Meeting) {
+    this.modelMeeting = meeting;
+    this.selected = 'model';
+  }
+
   resetMeetings() {
     this.allMeetings = null;
     this.selectedMeetings = null;
+    this.viewMeetings = null;
   }
 
 
@@ -81,11 +81,22 @@ export class MeetingsComponent implements OnInit {
       },
       error => {
         this.notificationService.warn(error.message);
-        this.allMeetings = new AllMeetings(
-          [new Meeting('x', [])], [new Meeting('x', [])], [new Meeting('x', [])]
-        );
       }
     );
+  }
+
+  filterNames(prefix: string) {
+    this.viewMeetings = new AllMeetings([...this.selectedMeetings.current], [...this.selectedMeetings.recent], [...this.selectedMeetings.created]);
+    this.viewMeetings.current = this.selectedMeetings.current.filter(meeting => meeting.name.toLowerCase().includes(prefix.toLowerCase()));
+    this.viewMeetings.recent = this.selectedMeetings.recent.filter(meeting => meeting.name.toLowerCase().includes(prefix.toLowerCase()));
+    this.viewMeetings.created = this.selectedMeetings.created.filter(meeting => meeting.name.toLowerCase().includes(prefix.toLowerCase()));
+  }
+
+  filterIds(prefix: string) {
+    this.viewMeetings = new AllMeetings([...this.selectedMeetings.current], [...this.selectedMeetings.recent], [...this.selectedMeetings.created]);
+    this.viewMeetings.current = this.selectedMeetings.current.filter(meeting => meeting.meeting_number.toString().startsWith(prefix));
+    this.viewMeetings.recent = this.selectedMeetings.recent.filter(meeting => meeting.meeting_number.toString().startsWith(prefix));
+    this.viewMeetings.created = this.selectedMeetings.created.filter(meeting => meeting.meeting_number.toString().startsWith(prefix));
   }
 
   changeMeetingType(selected: string) {
@@ -112,6 +123,8 @@ export class MeetingsComponent implements OnInit {
         this.selectedMeetings = new AllMeetings([...this.allMeetings.current], [...this.allMeetings.recent], [...this.allMeetings.created]);
       }
     }
+    this.filterNames('');
+    this.filterIds('');
   }
 
   onDeleteClick(meeting: Meeting) {
