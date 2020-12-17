@@ -1,5 +1,6 @@
 @import '~@angular/material/theming';
 @import url("https://fonts.googleapis.com/icon?family=Material+Icons");
+@import '~saturn-datepicker/theming';
 
 @include mat-core();
 
@@ -25,6 +26,7 @@ $app-theme: mat-dark-theme($app-primary, $app-accent, $app-warn);
 
 @include angular-material-theme($app-theme);
 @include mix-app-theme($app-theme);
+@include sat-datepicker-theme($app-theme);
 
 body {
   font-family: Roboto, Arial, sans-serif;

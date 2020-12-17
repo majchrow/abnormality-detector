@@ -50,7 +50,7 @@ import {NotificationDialogComponent} from './components/shared/notification/noti
 import {MatBadgeModule} from '@angular/material/badge';
 import {MeetingModelComponent} from './components/meetings/meeting-model/meeting-model.component';
 import {MatDatepickerModule} from '@angular/material/datepicker';
-import {MatNativeDateModule} from '@angular/material/core';
+import {SatDatepickerModule, SatNativeDateModule} from 'saturn-datepicker';
 
 @NgModule({
   declarations: [
@@ -107,7 +107,8 @@ import {MatNativeDateModule} from '@angular/material/core';
     MatBadgeModule,
     ReactiveFormsModule,
     MatDatepickerModule,
-    MatNativeDateModule
+    SatNativeDateModule,
+    SatDatepickerModule
   ],
   providers: [],
   bootstrap: [AppComponent]
