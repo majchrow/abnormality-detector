@@ -15,8 +15,8 @@ CREATE TABLE roster_update(
     week_day_number int,
     anomaly boolean,
     anomaly_reason text,
-    ml_anomaly boolean,
     ml_anomaly_reason text,
+    threshold double,
     start_datetime timestamp,
     PRIMARY KEY (meeting_name, datetime)
 ); 
@@ -50,8 +50,8 @@ CREATE TABLE call_info_update(
     week_day_number int,
     anomaly boolean,
     anomaly_reason text, 
-    ml_anomaly boolean,
     ml_anomaly_reason text,
+    threshold double,
     start_datetime timestamp,
     PRIMARY KEY (meeting_name, datetime)
 );
@@ -61,7 +61,7 @@ CREATE TABLE meetings(
     meeting_number text,
     criteria text,
     monitored boolean,
-    anomaly_monitored boolean
+    ml_monitored boolean
 );
 
 CREATE TABLE training_jobs(
@@ -75,6 +75,7 @@ CREATE TABLE training_jobs(
 CREATE TABLE models(
     meeting_name text PRIMARY KEY,
     training_call_starts list<timestamp>,
+    threshold double,
     call_info_model blob,
     roster_model blob
 );
