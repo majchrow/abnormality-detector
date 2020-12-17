@@ -5,6 +5,7 @@ from cassandra.query import dict_factory
 from cassandra.auth import PlainTextAuthProvider
 import datetime
 from .exceptions import NotFoundError
+from flask import current_app
 from itertools import chain
 
 from .config import Config
@@ -98,11 +99,15 @@ class CassandraDAO:
         maxes = []
         query_aux = self.session.prepare(
             f"SELECT MAX(max_participants) AS m FROM {self.call_info_table} "
-            f"WHERE meeting_name = %s AND datetime >= %s AND datetime <= %s ALLOW FILTERING;"
+            f"WHERE meeting_name = ? AND datetime >= ? AND datetime <= ? ALLOW FILTERING;"
         )
         args_aux = [(meeting_name, r["start"], r["last_update"]) for r in result]
-        maxes = execute_concurrent_with_args(self.session, query_aux, args_aux)
-        maxes = [int(r[0]["m"]) for r in maxes]
+        aux_results = execute_concurrent_with_args(self.session, query_aux, args_aux)
+        maxes = []
+        for success, res in aux_results:
+            res = list(res)
+            if success and res:
+                maxes.append(int(res[0]["m"]))
         
         return [
             {"start": res["start"], "end": res["last_update"] if res["finished"] else None}
@@ -137,7 +142,7 @@ class CassandraDAO:
     def clear_meeting(self, name):
         self.session.execute(
             f"UPDATE {self.meetings_table} "
-            f"SET monitored=false, criteria='[]' "
+            f"SET monitored=false, criteria='' "
             f"WHERE meeting_name=%s IF EXISTS;",
             (name,),
         )
