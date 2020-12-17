@@ -22,8 +22,9 @@ async def run(setup, teardown, config):
 
 
 def handle_exception(loop, context):
+    msg = ''
     if e := context.get('exception', None):
-        msg = ''.join(traceback.format_tb(e.__traceback__))
+        msg += ''.join(traceback.format_tb(e.__traceback__))
     msg += context["message"]
 
     report('--- ERROR ---')
