@@ -162,9 +162,9 @@ class CassandraDAO:
     def get_anomalies(self, name, start_date, end_date):
         calls_query = (f"SELECT meeting_name, last_update as datetime, anomaly_reason FROM {self.calls_table} "
                        f"WHERE meeting_name=%s AND anomaly=true ")
-        ci_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.call_info_table} "
+        ci_query = (f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.call_info_table} "
                     f"WHERE meeting_name=%s AND anomaly=true ")
-        roster_query = (f"SELECT meeting_name, datetime, anomaly_reason FROM {self.roster_table} "
+        roster_query = (f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.roster_table} "
                         f"WHERE meeting_name=%s AND anomaly=true ")
         args = [name]
 
@@ -184,6 +184,16 @@ class CassandraDAO:
         queries = append([calls_query, *queries], ' ALLOW FILTERING;')
 
         results = list(chain(*map(lambda q: self.session.execute(q, args).all(), queries)))
+        for res in results:
+            ml_score = res.get('ml_anomaly_score', None)
+            ml_threshold = res.get('ml_threshold', None)
+
+            if ml_score is not None:
+                ml_score = float(ml_score)
+                ml_threshold = float(ml_threshold)
+            res['ml_anomaly_score'] = ml_score
+            res['ml_threshold'] = ml_threshold
+
         return {'anomalies': sorted(results, key=lambda r: r['datetime'])}
     
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
