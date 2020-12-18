@@ -36,6 +36,9 @@ class CassandraDAO:
         ).all()
 
         calls_dfs = [self.load_data(meeting_name, call['start'], call['end']) for call in calls]
+        if not calls_dfs:
+            raise MissingDataError
+
         ci_dfs, roster_dfs = zip(*calls_dfs)
         return pd.concat(ci_dfs), pd.concat(roster_dfs)
 
