@@ -1,9 +1,10 @@
 from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
-from flask import request
+from flask import current_app, request
 from marshmallow import ValidationError
 import pandas as pd
+import pytz
 
 from .db import dao
 from .bridge import dao as bridge_dao
@@ -54,7 +55,7 @@ class MeetingDetails(Resource):
     @cross_origin()
     def get(self, meeting_name):
         if meeting := dao.meeting_details(meeting_name):
-            return meeting
+            return meeting_schema.dump(meeting)
         else:
             return {"message": f"no meeting {meeting_name}"}, 404
 
@@ -84,7 +85,9 @@ class CallHistory(Resource):
         except ParserError:
             return {"message": "invalid date format"}, 400
 
-        result = dao.get_calls(meeting_name, start_date, end_date, min_duration, max_participants)
+        result = dao.get_calls(
+            meeting_name, start_date, end_date, min_duration, max_participants
+        )
         return {"calls": result}
 
 
@@ -116,7 +119,7 @@ class Report(Resource):
 
         try:
             start_datetime = (
-                pd.Timestamp(request.args["start_datetime"])
+                pd.Timestamp(request.args["start_datetime"]).tz_convert(pytz.timezone("Europe/Warsaw"))
                 if "start_datetime" in request.args
                 else None
             )
@@ -145,6 +148,13 @@ class Report(Resource):
         )
 
 
+class Models(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        result = dao.get_last_training(meeting_name)
+        return {'last': result}
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Report, "/reports/<string:meeting_name>")
@@ -153,3 +163,5 @@ def setup_resources(app):
     api.add_resource(Calls, "/calls")
     api.add_resource(CallHistory, "/calls/<string:meeting_name>")
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
+    api.add_resource(Models, "/models/<string:meeting_name>")
+

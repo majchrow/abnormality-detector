@@ -22,9 +22,9 @@ class MsgType(Enum):
 
 class Anomaly(BaseModel):
     parameter: str
-    value: Union[bool, float, str]
+    value: Union[float, bool, str]
     condition_type: str
-    condition_value: Union[bool, float, str, List]
+    condition_value: Union[float, bool, str, List]
 
 
 class Criterion(ABC):
@@ -240,7 +240,7 @@ class DaysCriterion(StrictModel, Criterion):
         else:
             return Anomaly(
                 parameter='day',
-                value=week_day,
+                value=float(week_day),
                 condition_type='in',
                 condition_value=[c.day for c in self.conditions]
             )

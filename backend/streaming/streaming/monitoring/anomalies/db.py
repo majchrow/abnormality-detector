@@ -36,14 +36,17 @@ class CassandraDAO:
         ).all()
 
         calls_dfs = [self.load_data(meeting_name, call['start'], call['end']) for call in calls]
+        if not calls_dfs:
+            raise MissingDataError
+
         ci_dfs, roster_dfs = zip(*calls_dfs)
         return pd.concat(ci_dfs), pd.concat(roster_dfs)
 
-    def save_models(self, ci_model, roster_model, calls):
+    def save_models(self, ci_model, roster_model, calls, threshold):
         self.session.execute(
-            f'INSERT INTO models(meeting_name, training_call_starts, call_info_model, roster_model) '
-            f'VALUES (%s, %s, %s, %s);',
-            (ci_model.meeting_name, calls, ci_model.serialize(), roster_model.serialize())
+            f'INSERT INTO models(meeting_name, training_call_starts, threshold, call_info_model, roster_model) '
+            f'VALUES (%s, %s, %s, %s, %s);',
+            (ci_model.meeting_name, calls, threshold, ci_model.serialize(), roster_model.serialize())
         )
 
     def complete_training_job(self, job_id, status='completed'):
@@ -59,7 +62,7 @@ class CassandraDAO:
     ###########
     def load_models(self, meeting_name):
         result = self.session.execute(
-            f'SELECT call_info_model, roster_model FROM models '
+            f'SELECT threshold, call_info_model, roster_model FROM models '
             f'WHERE meeting_name=%s;',
         (meeting_name,)).all()
 
@@ -68,7 +71,7 @@ class CassandraDAO:
         roster_model = Model(meeting_name)
         ci_model.deserialize(result[0]['call_info_model'])
         roster_model.deserialize(result[0]['roster_model'])
-        return ci_model, roster_model
+        return float(result[0]['threshold']), ci_model, roster_model
 
     def load_data(self, meeting_name, start, end):
         ci_result = self.session.execute(
@@ -96,14 +99,14 @@ class CassandraDAO:
         if ci_results:
             ci_stmt = self.session.prepare(
                 f"UPDATE call_info_update "
-                f"SET ml_anomaly=true "
+                f"SET anomaly=true, ml_reason=?"
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, ci_stmt, ci_results)
         if roster_results:
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
-                f"SET ml_anomaly=true "
+                f"SET anomaly=true, ml_reason=? "
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, roster_stmt, roster_results)

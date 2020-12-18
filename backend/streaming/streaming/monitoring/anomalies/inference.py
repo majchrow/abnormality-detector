@@ -33,13 +33,13 @@ class Worker:
             report(f'job received: run model on {meeting_name} from {start} to {end}')
 
             # TODO: we block here...
-            ci_model, roster_model = self.dao.load_models(meeting_name)
+            threshold, ci_model, roster_model = self.dao.load_models(meeting_name)
             ci_batch, roster_batch = self.dao.load_data(meeting_name, start, end)
             ci_predictions = ci_model.predict(ci_batch)
             roster_predictions = roster_model.predict(roster_batch)
 
             def anomaly_filter(df):
-                return filter_anomalies(meeting_name, df)
+                return filter_anomalies(meeting_name, threshold, df)
 
             ci_results, roster_results = map(anomaly_filter, [ci_predictions, roster_predictions])
             report(f'{len(ci_results) + len(roster_results)} anomalies found')
@@ -50,11 +50,11 @@ class Worker:
             report(f'job finished: run model on {meeting_name} from {start} to {end}')
 
 
-def filter_anomalies(meeting, scores_df):
+def filter_anomalies(meeting, threshold, scores_df):
     anomalies = []
     for ts, p in scores_df.iterrows():
-        if p[1] > 0.90:  # TODO: configurable threshold?
-            anomalies.append((meeting, ts))
+        if p[1] > threshold:
+            anomalies.append((str(p[1]), meeting, ts))
     return anomalies
 
 
