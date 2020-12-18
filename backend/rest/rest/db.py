@@ -7,7 +7,7 @@ import datetime
 from .exceptions import NotFoundError
 from flask import current_app
 from itertools import chain
-
+import pytz
 from .config import Config
 import pandas as pd
 
@@ -63,17 +63,43 @@ class CassandraDAO:
         meeting_numbers = {
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
         }
-        
-        monitored = [m for m in meetings if m['criteria'] or m['ml_monitored']]
-        for m in meetings:
-            m.pop('monitored', None); m.pop('ml_monitored', None)
 
-        current = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, current))
-        recent = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, recent))
+        monitored = [m for m in meetings if m["criteria"] or m["ml_monitored"]]
+        for m in meetings:
+            m.pop("monitored", None)
+            m.pop("ml_monitored", None)
+
+        current = list(
+            map(
+                lambda call: {
+                    "name": call,
+                    "meeting_number": meeting_numbers[call],
+                    "criteria": [],
+                },
+                current,
+            )
+        )
+        recent = list(
+            map(
+                lambda call: {
+                    "name": call,
+                    "meeting_number": meeting_numbers[call],
+                    "criteria": [],
+                },
+                recent,
+            )
+        )
 
         return {"current": current, "recent": recent, "created": monitored}
 
-    def get_calls(self, meeting_name, start_date, end_date, min_duration=None, max_participants=None):
+    def get_calls(
+        self,
+        meeting_name,
+        start_date,
+        end_date,
+        min_duration=None,
+        max_participants=None,
+    ):
         query = (
             f"SELECT start_datetime AS start, last_update, finished, duration "
             f"FROM {self.calls_table} WHERE meeting_name = %s"
@@ -94,7 +120,10 @@ class CassandraDAO:
         result = self.session.execute(query, args).all()
         if max_participants is None:
             return [
-                {"start": c["start"], "end": c["last_update"] if c["finished"] else None}
+                {
+                    "start": c["start"],
+                    "end": c["last_update"] if c["finished"] else None,
+                }
                 for c in result
             ]
 
@@ -110,10 +139,13 @@ class CassandraDAO:
             res = list(res)
             if success and res:
                 maxes.append(int(res[0]["m"]))
-        
+
         return [
-            {"start": res["start"], "end": res["last_update"] if res["finished"] else None}
-            for res, m in zip(result, maxes) 
+            {
+                "start": res["start"],
+                "end": res["last_update"] if res["finished"] else None,
+            }
+            for res, m in zip(result, maxes)
             if m >= int(max_participants)
         ]
 
@@ -170,12 +202,18 @@ class CassandraDAO:
         return result[0]['submission_datetime'] if list(result) else None
 
     def get_anomalies(self, name, start_date, end_date):
-        calls_query = (f"SELECT meeting_name, last_update as datetime, anomaly_reason FROM {self.calls_table} "
-                       f"WHERE meeting_name=%s AND anomaly=true ")
-        ci_query = (f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.call_info_table} "
-                    f"WHERE meeting_name=%s AND anomaly=true ")
-        roster_query = (f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.roster_table} "
-                        f"WHERE meeting_name=%s AND anomaly=true ")
+        calls_query = (
+            f"SELECT meeting_name, last_update as datetime, anomaly_reason FROM {self.calls_table} "
+            f"WHERE meeting_name=%s AND anomaly=true "
+        )
+        ci_query = (
+            f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.call_info_table} "
+            f"WHERE meeting_name=%s AND anomaly=true "
+        )
+        roster_query = (
+            f"SELECT meeting_name, datetime, anomaly_reason, ml_anomaly_reason as ml_anomaly_score, threshold as ml_threshold FROM {self.roster_table} "
+            f"WHERE meeting_name=%s AND anomaly=true "
+        )
         args = [name]
 
         def append(qs, suf):
@@ -184,28 +222,30 @@ class CassandraDAO:
         queries = [ci_query, roster_query]
 
         if start_date:
-            queries = append(queries, ' AND datetime >= %s')
-            calls_query += ' AND last_update >= %s'
+            queries = append(queries, " AND datetime >= %s")
+            calls_query += " AND last_update >= %s"
             args.append(start_date)
         if end_date:
-            queries = append(queries, ' AND datetime <= %s')
-            calls_query += ' AND last_update <= %s'
+            queries = append(queries, " AND datetime <= %s")
+            calls_query += " AND last_update <= %s"
             args.append(end_date)
-        queries = append([calls_query, *queries], ' ALLOW FILTERING;')
+        queries = append([calls_query, *queries], " ALLOW FILTERING;")
 
-        results = list(chain(*map(lambda q: self.session.execute(q, args).all(), queries)))
+        results = list(
+            chain(*map(lambda q: self.session.execute(q, args).all(), queries))
+        )
         for res in results:
-            ml_score = res.get('ml_anomaly_score', None)
-            ml_threshold = res.get('ml_threshold', None)
+            ml_score = res.get("ml_anomaly_score", None)
+            ml_threshold = res.get("ml_threshold", None)
 
             if ml_score is not None:
                 ml_score = float(ml_score)
                 ml_threshold = float(ml_threshold)
-            res['ml_anomaly_score'] = ml_score
-            res['ml_threshold'] = ml_threshold
+            res["ml_anomaly_score"] = ml_score
+            res["ml_threshold"] = ml_threshold
 
-        return {'anomalies': sorted(results, key=lambda r: r['datetime'])}
-    
+        return {"anomalies": sorted(results, key=lambda r: r["datetime"])}
+
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
         return True
@@ -222,6 +262,12 @@ class CassandraDAO:
         )
         if result.empty:
             raise NotFoundError
+        result["start_datetime"] = result["start_datetime"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
+        result["datetime"] = result["datetime"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
         result = self.__separate_date_and_time(result)
 
         if start_date and end_date:
@@ -247,6 +293,12 @@ class CassandraDAO:
         )
         if result.empty:
             raise NotFoundError
+        result["start_datetime"] = result["start_datetime"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
+        result["datetime"] = result["datetime"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
         result = self.__separate_date_and_time(result)
         if start_date and end_date:
             result = self.__filter(result, start_date, end_date)
@@ -271,6 +323,12 @@ class CassandraDAO:
         )
         if result.empty:
             raise NotFoundError
+        result["start_datetime"] = result["start_datetime"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
+        result["last_update"] = result["last_update"].apply(
+            lambda d: d.tz_localize('UTC').tz_convert(pytz.timezone("Europe/Warsaw"))
+        )
         result["date"] = result["start_datetime"].apply(lambda d: d.date())
         result["start_time"] = result["start_datetime"].apply(lambda d: d.time())
         result["last_update_time"] = result["last_update"].apply(lambda d: d.time())

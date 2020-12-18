@@ -4,6 +4,7 @@ from flask_restful import Resource, Api
 from flask import current_app, request
 from marshmallow import ValidationError
 import pandas as pd
+import pytz
 
 from .db import dao
 from .bridge import dao as bridge_dao
@@ -84,7 +85,9 @@ class CallHistory(Resource):
         except ParserError:
             return {"message": "invalid date format"}, 400
 
-        result = dao.get_calls(meeting_name, start_date, end_date, min_duration, max_participants)
+        result = dao.get_calls(
+            meeting_name, start_date, end_date, min_duration, max_participants
+        )
         return {"calls": result}
 
 
@@ -116,7 +119,7 @@ class Report(Resource):
 
         try:
             start_datetime = (
-                pd.Timestamp(request.args["start_datetime"]).tz_convert(None)
+                pd.Timestamp(request.args["start_datetime"]).tz_convert(pytz.timezone("Europe/Warsaw"))
                 if "start_datetime" in request.args
                 else None
             )
