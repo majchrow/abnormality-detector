@@ -64,8 +64,10 @@ class CassandraDAO:
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
         }
         
-        monitored = [m for m in meetings if m['criteria']]
-        [m.pop('monitored') for m in meetings]
+        monitored = [m for m in meetings if m['criteria'] or m['ml_monitored']]
+        for m in meetings:
+            m.pop('monitored', None); m.pop('ml_monitored', None)
+
         current = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, current))
         recent = list(map(lambda call: {"name": call, "meeting_number": meeting_numbers[call], "criteria": []}, recent))
 
