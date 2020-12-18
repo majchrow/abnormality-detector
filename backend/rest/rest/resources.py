@@ -145,6 +145,13 @@ class Report(Resource):
         )
 
 
+class Models(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        result = dao.get_last_training(meeting_name)
+        return {'last': result}
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Report, "/reports/<string:meeting_name>")
@@ -153,3 +160,5 @@ def setup_resources(app):
     api.add_resource(Calls, "/calls")
     api.add_resource(CallHistory, "/calls/<string:meeting_name>")
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
+    api.add_resource(Models, "/models/<string:meeting_name>")
+

@@ -161,6 +161,14 @@ class CassandraDAO:
             return meetings[0]
         return {}
 
+    def get_last_training(self, meeting_name):
+        result = self.session.execute(
+            f'SELECT submission_datetime FROM training_jobs '
+            f'WHERE meeting_name=%s ALLOW FILTERING;',
+            (meeting_name,)
+        ).all()
+        return result[0]['submission_datetime'] if list(result) else None
+
     def get_anomalies(self, name, start_date, end_date):
         calls_query = (f"SELECT meeting_name, last_update as datetime, anomaly_reason FROM {self.calls_table} "
                        f"WHERE meeting_name=%s AND anomaly=true ")
