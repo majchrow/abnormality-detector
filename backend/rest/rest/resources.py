@@ -1,7 +1,7 @@
 from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
-from flask import request
+from flask import current_app, request
 from marshmallow import ValidationError
 import pandas as pd
 
@@ -116,7 +116,7 @@ class Report(Resource):
 
         try:
             start_datetime = (
-                pd.Timestamp(request.args["start_datetime"])
+                pd.Timestamp(request.args["start_datetime"]).tz_convert(None)
                 if "start_datetime" in request.args
                 else None
             )
