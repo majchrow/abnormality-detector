@@ -94,3 +94,8 @@ snack-bar-container.notification simple-snack-bar {
 .mat-typography {
   font-size: 7px;
 }
+
+mat-list {
+  flex-grow: 1;
+  overflow: auto;
+}

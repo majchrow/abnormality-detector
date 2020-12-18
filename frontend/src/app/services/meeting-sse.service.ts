@@ -2,6 +2,7 @@ import {Injectable, NgZone} from '@angular/core';
 import {Observable, Observer} from 'rxjs';
 import {environment} from '../../environments/environment';
 import {HttpClient} from '@angular/common/http';
+import {Meeting} from "../components/meetings/class/meeting";
 
 @Injectable({
   providedIn: 'root'
@@ -69,6 +70,30 @@ export class MeetingSSEService {
   getServerSentEvent(name: string): Observable<any> {
     const url = `${this.backend.url}/${this.backend.notification}/${name}?type=threshold`;
     return this._getObservable(url);
+  }
+
+  trainModel(meeting: Meeting, calls: string[], threshold: number): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.train}/${meeting.name}`;
+    const payload = {
+      calls,
+      threshold: threshold / 100
+    };
+    return this.http.put(url, payload);
+  }
+
+  getMLMonitoring(meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.ml}/${meeting.name}`;
+    return this.http.get(url, {});
+  }
+
+  putMLMonitoring(meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.ml}/${meeting.name}`;
+    return this.http.put(url, {});
+  }
+
+  deleteMLMonitoring(meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.ml}/${meeting.name}`;
+    return this.http.delete(url, {});
   }
 
 }

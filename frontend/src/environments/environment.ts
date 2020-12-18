@@ -10,13 +10,16 @@ export const environment = {
       meetings: 'calls',
       public_meetings: 'meetings',
       anomalies: 'anomalies',
-      reports: 'reports'
+      reports: 'reports',
+      models: 'models'
     },
     sse: {
       url: 'http://localhost:5001',
       notification: 'notifications',
       monitoring: 'monitoring',
-      all: 'notifications'
+      all: 'notifications',
+      ml: 'anomaly-detection',
+      train: 'anomaly-detection/train'
     }
   }
 };

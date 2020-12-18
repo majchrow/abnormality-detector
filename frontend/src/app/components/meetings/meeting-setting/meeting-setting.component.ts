@@ -331,7 +331,7 @@ export class MeetingSettingComponent implements OnInit {
   sliderOptions(): Options {
     return {
       floor: 0,
-      ceil: 600,
+      ceil: 480,
       showTicks: false,
       disabled: !this.config.time_diff.checked,
       translate: (value: number, label: LabelType): string => {
