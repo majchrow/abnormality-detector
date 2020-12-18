@@ -65,8 +65,9 @@ class CassandraDAO:
             f'SELECT threshold, call_info_model, roster_model FROM models '
             f'WHERE meeting_name=%s;',
         (meeting_name,)).all()
+        if not result:
+            raise MissingModelError
 
-        # TODO: handle non-existent model
         ci_model = Model(meeting_name)
         roster_model = Model(meeting_name)
         ci_model.deserialize(result[0]['call_info_model'])
