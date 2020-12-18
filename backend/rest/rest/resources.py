@@ -118,7 +118,7 @@ class Report(Resource):
 
         try:
             start_datetime = (
-                pd.Timestamp(request.args["start_datetime"]).tz_convert(None)
+                pd.Timestamp(request.args["start_datetime"]).tz_convert(pytz.timezone("Europe/Warsaw"))
                 if "start_datetime" in request.args
                 else None
             )
