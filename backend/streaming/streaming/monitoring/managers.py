@@ -66,6 +66,9 @@ class Manager:
         await self.anomaly_manager.fire(meeting_name, start, end)
         logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
 
+    async def is_anomaly_monitored(self, conf_name: str):
+        return await self.dao.is_anomaly_monitored(conf_name)
+
     ############
     # monitoring
     ############

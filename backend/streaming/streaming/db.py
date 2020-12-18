@@ -100,6 +100,18 @@ class CassandraDAO:
     ###################
     # anomaly detection
     ###################
+    async def is_anomaly_monitored(self, call_name: str):
+        result = await self.async_exec(
+            'is_anomaly_monitored',
+            f'SELECT ml_monitored FROM {self.meetings_table} '
+            f'WHERE meeting_name=%s;',
+            (call_name,)
+        )
+        logging.info(f'{self.TAG}: fetched ML monitoring status for {call_name}')
+        if result and result[0]['ml_monitored']:
+            return True
+        return False
+
     async def add_training_job(self, meeting_name: str, calls: List[str], threshold: float):
         uid = str(uuid4())
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
