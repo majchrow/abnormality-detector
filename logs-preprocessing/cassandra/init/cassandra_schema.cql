@@ -69,6 +69,7 @@ CREATE TABLE training_jobs(
     meeting_name text,
     submission_datetime timestamp,
     training_call_starts list<timestamp>,
+    threshold double,
     status text
 );
 
