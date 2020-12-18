@@ -52,6 +52,7 @@ class ReportGenerator:
             parameter="streaming",
             apply_func=bin_to_zero_one,
         )
+
         data["recording"] = self.call_info_data_provider.get_data_for_column(
             start_datetime,
             "recording",
@@ -169,7 +170,7 @@ class MeetingReportGenerator(ReportGenerator):
             start_time=str(self.start_time)[:-7],
             last_update_time=str(self.last_update_time)[:-7],
             duration=self.duration,
-            plots=self.plots,
+            plot=self.plot,
             finished=self.finished,
         )
 
@@ -182,7 +183,7 @@ class MeetingReportGenerator(ReportGenerator):
         self.last_update_time = details["last_update_time"]
         self.duration = details["duration"]
         self.finished = details["finished"]
-        self.plots = self.generate_plot_for_meeting(self.start_datetime)
+        self.plot = self.generate_plot_for_meeting(self.start_datetime)
 
 
 class Titles(Enum):

@@ -84,7 +84,9 @@ class CallHistory(Resource):
         except ParserError:
             return {"message": "invalid date format"}, 400
 
-        result = dao.get_calls(meeting_name, start_date, end_date, min_duration, max_participants)
+        result = dao.get_calls(
+            meeting_name, start_date, end_date, min_duration, max_participants
+        )
         return {"calls": result}
 
 
