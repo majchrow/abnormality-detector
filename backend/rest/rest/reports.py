@@ -101,9 +101,9 @@ class ReportGenerator:
         info_anomalies = self.call_info_data_provider.get_anomalies(start_datetime)
         roster_anomalies = self.roster_data_provider.get_anomalies(start_datetime)
         anomalies = pd.concat([info_anomalies, roster_anomalies]).sort_index()
-        anomalies = anomalies[~anomalies["ml_anomaly"].isna()]
+        anomalies = anomalies[~anomalies["ml_anomaly_reason"].isna()]
         if not anomalies.empty:
-            anomalies["ml_anomaly"] = "anomaly"
+            anomalies["ml_anomaly_reason"] = "anomaly"
         return anomalies
 
     def get_pdf_content(self):
@@ -501,7 +501,7 @@ class CallInfoDataProvider(MeetingDataProvider):
 
     def get_anomalies(self, start_datetime):
         filtered = self.filter_by_start_datetime(start_datetime)[
-            ["datetime", "ml_anomaly"]
+            ["datetime", "ml_anomaly_reason"]
         ]
         filtered.index = filtered["datetime"]
         del filtered["datetime"]
@@ -620,7 +620,7 @@ class RosterDataProvider(MeetingDataProvider):
 
     def get_anomalies(self, start_datetime):
         filtered = self.filter_by_start_datetime(start_datetime)[
-            ["datetime", "ml_anomaly"]
+            ["datetime", "ml_anomaly_reason"]
         ]
         filtered.index = filtered["datetime"]
         del filtered["datetime"]

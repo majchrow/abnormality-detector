@@ -40,12 +40,13 @@ class CassandraDAO:
             logging.error(f'{self.TAG}: "{name}" failed with {e}'),
             future.set_exception(AppException.db_error())
 
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
         if args:
             promise = self.session.execute_async(query, args)
         else:
             promise = self.session.execute_async(query)
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
 
         promise.add_callbacks(callback, errback)
         return await future
