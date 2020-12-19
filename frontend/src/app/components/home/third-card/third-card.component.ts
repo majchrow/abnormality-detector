@@ -1,4 +1,6 @@
 import {Component, OnInit} from '@angular/core';
+import {MeetingsService} from '../../../services/meetings.service';
+import {AllMeetings} from '../../meetings/class/all-meetings';
 
 @Component({
   selector: 'app-third-card',
@@ -7,16 +9,35 @@ import {Component, OnInit} from '@angular/core';
 })
 export class ThirdCardComponent implements OnInit {
 
-  constructor() {
+  constructor(
+    private meetingsService: MeetingsService
+  ) {
   }
 
-  infos: Array<string> = [
-    'Active meetings: 4',
-    'Last error: 4/1/2021 10:15',
-    'Abnormalities found today: 10'
-  ];
+
+  observedMeetings: string;
+  activeMeetings: string;
+  historicalMeetings: string;
+
 
   ngOnInit(): void {
+    this.fetchMeetings();
+  }
+
+  fetchMeetings() {
+    this.meetingsService.fetchMeetings().subscribe(
+      res => {
+        this.observedMeetings = '' + res.created.length;
+        this.activeMeetings = '' + res.current.length;
+        this.historicalMeetings = '' + res.recent.length;
+      },
+      err => {
+        console.log(err);
+        this.activeMeetings = '?';
+        this.observedMeetings = '?';
+        this.historicalMeetings = '?';
+      }
+    );
   }
 
 }

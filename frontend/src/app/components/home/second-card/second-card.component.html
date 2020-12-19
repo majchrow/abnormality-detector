@@ -1,11 +1,12 @@
 <mat-card class="second-card">
   <mat-card-content>
-    <div class="content">
-      Least meetings warnings
-    </div>
+    <h2>Least application notifications:</h2>
+<!--    <div class="content">-->
+<!--      Least meetings warnings-->
+<!--    </div>-->
     <mat-list>
       <mat-list-item class="event" *ngFor="let info of infos" (click)="move($event)">
-        <mat-icon mat-list-icon>calendar_today</mat-icon>
+        <mat-icon mat-list-icon>info</mat-icon>
         <div mat-line>{{info.meeting}}</div>
         <div mat-line>{{info.date}}</div>
         <div id="red" mat-line> {{info.info}} </div>

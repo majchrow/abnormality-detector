@@ -20,7 +20,7 @@
       <ng-template #infoOn>
         <div class="row" fxLayout="row" fxLayoutAlign="center center">
           <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
-            Pick data range:
+            Train data range:
           </div>
           <div class="calendar" fxFlex="70%" fxLayoutAlign="center center">
             <mat-form-field>
@@ -74,7 +74,7 @@
           <div fxFlex="70%" fxLayoutAlign="center center">
             <div class="custom-one-slider">
               <mat-slider [(ngModel)]="threshold"
-                          [min]=50
+                          [min]=75
                           [max]=100
                           [displayWith]="formatPercent"
                           [tickInterval]=1

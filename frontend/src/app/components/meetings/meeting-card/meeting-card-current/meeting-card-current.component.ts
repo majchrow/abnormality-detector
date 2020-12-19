@@ -13,6 +13,7 @@ export class MeetingCardCurrentComponent implements OnInit {
   @Output() modelEmitter = new EventEmitter<Meeting>();
   @Output() historyEmitter = new EventEmitter<Meeting>();
   @Output() settingEmitter = new EventEmitter<Meeting>();
+  @Output() inferenceEmitter = new EventEmitter<Meeting>();
 
   monitoring: Observable<any>;
   monitored = false;
@@ -21,6 +22,10 @@ export class MeetingCardCurrentComponent implements OnInit {
   }
 
   ngOnInit(): void {
+  }
+
+  onInferenceClick() {
+    this.inferenceEmitter.emit(this.meeting);
   }
 
   onModelClick() {

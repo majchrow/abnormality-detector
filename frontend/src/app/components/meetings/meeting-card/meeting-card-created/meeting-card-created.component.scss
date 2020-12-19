@@ -30,5 +30,40 @@
 }
 
 .admin {
-  padding-left: 20px;
+    padding-left: 15px;
+}
+
+.space {
+  padding-left: 5px;
+}
+
+:host {
+  .mat-slide-toggle {
+    &.mat-checked {
+      ::ng-deep.mat-slide-toggle-bar::after {
+        content: 'ON';
+        font-size: 45%;
+        font-weight: 700;
+        color: black;
+        position: absolute;
+        left: 4px;
+        top: -5px;
+      }
+    }
+    &:not(.mat-checked) {
+      ::ng-deep.mat-slide-toggle-bar::after {
+        content: 'OFF';
+        font-size: 45%;
+        font-weight: 700;
+        color: white;
+        position: absolute;
+        left: 21px;
+        top: -5px;
+      }
+    }
+  }
+}
+
+mat-slide-toggle{
+  transform: scale(1.15);
 }

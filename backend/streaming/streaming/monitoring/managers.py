@@ -6,11 +6,12 @@ from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List
 
 from .kafka import KafkaListener
-from .thresholds import STREAM_FINISHED, validate
+from .serializers import DateTimeEncoder
 from .subprocess import BaseWorkerManager, run_for_result
+from .thresholds import STREAM_FINISHED, validate
 from ..db import CassandraDAO
 from ..config import Config
 from ..exceptions import AppException
@@ -26,7 +27,7 @@ class Manager:
 
         self.anomaly_manager = AnomalyManager(dao, config)
         self.kafka_manager = KafkaListener(config.kafka_bootstrap_server, config.kafka_call_list_topic)
-        self.threshold_manager = ThresholdManager(config)
+        self.threshold_manager = ThresholdManager(dao, config)
 
     def start(self):
         asyncio.create_task(self._run())
@@ -62,9 +63,9 @@ class Manager:
         await self.anomaly_manager.unschedule(meeting_name)
         logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
 
-    async def run_inference(self, meeting_name: str, start: Optional[datetime], end: Optional[datetime]):
-        await self.anomaly_manager.fire(meeting_name, start, end)
-        logging.info(f'{self.TAG}: unscheduled inference for {meeting_name}')
+    async def run_inference(self, meeting_name: str, training_calls: List[datetime], start: datetime, end: datetime, threshold: float):
+        await self.anomaly_manager.fire_anomaly(meeting_name, training_calls, start, end, threshold)
+        logging.info(f'{self.TAG}: ran training & inference for {meeting_name}')
 
     async def is_anomaly_monitored(self, conf_name: str):
         return await self.dao.is_anomaly_monitored(conf_name)
@@ -82,6 +83,11 @@ class Manager:
         await self.dao.set_monitoring_status(meeting_name, monitored=False)
         await self.threshold_manager.unschedule(meeting_name)
         logging.info(f'{self.TAG}: unscheduled monitoring for {meeting_name}')
+
+    async def run_monitoring(self, meeting_name: str, criteria: List[dict], start: datetime, end: datetime):
+        validate(criteria)
+        await self.threshold_manager.fire_thresholds(meeting_name, criteria, start, end)
+        logging.info(f'{self.TAG}: ran training & inference for {meeting_name}')
 
     async def get_all_monitored(self):
         # TODO: test if DAO works
@@ -139,11 +145,12 @@ class ThresholdManager(BaseWorkerManager):
 
     TAG = 'ThresholdManager'
 
-    def __init__(self, config: Config):
+    def __init__(self, dao: CassandraDAO, config: Config):
         super().__init__()
         self.cmd = ['python3', '-m', 'streaming.monitoring.thresholds.monitor']
         self.num_workers = config.num_threshold_workers
         self.worker_id = 'thresholds-worker'
+        self.dao = dao
         self.kafka_producer = None
 
     def init(self, kafka_producer):
@@ -163,6 +170,21 @@ class ThresholdManager(BaseWorkerManager):
             'meeting_name': meeting_name
         }).encode()
         await self.kafka_producer.send_and_wait(topic='monitoring-thresholds-config', value=payload)
+
+    async def fire_thresholds(self, meeting_name, criteria, start, end):
+        if not await self.dao.meeting_exists(meeting_name):
+            raise AppException.meeting_not_found()
+
+        payload = json.dumps({
+            'meeting_name': meeting_name,
+            'criteria': criteria,
+            'start': start,
+            'end': end,
+        }, cls=DateTimeEncoder).encode()
+        asyncio.create_task(run_for_result(
+            'batch-thresholds-worker',
+            ['python3', '-m', 'streaming.monitoring.thresholds.batch', payload]
+        ))
 
 
 def async_partial(coro_fun, *args, **kwargs):
@@ -228,23 +250,22 @@ class AnomalyManager(BaseWorkerManager):
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, False):
             raise AppException.meeting_not_found()
 
-    async def fire(self, meeting_name, start, end):
-        if not await self.dao.model_exists(meeting_name):
-            raise AppException.model_not_found()
+    async def fire_anomaly(self, meeting_name, calls, start, end, threshold):
         if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
             raise AppException.meeting_not_found()
-        if not start:
-            start = await self.dao.earliest_observation(meeting_name)
-        if not end:
-            end = datetime.now()
+
         job = {
             'meeting_name': meeting_name,
+            'training_call_starts': calls,
             'start': start,
             'end': end,
-            'status': 'pending'
+            'threshold': threshold
         }
-        await self.dao.add_inference_job(**job)
-        await self.push_inference_job(job)
+        payload = json.dumps(job, cls=DateTimeEncoder).encode()
+        asyncio.create_task(run_for_result(
+            'training-inference-worker',
+            ['python3', '-m', 'streaming.monitoring.anomalies.training_inference', payload]
+        ))
 
     async def periodic_dispatch(self):
         while True:
@@ -278,10 +299,12 @@ class AnomalyManager(BaseWorkerManager):
                 logging.info(f'{self.TAG}: pushed to workers')
 
     async def push_inference_job(self, job):
-        # transform date for json to serialize
-        job['start'] = job['start'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
-        job['end'] = job['end'].strftime('%Y-%m-%d %H:%M:%S.%fZ')
-        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=json.dumps(job).encode())
+        payload = json.dumps(job).encode()
+        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=payload, cls=DateTimeEncoder)
+
+    @staticmethod
+    def fmt_dt(dt):
+        return dt
 
     async def shutdown(self):
         await super().shutdown()

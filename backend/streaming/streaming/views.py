@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 __all__ = [
     'schedule_training', 'schedule_inference', 'unschedule_inference', 'run_inference', 'is_anomaly_monitored',
-    'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored',
+    'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored', 'run_monitoring',
     'get_call_info_notifications', 'get_monitoring_notifications'
 ]
 
@@ -58,21 +58,44 @@ async def unschedule_inference(request):
 async def run_inference(request):
     if (conf_name := request.match_info.get('conf_name', None)) is None:
         raise web.HTTPBadRequest(reason='no meeting name given')
-    start_date = request.rel_url.query.get('start', None)
-    end_date = request.rel_url.query.get('end', None)
 
     try:
-        # TODO: timezone!
-        if start_date:
-            start_date = parse(start_date)
-        if end_date:
-            end_date = parse(end_date)
+        payload = await request.json()
+        start, end = parse(payload['start']), parse(payload['end'])
+        threshold = float(payload['threshold'])
+    except JSONDecodeError:
+        raise web.HTTPBadRequest(reason='Failed to parse JSON')
+    except KeyError:
+        raise web.HTTPBadRequest(reason='fields "start", "end" and "threshold" are mandatory')
     except ParserError:
         return web.HTTPBadRequest(reason=f'invalid date format')
 
     manager = request.app['monitoring']
-    await manager.run_inference(conf_name, start_date, end_date)
+    await manager.run_inference(conf_name, payload['training_calls'], start, end, threshold)
     return web.Response()
+
+
+async def run_monitoring(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='no meeting name given')
+
+    try:
+        payload = await request.json()
+        criteria = payload['criteria']
+        start, end = parse(payload['start']), parse(payload['end'])
+    except JSONDecodeError:
+        raise web.HTTPBadRequest(reason='Failed to parse JSON')
+    except KeyError:
+        raise web.HTTPBadRequest(reason='fields "criteria", "start" and "end" are mandatory')
+    except ParserError:
+        return web.HTTPBadRequest(reason=f'invalid date format')
+
+    manager = request.app['monitoring']
+    try:
+        await manager.run_monitoring(conf_name, criteria, start, end)
+        return web.Response()
+    except ValidationError as e:
+        return web.HTTPBadRequest(reason=str(e))
 
 
 async def schedule_monitoring(request):

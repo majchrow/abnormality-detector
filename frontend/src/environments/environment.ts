@@ -19,7 +19,8 @@ export const environment = {
       monitoring: 'monitoring',
       all: 'notifications',
       ml: 'anomaly-detection',
-      train: 'anomaly-detection/train'
+      train: 'anomaly-detection/train',
+      evaluate: 'anomaly-detection/once'
     }
   }
 };

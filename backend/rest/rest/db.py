@@ -235,9 +235,7 @@ class CassandraDAO:
             args.append(end_date)
         queries = append([calls_query, *queries], " ALLOW FILTERING;")
 
-        results = list(
-            chain(*map(lambda q: self.session.execute(q, args).all(), queries))
-        )
+        results = list(chain(*map(lambda q: self.session.execute(q, args).all(), queries)))
         for res in results:
             ml_score = res.get("ml_anomaly_score", None)
             ml_threshold = res.get("ml_threshold", None)

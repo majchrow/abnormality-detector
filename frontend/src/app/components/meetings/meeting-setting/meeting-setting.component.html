@@ -6,7 +6,7 @@
     </div>
     <mat-card-header style="justify-content: center">
       <mat-card-title style="text-align: center;">
-        <h2>Settings</h2>
+        <h2>Anomaly conditions</h2>
         <h3>{{ meeting.name }}</h3>
       </mat-card-title>
     </mat-card-header>
@@ -21,7 +21,7 @@
             <mat-checkbox class="example-margin" [checked]="this.config.time_diff.checked"
                           (change)="onChange(this.config.time_diff)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
+          <div fxFlex="20%" fxLayoutAlign="start center">
             Meeting duration range:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
@@ -38,7 +38,7 @@
             <mat-checkbox class="example-margin" [checked]="this.config.max_participants.checked"
                           (change)="onChange(this.config.max_participants)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
+          <div fxFlex="20%" fxLayoutAlign="start center">
             Maximum number of participant:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
@@ -58,7 +58,7 @@
             <mat-checkbox class="example-margin" [checked]="this.config.active_speaker.checked"
                           (change)="onChange(this.config.active_speaker)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
+          <div fxFlex="20%" fxLayoutAlign="start center">
             Maximum number of speakers:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
@@ -78,8 +78,8 @@
             <mat-checkbox class="example-margin" [checked]="this.config.recording.checked"
                           (change)="onChange(this.config.recording)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
-            Recording allowed:
+          <div fxFlex="20%" fxLayoutAlign="start center">
+            Recording:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
             <div>
@@ -98,8 +98,8 @@
             <mat-checkbox class="example-margin" [checked]="this.config.streaming.checked"
                           (change)="onChange(this.config.streaming)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
-            Streaming allowed:
+          <div fxFlex="20%" fxLayoutAlign="start center">
+            Streaming:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
             <div>
@@ -119,11 +119,11 @@
             <mat-checkbox class="example-margin" [checked]="this.config.days.checked"
                           (change)="onChange(this.config.days)"></mat-checkbox>
           </div>
-          <div fxFlex="20%" fxLayoutAlign="center center">
+          <div fxFlex="20%" fxLayoutAlign="start center">
             Allowed days of the week:
           </div>
           <div fxFlex="60%" fxLayoutAlign="center center">
-            <button mat-icon-button [disabled]="!this.config.days.checked" (click)="openDaysDialog()">
+            <button mat-icon-button color="primary" [disabled]="!this.config.days.checked" (click)="openDaysDialog()">
               <mat-icon style="cursor: pointer;">calendar_today</mat-icon>
             </button>
           </div>

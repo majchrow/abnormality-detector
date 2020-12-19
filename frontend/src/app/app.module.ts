@@ -51,6 +51,7 @@ import {MatBadgeModule} from '@angular/material/badge';
 import {MeetingModelComponent} from './components/meetings/meeting-model/meeting-model.component';
 import {MatDatepickerModule} from '@angular/material/datepicker';
 import {SatDatepickerModule, SatNativeDateModule} from 'saturn-datepicker';
+import { MeetingInferenceComponent } from './components/meetings/meeting-inference/meeting-inference.component';
 
 @NgModule({
   declarations: [
@@ -77,7 +78,8 @@ import {SatDatepickerModule, SatNativeDateModule} from 'saturn-datepicker';
     SelectMeetingTypeComponent,
     MeetingHistoryComponent,
     NotificationDialogComponent,
-    MeetingModelComponent
+    MeetingModelComponent,
+    MeetingInferenceComponent
   ],
   imports: [
     BrowserModule,

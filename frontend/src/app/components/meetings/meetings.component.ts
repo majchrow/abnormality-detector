@@ -28,18 +28,11 @@ export class MeetingsComponent implements OnInit {
   settingMeeting: Meeting;
   historyMeeting: Meeting;
   modelMeeting: Meeting;
-  paginatorSize = 1;
-  numberOfProductsDisplayedInPage = 24;
-  pageSizeOptions = [12, 24];
+  inferenceMeeting: Meeting;
   allMeetings: AllMeetings;
   selectedMeetings: AllMeetings;
   viewMeetings: AllMeetings;
   meetingType = 'current';
-
-
-  updateMeetingsDisplayedInPage(event) {
-    console.log(event);
-  }
 
   ngOnInit(): void {
     this.initAllMeetings();
@@ -64,6 +57,11 @@ export class MeetingsComponent implements OnInit {
   onModelClick(meeting: Meeting) {
     this.modelMeeting = meeting;
     this.selected = 'model';
+  }
+
+  onInferenceClick(meeting: Meeting) {
+    this.inferenceMeeting = meeting;
+    this.selected = 'inference';
   }
 
   resetMeetings() {
@@ -128,16 +126,16 @@ export class MeetingsComponent implements OnInit {
   }
 
   onDeleteClick(meeting: Meeting) {
-    this.dialogService.openConfirmDialog('Are you sure you want to delete this meeting?')
+    this.dialogService.openConfirmDialog('Are you sure you want to delete this room?')
       .afterClosed().subscribe(res => {
       if (res) {
         this.meetingsService.deleteMeeting(meeting).subscribe(
           () => {
-            this.notificationService.success('Deleted successfully');
+            this.notificationService.success('Room successfully deleted from observed');
             this.resetMeetings();
             this.subscribeRest();
           }, () => {
-            this.notificationService.warn('Failed to delete meeting');
+            this.notificationService.warn('Failed to delete room from observed');
           }
         );
       }

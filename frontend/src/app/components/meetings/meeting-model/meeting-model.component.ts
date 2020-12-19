@@ -30,7 +30,7 @@ export class MeetingModelComponent implements OnInit {
   date = {begin: new Date(), end: new Date()};
   participants = 0;
   duration = 0;
-  threshold = 90;
+  threshold = 95;
   last: string;
 
 
@@ -69,7 +69,6 @@ export class MeetingModelComponent implements OnInit {
     this.date = {begin: new Date(), end: new Date()};
     this.participants = 0;
     this.duration = 0;
-
   }
 
   saveDate(event: any) {

@@ -17,6 +17,7 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
   @Output() historyEmitter = new EventEmitter<Meeting>();
   @Output() settingEmitter = new EventEmitter<Meeting>();
   @Output() modelEmitter = new EventEmitter<Meeting>();
+  @Output() inferenceEmitter = new EventEmitter<Meeting>();
 
   constructor(
     private meetingSSEService: MeetingSSEService,
@@ -50,16 +51,16 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
         console.log(res);
         this.last = !!res.last;
         if (this.last) {
-          this.meetingSSEService.getMLMonitoring(this.meetingsService).subscribe(
-            () => {
-              this.mlMonitored = true;
+          this.meetingSSEService.getMLMonitoring(this.meeting).subscribe(
+            result => {
+              this.mlMonitored = result.monitored;
             },
             err => {
               this.mlMonitored = false;
             }
           );
 
-          } else {
+        } else {
           this.mlMonitored = false;
         }
       }, err => {
@@ -92,9 +93,7 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
       },
       error => {
         console.log(error);
-        if (error.eventPhase !== 2) {
-          this.notificationService.warn(error.message);
-        }
+        this.subscribeMonitoring();
       });
   }
 
@@ -103,6 +102,10 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
       this.subscription.unsubscribe();
     }
     this.monitoring = null;
+  }
+
+  onInferenceClick() {
+    this.inferenceEmitter.emit(this.meeting);
   }
 
   onModelClick() {

@@ -2,7 +2,8 @@ import {Injectable, NgZone} from '@angular/core';
 import {Observable, Observer} from 'rxjs';
 import {environment} from '../../environments/environment';
 import {HttpClient} from '@angular/common/http';
-import {Meeting} from "../components/meetings/class/meeting";
+import {Meeting} from '../components/meetings/class/meeting';
+import {HistoryMeeting} from "../components/meetings/meeting-history/class/history-meeting";
 
 @Injectable({
   providedIn: 'root'
@@ -76,13 +77,48 @@ export class MeetingSSEService {
     const url = `${this.backend.url}/${this.backend.train}/${meeting.name}`;
     const payload = {
       calls,
-      threshold: threshold / 100
+      threshold: threshold / 100,
+    };
+    return this.http.put(url, payload);
+  }
+
+  evaluateModel(meeting: Meeting, calls: string[], threshold: number, historyMeeting: HistoryMeeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.evaluate}/${meeting.name}`;
+    let end;
+    try {
+      end = historyMeeting.end.toISOString();
+    } catch (e) {
+      end = new Date().toISOString();
+    }
+    const payload = {
+      training_calls: calls,
+      threshold: threshold / 100,
+      start: historyMeeting.start.toISOString(),
+      end
+    };
+    return this.http.put(url, payload);
+  }
+
+  evaluateAdminModel(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.evaluate}/${meeting.name}`;
+    let end;
+    try {
+      end = historyMeeting.end.toISOString();
+    } catch (e) {
+      end = new Date().toISOString();
+    }
+    const payload = {
+      name: meeting.name,
+      criteria: meeting.criteria,
+      start: historyMeeting.start.toISOString(),
+      end
     };
     return this.http.put(url, payload);
   }
 
   getMLMonitoring(meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.ml}/${meeting.name}`;
+    console.log(url);
     return this.http.get(url, {});
   }
 
