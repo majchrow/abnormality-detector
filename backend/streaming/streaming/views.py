@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 
 __all__ = [
-    'schedule_training', 'schedule_inference', 'unschedule_inference', 'run_inference',
+    'schedule_training', 'schedule_inference', 'unschedule_inference', 'run_inference', 'is_anomaly_monitored',
     'schedule_monitoring', 'cancel_monitoring', 'get_all_monitoring', 'is_monitored',
     'get_call_info_notifications', 'get_monitoring_notifications'
 ]
@@ -117,6 +117,14 @@ async def is_monitored(request):
 
     manager = request.app['monitoring']
     return web.json_response({'monitored': await manager.is_monitored(conf_name)})
+
+
+async def is_anomaly_monitored(request):
+    if (conf_name := request.match_info.get('conf_name', None)) is None:
+        raise web.HTTPBadRequest(reason='No conference name given')
+
+    manager = request.app['monitoring']
+    return web.json_response({'monitored': await manager.is_anomaly_monitored(conf_name)})
 
 
 async def get_monitoring_notifications(request):

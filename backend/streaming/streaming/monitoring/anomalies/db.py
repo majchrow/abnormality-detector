@@ -65,8 +65,9 @@ class CassandraDAO:
             f'SELECT threshold, call_info_model, roster_model FROM models '
             f'WHERE meeting_name=%s;',
         (meeting_name,)).all()
+        if not result:
+            raise MissingModelError
 
-        # TODO: handle non-existent model
         ci_model = Model(meeting_name)
         roster_model = Model(meeting_name)
         ci_model.deserialize(result[0]['call_info_model'])
@@ -99,14 +100,14 @@ class CassandraDAO:
         if ci_results:
             ci_stmt = self.session.prepare(
                 f"UPDATE call_info_update "
-                f"SET anomaly=true, ml_reason=?"
+                f"SET anomaly=true, ml_anomaly_reason=?"
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, ci_stmt, ci_results)
         if roster_results:
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
-                f"SET anomaly=true, ml_reason=? "
+                f"SET anomaly=true, ml_anomaly_reason=? "
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, roster_stmt, roster_results)
