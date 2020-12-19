@@ -24,11 +24,12 @@ from matplotlib import gridspec
 import numpy as np
 import math
 from flask import current_app
+import matplotlib
 
 sys.path.append(os.getcwd())
 
 options = {"enable-local-file-access": None}
-
+matplotlib.rcParams['timezone'] = "Europe/Warsaw"
 
 class ReportGenerator:
     def __init__(self, dao, name, template):
