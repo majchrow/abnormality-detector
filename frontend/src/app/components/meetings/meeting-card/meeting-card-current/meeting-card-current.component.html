@@ -21,8 +21,9 @@
 
 <!--    </mat-slide-toggle>-->
     <span class="app-spacer"></span>
-    <i class="app-icon fa fa-lightbulb-o" (click)="onModelClick()"></i>
-    <i class="app-icon fa fa-cog" (click)="onSettingClick()"></i>
-    <i class="app-icon fa fa-history" (click)="onHistoryClick()"></i>
+    <i class="app-icon fa fa-lightbulb-o" title="Train anomaly model" (click)="onModelClick()"></i>
+    <i class="app-icon fa fa-pencil-square-o" title="Set manual anomaly conditions" (click)="onSettingClick()"></i>
+    <i class="app-icon fa fa-retweet"  title="Evaluate models on historical data" (click)="onInferenceClick()"></i>
+    <i class="app-icon fa fa-history" title="Check anomaly history" (click)="onHistoryClick()"></i>
   </mat-card-actions>
 </mat-card>

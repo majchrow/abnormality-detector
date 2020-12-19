@@ -172,10 +172,10 @@ export class MeetingHistoryComponent implements OnInit {
           (anomaly, index) => new HistorySpec(
             'warning',
             new Date(Date.parse(anomalyGroup.datetime)),
-            anomalyGroup.ml_anomaly_score === null ? anomaly.parameter : 'ml_anomaly',
-            anomalyGroup.ml_anomaly_score === null ? anomaly.value : anomalyGroup.ml_anomaly_score * 100,
-            anomalyGroup.ml_anomaly_score === null ? anomaly.condition_type : 'probability[%]',
-            anomalyGroup.ml_anomaly_score === null ? anomaly.condition_value : anomalyGroup.ml_threshold * 100
+            anomaly.parameter,
+            anomaly.parameter === 'ML model' ? anomaly.value * 100 + '%' : anomaly.value,
+            anomaly.condition_type,
+            anomaly.parameter === 'ML model' ? anomaly.condition_value * 100 + '%' : anomaly.condition_value
           )
         ));
         this.filter();
@@ -195,12 +195,14 @@ export class MeetingHistoryComponent implements OnInit {
           (anomaly, index) => new HistorySpec(
             'warning',
             new Date(Date.parse(anomalyGroup.datetime)),
-            anomalyGroup.ml_anomaly_score === null ? anomaly.parameter : 'ml_anomaly',
-            anomalyGroup.ml_anomaly_score === null ? anomaly.value : anomalyGroup.ml_anomaly_score * 100,
-            anomalyGroup.ml_anomaly_score === null ? anomaly.condition_type : 'probability[%]',
-            anomalyGroup.ml_anomaly_score === null ? anomaly.condition_value : anomalyGroup.ml_threshold * 100
+            anomaly.parameter,
+            anomaly.parameter === 'ML model' ? anomaly.value * 100 + '%' : anomaly.value,
+            anomaly.condition_type,
+            anomaly.parameter === 'ML model' ? anomaly.condition_value * 100 + '%' : anomaly.condition_value
           )
         ));
+        console.log('anomaly 2');
+        console.log(this.anomaliesHistory);
         this.filter();
       }, err => {
         console.log(err);
@@ -211,8 +213,6 @@ export class MeetingHistoryComponent implements OnInit {
   fetchHistoryMeeting() {
     this.meetingsService.fetchMeetingHistory(this.meeting.name).subscribe(
       res => {
-        console.log('meetings');
-        console.log(res);
         this.meetingsHistory = res.calls.map(el => new HistoryMeeting(new Date(Date.parse(el.start)), new Date(Date.parse(el.end))));
       }, err => {
         console.log(err);

@@ -1,3 +1,58 @@
+table {
+  width: 100%;
+}
+
+.history-body {
+  width: 1000px;
+}
+
+#green {
+  color: #388E3C;
+}
+
+.history-card {
+  width: 100%;
+}
+
+.subanomaly {
+}
+
+.report {
+  position: relative;
+  right: 40px;
+  bottom: 50px;
+}
+
+//.subanomaly table {
+//  border: 0;
+//}
+
+td.mat-cell {
+  border-bottom-style: none;
+}
+
+:not(.subanomaly) > td {
+  border-top: 2px solid #878787;
+}
+
+.first {
+  width: 250px;
+  padding-left: 8.25%;
+}
+
+.second {
+  padding-left: 30px;
+  width: 250px;
+}
+
+.inner-mat {
+  width: 80%;
+}
+
+.container {
+  height: 400px;
+}
+
 .setting-card {
   width: 70%;
 }
@@ -81,5 +136,3 @@ mat-slide-toggle{
     }
   }
 }
-
-

@@ -1,0 +1,267 @@
+<div class="history-body">
+  <mat-card class="history-card">
+    <div fxLayout="row">
+      <span class="app-spacer"></span>
+      <i id="close-icon" class="app-icon fa fa-times-circle" (click)="onExitClick()"></i>
+    </div>
+    <mat-card-header style="justify-content: center">
+      <mat-card-title style="text-align: center;">
+        <h2>Model evaluation</h2>
+        <h3>{{ meeting.name }}</h3>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <ng-container
+        *ngIf="meetingsHistory; then inferenceOn; else inferenceOff">
+      </ng-container>
+      <ng-template #inferenceOn>
+        <span>
+        <mat-form-field class="first" appearance="fill">
+          <mat-label>Select meeting to evaluate</mat-label>
+          <mat-select [(ngModel)]="selectedMeeting" (selectionChange)="onSelectMeetingChange()" required>
+            <mat-option *ngFor="let meeting of meetingsHistory" [value]="meeting.start.toISOString()">
+            {{meeting.start.toLocaleString('en-GB', options)}}
+            </mat-option>
+          </mat-select>
+          <mat-error *ngIf="meetingControl.hasError('required')">Please select a meeting</mat-error>
+        </mat-form-field>
+
+          <mat-form-field class="second" appearance="fill">
+          <mat-label>Select model to evaluate</mat-label>
+          <mat-select [(value)]="selectedModel" (selectionChange)="onSelectModelChange()" required>
+            <mat-option *ngFor="let model of filterModels" [value]="model">
+              {{ model }}
+            </mat-option>
+          </mat-select>
+            <mat-error *ngIf="modelControl.hasError('required')">Please select a model</mat-error>
+        </mat-form-field>
+          </span>
+
+      </ng-template>
+      <ng-template #inferenceOff>
+        <div fxLayoutAlign="center center">
+          <app-progress-bar></app-progress-bar>
+        </div>
+      </ng-template>
+
+      <ng-container [ngSwitch]="selectedModel">
+        <div fxLayoutAlign="center center">
+          <mat-card class="inner-mat">
+            <div>
+              <ng-container *ngSwitchCase="'ml model'">
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
+                    Train data range:
+                  </div>
+                  <div class="calendar" fxFlex="70%" fxLayoutAlign="center center">
+                    <mat-form-field>
+                      <input matInput
+                             placeholder="Date range"
+                             [satDatepicker]="picker"
+                             [value]="date"
+                             (dateChange)="saveDate($event)">
+                      <sat-datepicker #picker [rangeMode]="true"></sat-datepicker>
+                      <sat-datepicker-toggle matSuffix [for]="picker"></sat-datepicker-toggle>
+                    </mat-form-field>
+                  </div>
+                </div>
+
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
+                    Minimum participants:
+                  </div>
+                  <div fxFlex="70%" fxLayoutAlign="center center">
+                    <div class="custom-one-slider">
+                      <mat-slider [(ngModel)]="participants"
+                                  [min]=0
+                                  [max]=250
+                                  [tickInterval]=1
+                                  [thumbLabel]=true></mat-slider>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
+                    Minimum duration:
+                  </div>
+                  <div fxFlex="70%" fxLayoutAlign="center center">
+                    <div class="custom-one-slider">
+                      <mat-slider [(ngModel)]="duration"
+                                  [min]=0
+                                  [max]=480
+                                  [displayWith]="formatLabel"
+                                  [tickInterval]=1
+                                  [thumbLabel]=true></mat-slider>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
+                    Anomaly threshold:
+                  </div>
+                  <div fxFlex="70%" fxLayoutAlign="center center">
+                    <div class="custom-one-slider">
+                      <mat-slider [(ngModel)]="threshold"
+                                  [min]=75
+                                  [max]=100
+                                  [displayWith]="formatPercent"
+                                  [tickInterval]=1
+                                  [thumbLabel]=true></mat-slider>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'admin model'">
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.time_diff.checked"
+                                  (change)="onChange(this.config.time_diff)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Meeting duration range:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <div class="custom-slider">
+                      <ngx-slider [(value)]="this.config.time_diff.conditions.min"
+                                  [(highValue)]="this.config.time_diff.conditions.max" [options]="sliderOptions()"></ngx-slider>
+                    </div>
+                  </div>
+                </div>
+
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.max_participants.checked"
+                                  (change)="onChange(this.config.max_participants)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Maximum number of participant:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <div class="custom-one-slider">
+                      <mat-slider [(ngModel)]="this.config.max_participants.conditions"
+                                  [min]=0
+                                  [max]=250
+                                  [tickInterval]=1
+                                  [thumbLabel]=true
+                                  [disabled]="!this.config.max_participants.checked"></mat-slider>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.active_speaker.checked"
+                                  (change)="onChange(this.config.active_speaker)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Maximum number of speakers:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <div class="custom-one-slider">
+                      <mat-slider [(ngModel)]="this.config.active_speaker.conditions"
+                                  [min]=0
+                                  [max]=50
+                                  [tickInterval]=1
+                                  [thumbLabel]=true
+                                  [disabled]="!this.config.active_speaker.checked"></mat-slider>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.recording.checked"
+                                  (change)="onChange(this.config.recording)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Recording:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <div>
+                      <mat-slide-toggle class="setting-toogle"
+                                        color="warn"
+                                        (change)="onSliderChange(this.config.recording)"
+                                        [disabled]="!this.config.recording.checked"
+                                        [checked]="this.config.recording.conditions">
+                      </mat-slide-toggle>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.streaming.checked"
+                                  (change)="onChange(this.config.streaming)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Streaming:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <div>
+                      <mat-slide-toggle class="setting-toogle"
+                                        color="warn"
+                                        (change)="onSliderChange(this.config.streaming)"
+                                        [disabled]="!this.config.streaming.checked"
+                                        [checked]="this.config.streaming.conditions">
+                      </mat-slide-toggle>
+                    </div>
+                  </div>
+                </div>
+
+
+                <div class="row" fxLayout="row" fxLayoutAlign="center center">
+                  <div class="checkbox" fxFlex="20%">
+                    <mat-checkbox class="example-margin" [checked]="this.config.days.checked"
+                                  (change)="onChange(this.config.days)"></mat-checkbox>
+                  </div>
+                  <div fxFlex="20%" fxLayoutAlign="start center">
+                    Allowed days of the week:
+                  </div>
+                  <div fxFlex="60%" fxLayoutAlign="center center">
+                    <button mat-icon-button color="primary" [disabled]="!this.config.days.checked" (click)="openDaysDialog()">
+                      <mat-icon style="cursor: pointer;">calendar_today</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </ng-container>
+
+              <ng-container *ngSwitchDefault>
+                <div class="container"></div>
+              </ng-container>
+            </div>
+          </mat-card>
+        </div>
+      </ng-container>
+
+
+      <mat-card-actions>
+        <div fxLayout="row" fxLayoutAlign="center center">
+          <div fxFlex="50%" fxLayoutAlign="center center">
+            <button class="save-button"
+                    mat-flat-button
+                    color="warn"
+                    [disabled]="!this.selectedModel"
+                    (click)="onRestoreClick()">
+              Restore default <i class="app-icon-medium fa fa-trash fa-2x"></i>
+            </button>
+          </div>
+          <div fxFlex="50%" fxLayoutAlign="center center">
+            <button class="save-button"
+                    mat-flat-button
+                    color="primary"
+                    [disabled]="!(this.selectedMeeting && this.selectedModel)"
+                    (click)="onEvaluateClick()">
+              Evaluate model <i class="app-icon-medium fa fa-save fa-2x"></i>
+            </button>
+          </div>
+        </div>
+      </mat-card-actions>
+
+    </mat-card-content>
+  </mat-card>
+</div>

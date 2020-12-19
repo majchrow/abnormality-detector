@@ -1,20 +1,9 @@
 <mat-card class="first-card">
   <mat-card-content>
-    <div class="content">
-      Abnormalites detector web application.
-    </div>
+    <h2>Currently supported functionalities:</h2>
     <div class="listing">
-      Currently supported features
       <ul>
-        <li>
-          Meetings managment
-        </li>
-        <li>
-          Logging and plotting
-        </li>
-        <li>
-          Settings adjustment
-        </li>
+        <li *ngFor="let info of infos"> {{info}} </li>
       </ul>
     </div>
   </mat-card-content>
