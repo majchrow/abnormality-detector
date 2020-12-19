@@ -150,7 +150,7 @@ class CassandraDAO:
         result = await self.async_exec(
             'set_anomaly_monitoring_status',
             f'UPDATE meetings '
-            f'SET anomaly_monitored=%s '
+            f'SET ml_monitored=%s '
             f'WHERE meeting_name=%s '
             f'IF EXISTS;',
             (status, meeting_name)
@@ -161,7 +161,7 @@ class CassandraDAO:
         result = await self.async_exec(
             'get_anomaly_monitored_meetings',
             f'SELECT meeting_name FROM meetings '
-            f'WHERE anomaly_monitored=true ALLOW FILTERING;'
+            f'WHERE ml_monitored=true ALLOW FILTERING;'
         )
         return [m['meeting_name'] for m in result]
 
