@@ -45,6 +45,7 @@ class CassandraDAO:
             f"SELECT meeting_name as name, finished, start_datetime FROM {self.calls_table}"
         ).all()
         meetings = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
+        modeled_meetings = {m['meeting_name'] for m in self.session.execute(f"SELECT meeting_name FROM models;")}
 
         current = set()
         recent = set()
@@ -64,10 +65,13 @@ class CassandraDAO:
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
         }
 
-        monitored = [m for m in meetings if m["criteria"] or m["ml_monitored"]]
+        monitored = [m for m in meetings if m["criteria"] or m["meeting_name"] in modeled_meetings]
         for m in meetings:
             m.pop("monitored", None)
             m.pop("ml_monitored", None)
+            if not m['criteria']:
+                # ML only
+                m['criteria'] = '[]'
 
         current = list(
             map(
@@ -240,6 +244,7 @@ class CassandraDAO:
 
             if ml_score is not None:
                 ml_score = float(ml_score)
+            if ml_threshold is not None:
                 ml_threshold = float(ml_threshold)
             res["ml_anomaly_score"] = ml_score
             res["ml_threshold"] = ml_threshold
