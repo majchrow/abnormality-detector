@@ -5,6 +5,7 @@ from flask import current_app, request
 from marshmallow import ValidationError
 import pandas as pd
 import pytz
+import requests
 
 from .db import dao
 from .bridge import dao as bridge_dao
@@ -43,6 +44,15 @@ class Meetings(Resource):
             return {"message": f"conference to remove is not specified"}, 400
 
         try:
+            enc_name = requests.utils.quote(name)
+            r_thresh = requests.delete(f'http://backend-streaming:5000/monitoring/{enc_name}')
+            r_ml = requests.delete(f'http://backend-streaming:5000/anomaly-detection/{enc_name}')
+            
+            if r_thresh.status_code != 200 or r_ml.status_code != 200:
+                current_app.logger.warning(f'monitoring: {r_thresh.status_code}, anomaly-detection: {r_ml.status_code}')
+                current_app.logger.warning(f'monitoring: {r_thresh.content}, anomaly-detection: {r_ml.content}')
+                return {'message': f'failed to unschedule monitoring and inference for meeting {name}'}, 400
+
             dao.clear_meeting(name)
             return {
                 "message": f"successfully removed {name} from monitored conferences"
