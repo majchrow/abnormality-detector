@@ -20,10 +20,6 @@ def push_to_kafka(msg, producer):
         report(f'Failed to send {msg} to Kafka!')
 
 
-# TODO:
-#  - job doesn't exist
-#  - no training data
-#  - other failures during training?
 def main(serialized_job):
     config = Config()
     producer = KafkaProducer(bootstrap_servers=[config.kafka_bootstrap_server])
@@ -32,33 +28,33 @@ def main(serialized_job):
     job = json.loads(serialized_job)
     meeting_name = job['meeting_name']
     criteria = validate(job['criteria'])
-    start, end = job['start'], job['end']
+    start = dt.strptime(job['start'], '%Y-%m-%d %H:%M:%S.%fZ')
+    end = dt.strptime(job['end'], '%Y-%m-%d %H:%M:%S.%fZ')
 
-    # TODO: calls
-    ci_records, roster_records = dao.load_data(meeting_name, start, end)
+    call_records, ci_records, roster_records = dao.load_data(meeting_name, start, end)
+    call_records = list(zip(call_records, repeat(MsgType.CALLS)))
     ci_records = list(zip(ci_records, repeat(MsgType.CALL_INFO)))
     roster_records = list(zip(roster_records, repeat(MsgType.ROSTER)))
 
-    report(f'loaded training data: call-info {len(ci_records)}, roster {len(roster_records)}')
+    report(f'loaded training data: {len(call_records)} from calls, {len(ci_records)} from call_info, {len(roster_records)} from roster')
 
-    results = {MsgType.CALL_INFO: [], MsgType.ROSTER: []}
-    for rec, tpe in ci_records + roster_records:
+    results = {MsgType.CALLS: [], MsgType.CALL_INFO: [], MsgType.ROSTER: []}
+    cnt = 0
+
+    for rec, tpe in call_records + ci_records + roster_records:
         anomalies = check(rec, tpe, criteria)
         reason = json.dumps([a.dict() for a in anomalies])
-        results[tpe].append((bool(anomalies), reason, meeting_name, rec['datetime']))
+        timestamp = rec['last_update'] if tpe == MsgType.CALLS else rec['datetime']
+        results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
+        if anomalies:
+            cnt += 1
+    report(f'Detected {cnt} anomalies')
 
-    dao.save_anomaly_status(results[MsgType.CALL_INFO], results[MsgType.ROSTER])
+    dao.save_anomaly_status(results[MsgType.CALLS], results[MsgType.CALL_INFO], results[MsgType.ROSTER])
     report(f'inference job finished: run thresholds on {meeting_name} from {start} to {end}')
 
     msg = {'meeting_name': job['meeting_name'], 'status': 'success'}
     push_to_kafka(msg, producer)
-
-
-def map_anomaly_status(meeting, threshold, scores_df):
-    anomalies = []
-    for ts, p in scores_df.iterrows():
-        anomalies.append((p[1] > threshold, p[1], meeting, ts))
-    return anomalies
 
 
 if __name__ == '__main__':

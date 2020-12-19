@@ -172,7 +172,7 @@ class ThresholdManager(BaseWorkerManager):
         await self.kafka_producer.send_and_wait(topic='monitoring-thresholds-config', value=payload)
 
     async def fire_thresholds(self, meeting_name, criteria, start, end):
-        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+        if not await self.dao.meeting_exists(meeting_name):
             raise AppException.meeting_not_found()
 
         payload = json.dumps({
