@@ -116,14 +116,14 @@ class CassandraDAO:
         if ci_results:
             ci_stmt = self.session.prepare(
                 f"UPDATE call_info_update "
-                f"SET anomaly=%s, threshold=?"
+                f"SET anomaly=?, threshold=?"
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, ci_stmt, ci_results)
         if roster_results:
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
-                f"SET anomaly=%s, threshold=? "
+                f"SET anomaly=?, threshold=? "
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, roster_stmt, roster_results)

@@ -237,7 +237,7 @@ class AnomalyManager(BaseWorkerManager):
 
         job = {
             'meeting_name': meeting_name,
-            'training_calls': calls,
+            'training_call_starts': calls,
             'start': start,
             'end': end,
             'threshold': threshold

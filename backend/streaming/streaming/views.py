@@ -61,7 +61,7 @@ async def run_inference(request):
 
     try:
         payload = await request.json()
-        training_calls = list(map(parse, payload['training_calls']))
+        # training_calls = list(map(parse, payload['training_calls']))
         start, end = parse(payload['start']), parse(payload['end'])
         threshold = float(payload['threshold'])
     except JSONDecodeError:
@@ -72,7 +72,7 @@ async def run_inference(request):
         return web.HTTPBadRequest(reason=f'invalid date format')
 
     manager = request.app['monitoring']
-    await manager.run_inference(conf_name, training_calls, start, end, threshold)
+    await manager.run_inference(conf_name, payload['training_calls'], start, end, threshold)
     return web.Response()
 
 

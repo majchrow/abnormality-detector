@@ -31,7 +31,7 @@ def main(serialized_job):
 
     job = json.loads(serialized_job)
     meeting_name = job['meeting_name']
-
+    
     try:
         ci_df, roster_df = dao.load_calls_data(meeting_name, job['training_call_starts'])
         report(f'loaded training data: call-info {ci_df.shape}, roster {roster_df.shape}')
@@ -77,7 +77,7 @@ def main(serialized_job):
 def map_anomaly_status(meeting, threshold, scores_df):
     anomalies = []
     for ts, p in scores_df.iterrows():
-        anomalies.append((p[1] > threshold, str(p[1]), meeting, ts))
+        anomalies.append((p[1] > threshold, p[1], meeting, ts))
     return anomalies
 
 
