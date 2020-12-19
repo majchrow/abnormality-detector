@@ -21,12 +21,15 @@ from .exceptions import NotFoundError
 import random
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
+import numpy as np
+import math
 from flask import current_app
+import matplotlib
 
 sys.path.append(os.getcwd())
 
 options = {"enable-local-file-access": None}
-
+matplotlib.rcParams['timezone'] = "Europe/Warsaw"
 
 class ReportGenerator:
     def __init__(self, dao, name, template):
@@ -40,7 +43,14 @@ class ReportGenerator:
         self.css = f"{self.resources_dir}mystyle.css"
 
     def generate_plot_for_meeting(self, start_datetime):
+        current_app.logger.info(f"Generating plot for meeting: {self.name} {start_datetime}")
+
         bin_to_zero_one = lambda x: 1 if x else 0
+
+        end_datetime = None
+        if self.calls_data_provider.is_meeting_finished(start_datetime):
+            end_datetime = self.calls_data_provider.get_last_update(start_datetime)
+
         data = dict()
         data["current_participants"] = self.call_info_data_provider.get_data_for_column(
             start_datetime, "current_participants", parameter="participant"
@@ -70,16 +80,49 @@ class ReportGenerator:
         )
         data["anomalies"] = self.get_anomalies(start_datetime)
 
-        start = min(data["streaming"].index[0], data["presenters"].index[0])
-        end = max(data["streaming"].index[-1], data["presenters"].index[-1])
+        info_end = data["streaming"].index[-1]
+        roster_end = data["presenters"].index[-1]
+
+        info_data = ["streaming", "recording", "current_participants"]
+        roster_data = ["presenters", "active_speakers"]
+
+        for data_type in info_data:
+            data[data_type] = self.unify_data(
+                data[data_type], start_datetime, roster_end, end_datetime
+            )
+
+        for data_type in roster_data:
+            data[data_type] = self.unify_data(
+                data[data_type], start_datetime, info_end, end_datetime
+            )
+
+        if not data["anomalies"].empty:
+            data["anomalies"] = self.unify_data(data["anomalies"], start_datetime)
 
         plot = self.pg.create_plot(
             data,
             f"{self.resources_dir}{self.get_plot_filename(start_datetime)}",
-            start,
-            end,
+            start_datetime,
+            end_datetime,
         )
         return plot
+
+    def unify_data(self, data, call_start, other_data_end=None, call_end=None):
+        data = data[data.index >= call_start]
+        if data.index[0] > call_start:
+            first_row = data.head(1).copy()
+            first_row.set_index(np.array([call_start]), inplace=True)
+            data = pd.concat([first_row, data])
+        if call_end:
+            data = data[data.index <= call_end]
+        data_end = data.index[-1]
+        if other_data_end:
+            end_to_compare = call_end if call_end else max(call_end, other_data_end)
+            if data_end < end_to_compare:
+                last_row = data.tail(1).copy()
+                last_row.set_index(np.array([end_to_compare]), inplace=True)
+                data = pd.concat([data, last_row])
+        return data
 
     def get_plot_filename(self, start_datetime):
         name = unidecode.unidecode(self.name.replace(" ", ""))
@@ -103,7 +146,7 @@ class ReportGenerator:
         anomalies = pd.concat([info_anomalies, roster_anomalies]).sort_index()
         anomalies = anomalies[~anomalies["ml_anomaly_reason"].isna()]
         if not anomalies.empty:
-            anomalies["ml_anomaly_reason"] = "anomaly"
+            anomalies["ml_anomaly_reason"] = "ML anomaly"
         return anomalies
 
     def get_pdf_content(self):
@@ -178,9 +221,18 @@ class MeetingReportGenerator(ReportGenerator):
 
     def prepare_all_data(self):
         details = self.calls_data_provider.get_meeting_details(self.start_datetime)
+        if not details["finished"]:
+            last_info_update = self.call_info_data_provider.get_last_update(
+                self.start_datetime
+            )
+            last_roster_update = self.roster_data_provider.get_last_update(
+                self.start_datetime
+            )
+            self.last_update_time = max(last_info_update, last_roster_update).time()
+        else:
+            self.last_update_time = details["last_update_time"]
         self.date = details["date"]
         self.start_time = details["start_time"]
-        self.last_update_time = details["last_update_time"]
         self.duration = details["duration"]
         self.finished = details["finished"]
         self.plot = self.generate_plot_for_meeting(self.start_datetime)
@@ -278,8 +330,11 @@ class PlotGenerator:
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
 
-    def plot_line(self, timestamp):
-        plt.axvline(pd.Timestamp(timestamp), c="black", linewidth=1.5, linestyle="--")
+    def plot_line(self, timestamp, label=None):
+        line = plt.axvline(
+            pd.Timestamp(timestamp), c="black", linewidth=1.5, linestyle="--"
+        )
+        return line
 
     def create_plot(self, data, filename, start, end):
         fig = plt.figure(figsize=(17, 12))
@@ -288,7 +343,7 @@ class PlotGenerator:
         interval = 5  # TODO: duration (in min) / 20 ???
 
         lines = []
-        line0, ax0 = self.create_first_line(
+        line0, ax0, start_line = self.create_first_line(
             data["current_participants"],
             "current_participants",
             "royalblue",
@@ -297,6 +352,7 @@ class PlotGenerator:
             start,
             end,
         )
+        lines.append(start_line)
         lines.append(line0)
 
         is_last = True if data["anomalies"].empty else False
@@ -357,6 +413,7 @@ class PlotGenerator:
         ax0.legend(
             tuple(lines),
             (
+                "meeting start/end",
                 "number of participants",
                 "number of active speakers",
                 "number of presenters",
@@ -398,14 +455,17 @@ class PlotGenerator:
         start, end = ax0.get_ylim()
 
         max_value = data[column].max()
+        number_of_steps = 20
+        step = max(1, math.ceil(max_value / number_of_steps))
 
         ax0.set_ylim(-0.5, max(1, max_value) + 0.5)
-        ax0.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, 1))
+        ax0.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, step))
 
-        self.plot_line(start_time)
-        self.plot_line(end_time)
+        start_line = line = self.plot_line(start_time)
+        if end_time:
+            self.plot_line(end_time)
 
-        return line0, ax0
+        return line0, ax0, start_line
 
     def add_line(
         self,
@@ -452,7 +512,8 @@ class PlotGenerator:
             plt.setp(ax1.get_xticklabels(), visible=False)
 
         self.plot_line(start_time)
-        self.plot_line(end_time)
+        if end_time:
+            self.plot_line(end_time)
 
         return line1, ax1
 
@@ -463,10 +524,11 @@ class PlotGenerator:
         ax1.xaxis.set_major_formatter(myFmt)
         ax1.grid(True)
         line1 = ax1.plot(
-            anomalies.index, anomalies["ml_anomaly"], marker="x", c="r", linestyle=""
+            anomalies.index, anomalies["ml_anomaly_reason"], marker="x", c="r", linestyle=""
         )
         self.plot_line(start_time)
-        self.plot_line(end_time)
+        if end_time:
+            self.plot_line(end_time)
         return line1, ax1
 
 
@@ -507,6 +569,9 @@ class CallInfoDataProvider(MeetingDataProvider):
         del filtered["datetime"]
         return pd.DataFrame(filtered)
 
+    def get_last_update(self, start_datetime):
+        return self.data[self.data["start_datetime"] == start_datetime].index[-1]
+
 
 class CallsDataProvider(MeetingDataProvider):
     def __init__(self, name, dao):
@@ -527,6 +592,18 @@ class CallsDataProvider(MeetingDataProvider):
             "finished": meeting["finished"],
             "duration": self.__convert_seconds_to_time_format(meeting["duration"]),
         }
+
+    def get_last_update(self, start_datetime):
+        meeting = self.get_meeting(start_datetime)
+        return meeting["last_update"]
+
+    def is_meeting_finished(self, start_datetime):
+        meeting = self.get_meeting(start_datetime)
+        return meeting["finished"]
+
+    def get_meeting(self, start_datetime):
+        meeting = self.data[self.data["start_datetime"] == start_datetime].iloc[0]
+        return meeting
 
     def __init_dates(self):
         dates = list(pd.unique(self.data["date"]))
@@ -625,3 +702,6 @@ class RosterDataProvider(MeetingDataProvider):
         filtered.index = filtered["datetime"]
         del filtered["datetime"]
         return pd.DataFrame(filtered)
+
+    def get_last_update(self, start_datetime):
+        return self.data[self.data["start_datetime"] == start_datetime].index[-1]
