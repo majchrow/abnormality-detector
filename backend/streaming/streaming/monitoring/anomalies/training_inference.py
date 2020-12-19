@@ -77,7 +77,7 @@ def main(serialized_job):
 def map_anomaly_status(meeting, threshold, scores_df):
     anomalies = []
     for ts, p in scores_df.iterrows():
-        anomalies.append((p[1] > threshold, p[1], meeting, ts))
+        anomalies.append((p[1] > threshold, threshold, str(p[1]), meeting, ts))
     return anomalies
 
 

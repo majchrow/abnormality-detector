@@ -118,6 +118,16 @@ class Anomalies(Resource):
 
         result = dao.get_anomalies(meeting_name, start_date, end_date)
         result["anomalies"] = list(map(anomaly_schema.dump, result["anomalies"]))
+        for res in result['anomalies']:
+            ml_score, ml_thresh = res.pop('ml_anomaly_score'), res.pop('ml_threshold')
+            res['anomaly_reason'].append(
+                {
+                    'parameter': 'ML model', 
+                    'value': ml_score, 
+                    'condition_type': 'probability[%]', 
+                    'condition_value': ml_thresh
+                }
+            )
         return result
 
 
