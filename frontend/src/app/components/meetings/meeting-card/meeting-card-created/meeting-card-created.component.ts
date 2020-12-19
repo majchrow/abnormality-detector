@@ -3,6 +3,7 @@ import {Meeting} from '../../class/meeting';
 import {MeetingSSEService} from '../../../../services/meeting-sse.service';
 import {NotificationService} from '../../../../services/notification.service';
 import {Observable, Subscription} from 'rxjs';
+import {MeetingsService} from '../../../../services/meetings.service';
 
 @Component({
   selector: 'app-meeting-card-created',
@@ -19,18 +20,22 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
 
   constructor(
     private meetingSSEService: MeetingSSEService,
+    private meetingsService: MeetingsService,
     private notificationService: NotificationService
   ) {
   }
 
   monitoring: Observable<any>;
   subscription: Subscription;
-  monitored = false;
+  monitored;
+  mlMonitored;
+  last: boolean;
   count = 0;
 
 
   ngOnInit(): void {
     this.fetchMonitoring();
+    this.fetchMl();
   }
 
   ngOnDestroy(): void {
@@ -39,15 +44,40 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
     }
   }
 
+  fetchMl() {
+    this.meetingsService.getModelInfo(this.meeting).subscribe(
+      res => {
+        console.log(res);
+        this.last = !!res.last;
+        if (this.last) {
+          this.meetingSSEService.getMLMonitoring(this.meetingsService).subscribe(
+            () => {
+              this.mlMonitored = true;
+            },
+            err => {
+              this.mlMonitored = false;
+            }
+          );
+
+          } else {
+          this.mlMonitored = false;
+        }
+      }, err => {
+        console.log(err);
+      }
+    );
+  }
+
   fetchMonitoring() {
     this.meetingSSEService.fetchMonitoring(this.meeting.name).subscribe(
       res => {
-        this.monitored = res.monitored;
+        console.log(res);
+        this.monitored = !!res.monitored;
         if (this.monitored) {
           this.subscribeMonitoring();
         }
       }, err => {
-        console.log(err);
+        this.monitored = false;
       }
     );
   }
@@ -92,27 +122,52 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
     this.deleteEmitter.emit(this.meeting);
   }
 
+  onMLMonitoringChange(event: boolean) {
+    if (event) {
+      this.meetingSSEService.putMLMonitoring(this.meeting).subscribe(
+        () => {
+          this.notificationService.success('ML model monitoring started');
+          this.mlMonitored = true;
+        },
+        () => {
+          this.notificationService.warn('Starting ml model monitoring failed');
+        }
+      );
+    } else {
+      this.unsubscribeMonitoring();
+      this.meetingSSEService.deleteMLMonitoring(this.meeting).subscribe(
+        () => {
+          this.notificationService.success('Deletes ml model monitoring successfully');
+          this.monitored = false;
+        },
+        () => {
+          this.notificationService.warn('Delete ml model monitoring failed');
+        }
+      );
+    }
+  }
+
   onMonitoringChange(event: boolean) {
     if (event) {
       this.meetingSSEService.putMonitoring(this.meeting).subscribe(
         () => {
-          this.notificationService.success('Monitoring started');
+          this.notificationService.success('Admin model monitoring started');
           this.subscribeMonitoring();
           this.monitored = true;
         },
         () => {
-          this.notificationService.warn('Starting monitoring failed');
+          this.notificationService.warn('Starting admin model monitoring failed');
         }
       );
     } else {
       this.unsubscribeMonitoring();
       this.meetingSSEService.deleteMonitoring(this.meeting).subscribe(
         () => {
-          this.notificationService.success('Deletes monitoring successfully');
+          this.notificationService.success('Deletes admin model monitoring successfully');
           this.monitored = false;
         },
         () => {
-          this.notificationService.warn('Delete monitoring failed');
+          this.notificationService.warn('Delete admin model monitoring failed');
         }
       );
     }

@@ -1,9 +1,9 @@
 export class HistoryMeeting {
-  constructor(start: string, end: string) {
+  constructor(start: Date, end: Date) {
     this.start = start;
     this.end = end;
   }
 
-  start: string;
-  end: string;
+  start: Date;
+  end: Date;
 }

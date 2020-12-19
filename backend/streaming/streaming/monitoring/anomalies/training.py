@@ -14,7 +14,7 @@ def push_to_kafka(msg, producer):
     try:
         msg = json.dumps(msg).encode()
         future = producer.send('anomalies-training', msg)
-        record_metadata = future.get(timeout=5)
+        future.get(timeout=5)
     except KafkaError:
         report(f'Failed to send {msg} to Kafka!')
 

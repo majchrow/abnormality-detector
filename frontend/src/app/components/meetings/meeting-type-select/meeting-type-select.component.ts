@@ -15,9 +15,9 @@ export class SelectMeetingTypeComponent {
   @Input() selected: string;
 
   meetingTypes: MeetingType[] = [
-    {value: 'created', viewValue: 'Created'},
+    {value: 'created', viewValue: 'Monitored'},
     {value: 'current', viewValue: 'Current'},
-    {value: 'recent', viewValue: 'Recent'},
+    {value: 'recent', viewValue: 'Historical'},
   ];
 
   onMeetingTypeChange(selectedOption: string) {

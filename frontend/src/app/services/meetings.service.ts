@@ -30,28 +30,40 @@ export class MeetingsService {
     let headers = new HttpHeaders();
     headers = headers.set('Accept', 'application/pdf');
     const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}`;
+    console.log(url);
     return this.http.get(url, {headers, responseType: 'blob' as 'json'});
+  }
+
+  getModelInfo(meeting: Meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.models}/${meeting.name}`;
+    return this.http.get<any>(url);
   }
 
   getReports(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
     let headers = new HttpHeaders();
     headers = headers.set('Accept', 'application/pdf');
-    const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}?start_datetime=${historyMeeting.start}`;
+    const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}?start_datetime=${historyMeeting.start.toISOString()}`;
+    console.log(url);
     return this.http.get(url, {headers, responseType: 'blob' as 'json'});
   }
 
   deleteMeeting(meeting: Meeting): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.meetings}?name=${meeting.name}`;
+    const url = `${this.backend.url}/${this.backend.public_meetings}?name=${meeting.name}`;
     return this.http.delete(url);
   }
 
   fetchMeeting(name: string): Observable<Meeting> {
-    const url = `${this.backend.url}/${this.backend.meetings}/${name}`;
+    const url = `${this.backend.url}/${this.backend.public_meetings}/${name}`;
     return this.http.get<Meeting>(url);
   }
 
   fetchMeetingHistory(name: string): Observable<any> {
     const url = `${this.backend.url}/${this.backend.meetings}/${name}`;
+    return this.http.get<any>(url);
+  }
+
+  fetchMeetingHistoryModel(name: string, start: Date, end: Date, minParticipants: number, duration: number): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.meetings}/${name}?start=${start.toISOString()}&end=${end.toISOString()}&min_duration=${duration}&max_participants=${minParticipants}`;
     return this.http.get<any>(url);
   }
 
@@ -67,11 +79,13 @@ export class MeetingsService {
 
   fetchAnomalies(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}`;
+    console.log(url);
     return this.http.get<any>(url);
   }
 
   fetchAnomaliesHistory(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start}&?end=${historyMeeting.end}`;
+    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start.toISOString()}&end=${historyMeeting.end.toISOString()}`;
+    console.log(url);
     return this.http.get<any>(url);
   }
 

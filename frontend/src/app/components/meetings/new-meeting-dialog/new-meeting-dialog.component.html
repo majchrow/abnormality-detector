@@ -6,7 +6,7 @@
     </div>
     <mat-card-header style="justify-content: center">
       <mat-card-title style="text-align: center;">
-        <h2>Create new meeting</h2>
+        <h2>Monitor new room</h2>
       </mat-card-title>
     </mat-card-header>
     <ng-container
@@ -21,7 +21,7 @@
                 {{meeting}}
               </mat-option>
             </mat-select>
-            <mat-error *ngIf="meetingControl.hasError('required')">Please choose an meeting</mat-error>
+            <mat-error *ngIf="meetingControl.hasError('required')">Please select a room</mat-error>
           </mat-form-field>
         </mat-card-content>
         <mat-card-actions>
@@ -31,7 +31,7 @@
                       mat-flat-button
                       color="warn"
                       (click)="onRestoreClick()">
-                Restore Default <i class="app-icon-medium fa fa-trash fa-2x"></i>
+                Restore default <i class="app-icon-medium fa fa-trash fa-2x"></i>
               </button>
             </div>
             <div fxFlex="50%" fxLayoutAlign="center center">

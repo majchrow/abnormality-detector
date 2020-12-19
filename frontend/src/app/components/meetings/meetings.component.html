@@ -41,7 +41,7 @@
           </span>
           <span class="search-engine">
             <mat-form-field>
-              <mat-label>Filter by id</mat-label>
+              <mat-label>Filter by ID</mat-label>
               <input matInput [ngModel]="id" (ngModelChange)="filterIds($event)">
             </mat-form-field>
           </span>
@@ -95,21 +95,21 @@
                   (click)="newMeetingDialog()"
                 >
                   <mat-card-header fxLayout="row" fxLayoutAlign="center center">
-                    <mat-card-title> Dodaj spotkanie</mat-card-title>
+                    <mat-card-title> Add room to monitored</mat-card-title>
                   </mat-card-header>
                 </mat-card>
               </div>
 
-              <div class="footer" *ngIf="allMeetings.current.length !== 0">
-                <!-- todo - make it working -->
-                <mat-paginator
-                  [length]="paginatorSize"
-                  [pageSize]="numberOfProductsDisplayedInPage"
-                  [pageSizeOptions]="pageSizeOptions"
-                  (page)="updateMeetingsDisplayedInPage($event)"
-                >
-                </mat-paginator>
-              </div>
+<!--              <div class="footer" *ngIf="allMeetings.current.length !== 0">-->
+<!--                &lt;!&ndash; todo - make it working &ndash;&gt;-->
+<!--                <mat-paginator-->
+<!--                  [length]="paginatorSize"-->
+<!--                  [pageSize]="numberOfProductsDisplayedInPage"-->
+<!--                  [pageSizeOptions]="pageSizeOptions"-->
+<!--                  (page)="updateMeetingsDisplayedInPage($event)"-->
+<!--                >-->
+<!--                </mat-paginator>-->
+<!--              </div>-->
             </div>
           </mat-card-content>
         </ng-template>

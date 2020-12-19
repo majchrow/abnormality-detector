@@ -2,10 +2,10 @@
   <mat-card-header style="justify-content: left">
     <mat-card-title>
       <div>
-        Name: {{ meeting.name }}
+        {{ meeting.name }}
       </div>
       <div>
-        Id: {{ meeting.meeting_number }}
+        ID: {{ meeting.meeting_number }}
       </div>
     </mat-card-title>
   </mat-card-header>
@@ -13,18 +13,47 @@
 
   </mat-card-content>
   <mat-card-actions fxLayout="row" fxLayoutAlign="end center">
-    <mat-slide-toggle class="setting-toogle"
-                      color="warn"
-                      [checked]="this.monitored"
-                      (change)=onMonitoringChange($event.checked)
-                      [disabled]="this.meeting.criteria.length === 0">
+    <ng-container
+      *ngIf="this.monitored !== undefined && this.mlMonitored !== undefined ; then monitoringOn; else monitoringOff">
+    </ng-container>
+    <ng-template #monitoringOn>
+      <div>
+        ML
+        <mat-slide-toggle class="setting-toogle"
+                          color="warn"
+                          [checked]="this.mlMonitored"
+                          (change)=onMLMonitoringChange($event.checked)
+                          [disabled]="!this.last">
 
-    </mat-slide-toggle>
-    <span [matBadge]="''+count" matBadgeColor="warn" [matBadgeHidden]="count === 0" matBadgeOverlap="false"></span>
+        </mat-slide-toggle>
+        <span class="admin">
+           Admin
+        <mat-slide-toggle class="setting-toogle"
+                          color="warn"
+                          [checked]="this.monitored"
+                          (change)=onMonitoringChange($event.checked)
+                          [disabled]="this.meeting.criteria.length === 0">
+
+        </mat-slide-toggle>
+        </span>
+      </div>
+
+      <span [matBadge]="''+count" matBadgeColor="warn" [matBadgeHidden]="count === 0" matBadgeOverlap="false"></span>
+    </ng-template>
+
+    <ng-template #monitoringOff>
+      <div class="progress-bar" fxLayoutAlign="center center">
+        <app-progress-bar></app-progress-bar>
+      </div>
+    </ng-template>
+
+
     <span class="app-spacer"></span>
     <i class="app-icon fa fa-lightbulb-o" (click)="onModelClick()"></i>
     <i class="app-icon fa fa-cog" (click)="onSettingClick()"></i>
     <i class="app-icon fa fa-history" (click)="onHistoryClick()"></i>
     <i class="app-icon fa fa-trash" (click)="onDeleteClick()"></i>
   </mat-card-actions>
+
+
 </mat-card>
