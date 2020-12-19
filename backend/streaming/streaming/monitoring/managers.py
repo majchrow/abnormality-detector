@@ -16,6 +16,7 @@ from ..db import CassandraDAO
 from ..config import Config
 from ..exceptions import AppException
 
+
 class Manager:
 
     TAG = 'Manager'
@@ -26,7 +27,7 @@ class Manager:
 
         self.anomaly_manager = AnomalyManager(dao, config)
         self.kafka_manager = KafkaListener(config.kafka_bootstrap_server, config.kafka_call_list_topic)
-        self.threshold_manager = ThresholdManager(config)
+        self.threshold_manager = ThresholdManager(dao, config)
 
     def start(self):
         asyncio.create_task(self._run())
@@ -69,9 +70,6 @@ class Manager:
     async def is_anomaly_monitored(self, conf_name: str):
         return await self.dao.is_anomaly_monitored(conf_name)
 
-    async def is_anomaly_monitored(self, conf_name: str):
-        return await self.dao.is_anomaly_monitored(conf_name)
-
     ############
     # monitoring
     ############
@@ -85,6 +83,11 @@ class Manager:
         await self.dao.set_monitoring_status(meeting_name, monitored=False)
         await self.threshold_manager.unschedule(meeting_name)
         logging.info(f'{self.TAG}: unscheduled monitoring for {meeting_name}')
+
+    async def run_monitoring(self, meeting_name: str, criteria: List[dict], start: datetime, end: datetime):
+        validate(criteria)
+        await self.threshold_manager.fire_thresholds(meeting_name, criteria, start, end)
+        logging.info(f'{self.TAG}: ran training & inference for {meeting_name}')
 
     async def get_all_monitored(self):
         # TODO: test if DAO works
@@ -142,11 +145,12 @@ class ThresholdManager(BaseWorkerManager):
 
     TAG = 'ThresholdManager'
 
-    def __init__(self, config: Config):
+    def __init__(self, dao: CassandraDAO, config: Config):
         super().__init__()
         self.cmd = ['python3', '-m', 'streaming.monitoring.thresholds.monitor']
         self.num_workers = config.num_threshold_workers
         self.worker_id = 'thresholds-worker'
+        self.dao = dao
         self.kafka_producer = None
 
     def init(self, kafka_producer):
@@ -166,6 +170,21 @@ class ThresholdManager(BaseWorkerManager):
             'meeting_name': meeting_name
         }).encode()
         await self.kafka_producer.send_and_wait(topic='monitoring-thresholds-config', value=payload)
+
+    async def fire_thresholds(self, meeting_name, criteria, start, end):
+        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+            raise AppException.meeting_not_found()
+
+        payload = json.dumps({
+            'meeting_name': meeting_name,
+            'criteria': criteria,
+            'start': start,
+            'end': end,
+        }, cls=DateTimeEncoder).encode()
+        asyncio.create_task(run_for_result(
+            'batch-thresholds-worker',
+            ['python3', '-m', 'streaming.monitoring.thresholds.batch', payload]
+        ))
 
 
 def async_partial(coro_fun, *args, **kwargs):

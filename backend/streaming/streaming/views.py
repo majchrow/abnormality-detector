@@ -61,13 +61,12 @@ async def run_inference(request):
 
     try:
         payload = await request.json()
-        # training_calls = list(map(parse, payload['training_calls']))
         start, end = parse(payload['start']), parse(payload['end'])
         threshold = float(payload['threshold'])
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
     except KeyError:
-        raise web.HTTPBadRequest(reason='fields "calls" and "threshold" are mandatory')
+        raise web.HTTPBadRequest(reason='fields "start", "end" and "threshold" are mandatory')
     except ParserError:
         return web.HTTPBadRequest(reason=f'invalid date format')
 
@@ -82,19 +81,22 @@ async def run_monitoring(request):
 
     try:
         payload = await request.json()
-        training_calls = list(map(parse, payload['training_calls']))
+        criteria = payload['criteria']
         start, end = parse(payload['start']), parse(payload['end'])
-        threshold = float(payload['threshold'])
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
     except KeyError:
-        raise web.HTTPBadRequest(reason='fields "calls" and "threshold" are mandatory')
+        raise web.HTTPBadRequest(reason='fields "criteria", "start" and "end" are mandatory')
     except ParserError:
         return web.HTTPBadRequest(reason=f'invalid date format')
 
     manager = request.app['monitoring']
-    await manager.run_inference(conf_name, training_calls, start, end, threshold)
-    return web.Response()
+    try:
+        await manager.run_monitoring(conf_name, criteria, start, end)
+        return web.Response()
+    except ValidationError as e:
+        return web.HTTPBadRequest(reason=str(e))
+
 
 async def schedule_monitoring(request):
     # TODO: meeting_name, not conf_name
