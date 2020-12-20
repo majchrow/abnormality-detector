@@ -1,6 +1,7 @@
 import json
 import logging
 from aiokafka import AIOKafkaConsumer
+from datetime import datetime as dt
 
 
 class KafkaListener:
@@ -24,6 +25,7 @@ class KafkaListener:
         try:
             async for msg in self.consumer:
                 msg_dict = json.loads(msg.value.decode())
+                timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).isoformat()
 
                 if msg.topic == self.call_list_topic:
                     call_name = msg_dict['meeting_name']
@@ -34,7 +36,7 @@ class KafkaListener:
                     else:
                         event = None
                     if event and self.call_event_listeners:
-                        msg = {'name': call_name, 'status': 'info', 'event': event}
+                        msg = {'name': call_name, 'status': 'info', 'event': event, 'timestamp': timestamp}
                         logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
                         for queue in self.call_event_listeners:
                             queue.put_nowait(msg)
@@ -42,7 +44,7 @@ class KafkaListener:
 
                 if msg.topic == 'anomalies-training' and self.call_event_listeners:
                     call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
-                    msg = {'name': call_name, 'status': status, 'event': event}
+                    msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
                     logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
                     for queue in self.call_event_listeners:
                         queue.put_nowait(msg)
