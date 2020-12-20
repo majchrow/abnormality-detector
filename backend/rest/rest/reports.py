@@ -29,7 +29,8 @@ import matplotlib
 sys.path.append(os.getcwd())
 
 options = {"enable-local-file-access": None}
-matplotlib.rcParams['timezone'] = "Europe/Warsaw"
+matplotlib.rcParams["timezone"] = "Europe/Warsaw"
+
 
 class ReportGenerator:
     def __init__(self, dao, name, template):
@@ -43,7 +44,9 @@ class ReportGenerator:
         self.css = f"{self.resources_dir}mystyle.css"
 
     def generate_plot_for_meeting(self, start_datetime):
-        current_app.logger.info(f"Generating plot for meeting: {self.name} {start_datetime}")
+        current_app.logger.info(
+            f"Generating plot for meeting: {self.name} {start_datetime}"
+        )
 
         bin_to_zero_one = lambda x: 1 if x else 0
 
@@ -117,7 +120,7 @@ class ReportGenerator:
             data = data[data.index <= call_end]
         data_end = data.index[-1]
         if other_data_end:
-            end_to_compare = call_end if call_end else max(call_end, other_data_end)
+            end_to_compare = call_end if call_end else other_data_end
             if data_end < end_to_compare:
                 last_row = data.tail(1).copy()
                 last_row.set_index(np.array([end_to_compare]), inplace=True)
@@ -330,12 +333,21 @@ class PlotGenerator:
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
 
-    def plot_line(self, timestamp, is_last=False):
+    def plot_line(self, timestamp, is_last=False, ax=None):
         line = plt.axvline(
             pd.Timestamp(timestamp), c="black", linewidth=2, linestyle="--"
         )
         if is_last:
-            plt.text(x=pd.Timestamp(timestamp), y=-.7, s=f"{str(timestamp)[11:19]}", weight='bold', fontsize=12, color='black',ha='center', va='top')
+            plt.text(
+                x=pd.Timestamp(timestamp),
+                y=-0.7,
+                s=f"{str(timestamp)[11:19]}",
+                weight="bold",
+                fontsize=12,
+                color="black",
+                ha="center",
+                va="top",
+            )
         return line
 
     def create_plot(self, data, filename, start, end):
@@ -427,7 +439,7 @@ class PlotGenerator:
 
         plt.subplots_adjust(hspace=0.0)
 
-        plt.savefig(filename)
+        plt.savefig(filename, bbox_inches="tight")
 
         plot = self.image_file_path_to_base64_string(filename)
 
@@ -467,6 +479,9 @@ class PlotGenerator:
         if end_time:
             self.plot_line(end_time)
 
+        # ax0.spines["bottom"].set_color("black")
+        # ax0.spines["left"].set_color("black")
+
         return line0, ax0, start_line
 
     def add_line(
@@ -501,8 +516,14 @@ class PlotGenerator:
 
         max_value = data[column].max()
 
-        ax1.set_ylim(-0.2, max(1, max_value) + 0.2)
-        ax1.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, 1))
+        if column == "active_speakers":
+            number_of_steps = 10
+            step = max(1, math.ceil(max_value / number_of_steps))
+            ax1.set_ylim(-1, max(1, max_value) + 1)
+        else:
+            step = 1
+            ax1.set_ylim(-0.2, max(1, max_value) + 0.2)
+        ax1.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, step))
 
         if is_binary:
             labels = [item.get_text() for item in ax1.get_yticklabels()]
@@ -517,6 +538,9 @@ class PlotGenerator:
         if end_time:
             self.plot_line(end_time, is_last)
 
+        # ax1.spines["bottom"].set_color("black")
+        # ax1.spines["left"].set_color("black")
+
         return line1, ax1
 
     def add_anomalies(self, anomalies, gs, index, interval, ax, start_time, end_time):
@@ -526,11 +550,19 @@ class PlotGenerator:
         ax1.xaxis.set_major_formatter(myFmt)
         ax1.grid(True)
         line1 = ax1.plot(
-            anomalies.index, anomalies["ml_anomaly_reason"], marker="x", c="r", linestyle=""
+            anomalies.index,
+            anomalies["ml_anomaly_reason"],
+            marker="x",
+            c="r",
+            linestyle="",
         )
         self.plot_line(start_time, True)
         if end_time:
             self.plot_line(end_time, True)
+
+        # ax1.spines["bottom"].set_color("black")
+        # ax1.spines["left"].set_color("black")
+
         return line1, ax1
 
 
