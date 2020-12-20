@@ -6,7 +6,6 @@ import os
 import signal
 from aiokafka import AIOKafkaProducer
 from asyncio import Queue
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
@@ -45,8 +44,6 @@ class ClientManager:
         self.session = aiohttp.ClientSession()
 
         self.calls = {}
-        self.call_starts = {}
-        self.call_counts = defaultdict(int)
         self.dump_queue = Queue()
         self.publish_queue = Queue()
 
@@ -163,83 +160,66 @@ class ClientManager:
 
     async def on_call_list_update(self, msg: dict, client_endpoint: Client):
         updates = msg["message"]["updates"]
-        current_ts = msg["date"]  # datetime.now().isoformat()
+        current_ts = datetime.now().isoformat()
         call = None
 
         for update in updates:
             update_type = update["updateType"]
             call_name = update["name"]
-            call_id = update["call"]
             finished = False
-            start_datetime = None
 
             if update_type == 'add':
-                if not (call := self.calls.get(call_id, None)):
-                    call = self.calls[call_id] = Call(
-                        manager=self, call_name=call_name, call_id=call_id, start_datetime=current_ts
-                    )
+                if not (call := self.calls.get(call_name, None)):
+                    call = self.calls[call_name] = Call(manager=self, call_name=call_name, start_datetime=current_ts)
                 await call.add(client_endpoint)
-
-                self.call_counts[call_name] += 1
-                if self.call_counts[call_name] == 1:
-                    self.call_starts[call_name] = current_ts
-                start_datetime = self.call_starts[call_name]
             elif update_type == 'remove':
-                if call_id not in self.calls:
-                    logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name} {call_id}')
+                if call_name not in self.calls:
+                    logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
                     continue
 
-                call = self.calls[call_id]
+                call = self.calls[call_name]
                 await call.remove(client_endpoint)
-
-                start_datetime = self.call_starts[call_name]
-                self.call_counts[call_name] -= 1
-                if self.call_counts[call_name] == 0:
-                    del self.call_starts[call_name]
-
                 if call.done:
-                    del self.calls[call_id]
+                    del self.calls[call_name]
                     finished = True
             else:
-                call = self.calls[call_id]
-                start_datetime = self.call_starts[call_name]
-
+                call = self.calls[call_name]
             update['finished'] = finished
-            update['startDatetime'] = start_datetime
+            update['startDatetime'] = call.start_datetime
 
         if call:
-            # msg['date'] = current_ts
+            msg['date'] = current_ts
             await self.publish(msg)
             await self.dump(msg)
 
-    async def on_call_info_update(self, msg: dict, call_id: str):
-        if not (call := self.calls.get(call_id, None)):
-            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_id}')
+    async def on_call_info_update(self, msg: dict, call_name: str):
+        if not (call := self.calls.get(call_name, None)):
+            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
 
         self.timestamp(msg, call)
         await self.publish(msg)
         await self.dump(msg)
 
-    async def on_roster_update(self, msg: dict, call_id: str):
-        if not (call := self.calls.get(call_id, None)):
-            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_id}')
+    async def on_roster_update(self, msg: dict, call_name: str):
+        if not (call := self.calls.get(call_name, None)):
+            logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
             return
         
         self.timestamp(msg, call)
         await self.publish(msg)
         await self.dump(msg)
 
-    def timestamp(self, msg, call):
-        msg['startDatetime'] = self.call_starts[call.call_name]
-        # msg['date'] = datetime.now().isoformat()
+    @staticmethod
+    def timestamp(msg, call):
+        msg['startDatetime'] = call.start_datetime
+        msg['date'] = datetime.now().isoformat()
         
 
 class Call:
-    def __init__(self, manager, call_name, call_id, start_datetime):
+    def __init__(self, manager, call_name, start_datetime):
         self.manager = manager
         self.call_name = call_name
-        self.call_id = call_id
         self.handler = None
         self.clients = set()
         self.start_datetime = start_datetime 
@@ -260,7 +240,7 @@ class Call:
         else:
             # No one's been listening so this client will
             self.handler = client
-            await client.on_connect_to(self.call_name, self.call_id)
+            await client.on_connect_to(self.call_name)
             logging.info(f'{self.manager.TAG}: {self.call_name} running on 1 server')
 
     async def remove(self, client):
@@ -268,16 +248,14 @@ class Call:
             # All clients left server we've been listening to so far,
             # we need a new client to take over
             try:
-                await self.handler.on_disconnect_from(self.call_name, self.call_id)
+                await self.handler.on_disconnect_from(self.call_name)
                 self.handler = next(iter(self.clients))
                 self.clients.discard(self.handler)
-                logging.info(f'{self.manager.TAG}: handler swap for {self.call_name}')
-                await self.handler.on_connect_to(self.call_name, self.call_id)
+                await self.handler.on_connect_to(self.call_name)
             except StopIteration:
                 # No other clients
                 self.handler = None
         else:
-            logging.info(f'{self.manager.TAG}: secondary client disconnected for {self.call_name}')
             self.clients.remove(client)
 
         if self.handler:

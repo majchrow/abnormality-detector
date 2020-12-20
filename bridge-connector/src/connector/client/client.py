@@ -2,7 +2,6 @@ import aiohttp
 import json
 import logging
 from aiohttp import ClientConnectionError
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 from websockets import connect
@@ -46,6 +45,7 @@ class Client:
         #  - we add this info to the message if necessary
         self.subscription_ind = 2
         self.subscriptions = {}         # subscription index -> Call
+        self.calls = {}                 # call name -> Call
         self.call_ids = {}              # call ID -> Call
 
     @property
@@ -120,7 +120,7 @@ class Client:
             if update_type == 'add':
                 call_name = update["name"]
                 call = Call(name=call_name, id=call_id, ci_subscription_index=None)
-                self.call_ids[call_id] = call
+                self.calls[call_name] = self.call_ids[call_id] = call
             else:
                 call_name = self.call_ids[call_id].name
                 update['name'] = call_name
@@ -133,7 +133,7 @@ class Client:
         call = self.subscriptions[index]
         msg["message"]["callInfo"]["call"] = call.id
         msg["message"]["callInfo"]["name"] = call.name
-        await self.call_manager.on_call_info_update(msg, call.id)
+        await self.call_manager.on_call_info_update(msg, call.name)
 
     async def on_roster_update(self, msg: dict):
         # Add call name and call ID
@@ -141,14 +141,14 @@ class Client:
         call = self.subscriptions[index]
         msg["call"] = call.id
         msg["name"] = call.name
-        await self.call_manager.on_roster_update(msg, call.id)
+        await self.call_manager.on_roster_update(msg, call.name)
 
-    async def on_connect_to(self, call_name, call_id):
+    async def on_connect_to(self, call_name):
         # Setup subscription indexes for call info and roster info
         s_ind = self.subscription_ind
         self.subscription_ind += 2
 
-        call = self.call_ids[call_id]
+        call = self.calls[call_name]
         call.ci_subscription_index = s_ind
         self.subscriptions[s_ind] = self.subscriptions[s_ind + 1] = call
 
@@ -156,12 +156,13 @@ class Client:
         await self._subscribe()
         logging.info(f'{self.TAG}: subscribed to call {call.name} with ID {call.id}')
 
-    async def on_disconnect_from(self, call_name, call_id):
-        call = self.call_ids[call_id]
+    async def on_disconnect_from(self, call_name):
+        call = self.calls[call_name]
         s_ind = call.ci_subscription_index
 
         del self.subscriptions[s_ind]
         del self.subscriptions[s_ind + 1]
+        del self.calls[call_name]
         del self.call_ids[call.id]
 
         logging.info(f'{self.TAG}: removed call {call_name} with ID {call.id}')
