@@ -218,7 +218,11 @@ class DaysCriterion(StrictModel, Criterion):
     def verify(self, message, msg_type):
         if msg_type == MsgType.CALLS:
             return
-        week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
+        
+        if isinstance(message['datetime'], datetime):
+            week_day, date_time = message['week_day_number'], message['datetime']
+        else:
+            week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
 
         for c in self.conditions:
             if week_day == c.day:

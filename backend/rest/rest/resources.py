@@ -123,9 +123,9 @@ class Anomalies(Resource):
             ml_score, ml_thresh = res.pop('ml_anomaly_score'), res.pop('ml_threshold')
             res['anomaly_reason'].append(
                 {
-                    'parameter': 'ML model', 
+                    'parameter': 'ml_model', 
                     'value': ml_score, 
-                    'condition_type': 'probability[%]', 
+                    'condition_type': 'prob', 
                     'condition_value': ml_thresh
                 }
             )
@@ -180,11 +180,33 @@ class Notifications(Resource):
     @cross_origin()
     def get(self):
         try:
-            num_msgs = request.args.get("count")
-            result = kafka_consumer.get_last(num_msgs)
-            return {'last': result}
+            num_msgs = int(request.args.get("count"))
         except KeyError:
             return {'message': '"count" is mandatory'}, 400
+        except ValueError:
+            return {'message': '"count" must be an integer'}, 400
+        
+        messages = kafka_consumer.get_last(num_msgs)
+        result = list(map(self.process_msg, messages))
+        result = [r for r in result if r]
+        return {'last': result}
+
+    @staticmethod
+    def process_msg(msg):
+        topic = msg['topic']
+        msg =  msg['content']
+        name = msg['meeting_name']
+
+        if topic != 'preprocessed_callListUpdate':
+            event = msg['status']
+        else:
+            if msg['finished']:
+                event = 'finished'
+            elif msg['start_datetime'] == msg['last_update']:
+                event = 'started'
+            else:
+                return None
+        return {'name': name, 'event': event}
 
 
 def setup_resources(app):
@@ -194,7 +216,7 @@ def setup_resources(app):
     api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
     api.add_resource(Calls, "/calls")
     api.add_resource(CallHistory, "/calls/<string:meeting_name>")
-    api.add_resource()
+    api.add_resource(Notifications, "/notifications")
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
     api.add_resource(Models, "/models/<string:meeting_name>")
 

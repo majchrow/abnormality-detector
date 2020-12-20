@@ -246,7 +246,6 @@ class CassandraDAO:
                 ml_threshold = float(ml_threshold)
             res["ml_anomaly_score"] = ml_score
             res["ml_threshold"] = ml_threshold
-
         return {"anomalies": sorted(results, key=lambda r: r["datetime"])}
 
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting

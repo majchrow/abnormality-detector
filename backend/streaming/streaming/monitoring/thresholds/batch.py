@@ -44,7 +44,7 @@ def main(serialized_job):
     for rec, tpe in call_records + ci_records + roster_records:
         anomalies = check(rec, tpe, criteria)
         reason = json.dumps([a.dict() for a in anomalies])
-        timestamp = rec['last_update'] if tpe == MsgType.CALLS else rec['datetime']
+        timestamp = rec['start_datetime'] if tpe == MsgType.CALLS else rec['datetime']
         results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
         if anomalies:
             cnt += 1
@@ -53,7 +53,7 @@ def main(serialized_job):
     dao.save_anomaly_status(results[MsgType.CALLS], results[MsgType.CALL_INFO], results[MsgType.ROSTER])
     report(f'inference job finished: run thresholds on {meeting_name} from {start} to {end}')
 
-    msg = {'meeting_name': job['meeting_name'], 'status': 'success'}
+    msg = {'meeting_name': job['meeting_name'], 'status': 'Monitoring job finished with status: success'}
     push_to_kafka(msg, producer)
 
 
