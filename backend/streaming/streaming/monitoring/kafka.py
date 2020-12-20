@@ -1,5 +1,6 @@
 import json
 import logging
+import pytz
 from aiokafka import AIOKafkaConsumer
 from datetime import datetime as dt
 
@@ -25,7 +26,7 @@ class KafkaListener:
         try:
             async for msg in self.consumer:
                 msg_dict = json.loads(msg.value.decode())
-                timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).isoformat()
+                timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw')).isoformat()
 
                 if msg.topic == self.call_list_topic:
                     call_name = msg_dict['meeting_name']

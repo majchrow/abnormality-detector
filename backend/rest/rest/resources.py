@@ -213,6 +213,16 @@ class Notifications(Resource):
         return {'name': name, 'timestamp': ts, 'status': status, 'event': event}
 
 
+class Monitoring(Resource):
+    @cross_origin()
+    def get(self):
+        # TODO:
+        #  - number of admin/ML actively monitored meetings
+        #  - number of meetings with ML model trained/criteria set
+        #  - ???
+        return {}, 200
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Report, "/reports/<string:meeting_name>")
@@ -223,4 +233,5 @@ def setup_resources(app):
     api.add_resource(Notifications, "/notifications")
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
     api.add_resource(Models, "/models/<string:meeting_name>")
+    api.add_resource(Monitoring, "/monitoring")
 
