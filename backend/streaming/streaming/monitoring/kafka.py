@@ -2,7 +2,7 @@ import json
 import logging
 import pytz
 from aiokafka import AIOKafkaConsumer
-from datetime import datetime as dt
+from datetime import datetime as dt, timezone
 
 
 class KafkaListener:
@@ -24,7 +24,7 @@ class KafkaListener:
         await self.consumer.start()
 
         try:
-            async for msg in self.consumer:
+            async for msg in self.consumer:               
                 msg_dict = json.loads(msg.value.decode())
                 timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw')).isoformat()
 
@@ -57,6 +57,8 @@ class KafkaListener:
                 logging.info(f'{self.TAG}: pushing {msg_dict} to {len(listeners)} listeners')
                 for queue in listeners:
                     queue.put_nowait(msg_dict['anomalies'])
+        except:
+            raise
         finally:
             await self.consumer.stop()
 
