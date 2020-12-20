@@ -30,7 +30,6 @@ export class MeetingsService {
     let headers = new HttpHeaders();
     headers = headers.set('Accept', 'application/pdf');
     const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}`;
-    console.log(url);
     return this.http.get(url, {headers, responseType: 'blob' as 'json'});
   }
 
@@ -43,7 +42,6 @@ export class MeetingsService {
     let headers = new HttpHeaders();
     headers = headers.set('Accept', 'application/pdf');
     const url = `${this.backend.url}/${this.backend.reports}/${meeting.name}?start_datetime=${historyMeeting.start.toISOString()}`;
-    console.log(url);
     return this.http.get(url, {headers, responseType: 'blob' as 'json'});
   }
 
@@ -72,6 +70,11 @@ export class MeetingsService {
     return this.http.get<AllMeetings>(url);
   }
 
+  fetchMonitoring(): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.monitoring}`;
+    return this.http.get<any>(url);
+  }
+
   fetchPublicMeetings(): Observable<any> {
     const url = `${this.backend.url}/${this.backend.public_meetings}`;
     return this.http.get<any>(url);
@@ -79,7 +82,6 @@ export class MeetingsService {
 
   fetchAnomalies(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}`;
-    console.log(url);
     return this.http.get<any>(url);
   }
 
@@ -93,5 +95,23 @@ export class MeetingsService {
     const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start.toISOString()}&end=${end}`;
     return this.http.get<any>(url);
   }
+
+
+  fetchNotifications(count: number): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.notifications}?count=${count}`;
+    console.log(url);
+    return this.http.get<any>(url);
+  }
+
+  downloadZips(meeting: Meeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.logs}/${meeting.name}`;
+    return this.http.get(url, {responseType: 'blob' as 'blob'});
+  }
+
+  downloadZip(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
+    const url = `${this.backend.url}/${this.backend.logs}/${meeting.name}?start=${historyMeeting.start.toISOString()}`;
+    return this.http.get(url, {responseType: 'blob' as 'blob'});
+  }
+
 
 }

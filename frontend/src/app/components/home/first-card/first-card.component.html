@@ -1,10 +1,6 @@
 <mat-card class="first-card">
   <mat-card-content>
     <h2>Currently supported functionalities:</h2>
-    <div class="listing">
-      <ul>
-        <li *ngFor="let info of infos"> {{info}} </li>
-      </ul>
-    </div>
+      <div class="info-style" *ngFor="let info of infos"> {{info}} </div>
   </mat-card-content>
 </mat-card>

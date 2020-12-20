@@ -1,16 +1,22 @@
 <mat-card class="second-card">
   <mat-card-content>
-    <h2>Least application notifications:</h2>
-<!--    <div class="content">-->
-<!--      Least meetings warnings-->
-<!--    </div>-->
-    <mat-list>
-      <mat-list-item class="event" *ngFor="let info of infos" (click)="move($event)">
-        <mat-icon mat-list-icon>info</mat-icon>
-        <div mat-line>{{info.meeting}}</div>
-        <div mat-line>{{info.date}}</div>
-        <div id="red" mat-line> {{info.info}} </div>
-      </mat-list-item>
-    </mat-list>
+    <h2>Last application notifications:</h2>
+    <ng-container *ngIf="infos; then infosOn; else infosOff">
+    </ng-container>
+    <ng-template #infosOn>
+      <mat-list>
+        <mat-list-item class="event" *ngFor="let info of infos">
+          <mat-icon [ngStyle]="getStyle(info.status)" mat-list-icon>{{info.status}}</mat-icon>
+          <div mat-line>{{info.meeting}}</div>
+          <div mat-line> {{info.info}} </div>
+          <div mat-line>{{info.date.toLocaleString('en-GB', options)}}</div>
+        </mat-list-item>
+      </mat-list>
+    </ng-template>
+    <ng-template #infosOff>
+      <div fxLayoutAlign="center center">
+        <app-progress-bar></app-progress-bar>
+      </div>
+    </ng-template>
   </mat-card-content>
 </mat-card>

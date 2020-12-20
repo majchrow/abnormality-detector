@@ -1,5 +1,5 @@
 export class HistorySpec {
-  constructor(type: string, date: Date, parameter: string, reason: string, conditionType: string, conditionValue: string) {
+  constructor(type: string, date: Date, parameter: string, reason: any, conditionType: string, conditionValue: any) {
     this.date = date;
     this.parameter = parameter;
     this.reason = reason;
@@ -9,10 +9,10 @@ export class HistorySpec {
 
   }
 
-  conditionValue: string;
+  conditionValue: any;
   conditionType: string;
   parameter: string;
   type: string;
   date: Date;
-  reason: string;
+  reason: any;
 }

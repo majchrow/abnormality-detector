@@ -6,6 +6,7 @@ import {MeetingsService} from '../../../services/meetings.service';
 import {HistorySpecExtended} from './class/history-extended';
 import {HistoryMeeting} from './class/history-meeting';
 import {Observable} from 'rxjs';
+import {saveAs} from 'file-saver';
 
 @Component({
   selector: 'app-meeting-history',
@@ -37,6 +38,7 @@ export class MeetingHistoryComponent implements OnInit {
   };
 
   anomaliesHistory: HistorySpec[];
+  anomaliesHistoryTmp: HistorySpec[];
   anomaliesHistoryView: HistorySpecExtended[];
   meetingsHistory: HistoryMeeting[];
   displayedColumns: string[] = ['type', 'startDate', 'endDate', 'occurrence', 'parameter', 'conditionType', 'reason', 'conditionValue'];
@@ -93,27 +95,28 @@ export class MeetingHistoryComponent implements OnInit {
   filterModel() {
     switch (this.selectedModel) {
       case 'ml model': {
-        this.anomaliesHistoryView = [...this.anomaliesHistoryView.filter(row => row.parameter === 'ml_anomaly')];
+        this.anomaliesHistoryTmp = [...this.anomaliesHistory.filter(row => row.parameter === 'ml_model')];
         break;
       }
       case 'admin model': {
-        this.anomaliesHistoryView = [...this.anomaliesHistoryView.filter(row => row.parameter !== 'ml_anomaly')];
+        this.anomaliesHistoryTmp = [...this.anomaliesHistory.filter(row => row.parameter !== 'ml_model')];
         break;
       }
       default: {
+        this.anomaliesHistoryTmp = [...this.anomaliesHistory];
         break;
       }
     }
   }
 
-  filter() {
-    let filtered;
+  filterCriteria() {
     if (this.selected !== 'all') {
-      filtered = [...this.anomaliesHistory.filter(spec => spec.parameter === this.selected)];
-    } else {
-      filtered = this.anomaliesHistory;
-      this.filterTypes = ['all', ...filtered.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index)];
+      this.anomaliesHistoryTmp = [...this.anomaliesHistoryTmp.filter(spec => spec.parameter === this.selected)];
     }
+  }
+
+  filterPhaseThree() {
+    const filtered = this.anomaliesHistoryTmp;
     const tmpArr: HistorySpecExtended[] = [];
     let prev = null;
 
@@ -147,7 +150,7 @@ export class MeetingHistoryComponent implements OnInit {
           entry.date,
           entry.date,
           entry.parameter,
-          entry.parameter === 'day' ? this.translateDay(entry.reason) : entry.reason,
+          entry.parameter === 'day' ? this.translateDay(entry.reason) : entry.parameter === 'prob' ? entry.reason : entry.reason,
           1,
           entry.conditionType,
           entry.parameter === 'day' ? entry.conditionValue.map(day => this.translateDay(day)) : entry.conditionValue
@@ -158,9 +161,16 @@ export class MeetingHistoryComponent implements OnInit {
       tmpArr.push(prev);
     }
 
-    this.anomaliesHistoryView = [...tmpArr];
-    this.filterModel();
+    this.anomaliesHistoryView = [...tmpArr.reverse()];
     this.changeDetectorRefs.detectChanges();
+  }
+
+  filter() {
+    this.filterModel();
+    this.filterCriteria();
+    this.filterPhaseThree();
+
+
   }
 
 
@@ -170,14 +180,17 @@ export class MeetingHistoryComponent implements OnInit {
         const tmp = res.anomalies;
         this.anomaliesHistory = tmp.flatMap(anomalyGroup => anomalyGroup.anomaly_reason.map(
           (anomaly, index) => new HistorySpec(
-            'warning',
+            anomaly.parameter,
             new Date(Date.parse(anomalyGroup.datetime)),
             anomaly.parameter,
-            anomaly.parameter === 'ML model' ? anomaly.value * 100 + '%' : anomaly.value,
+            anomaly.parameter === 'ml_model' ? (anomaly.value * 100).toFixed(2) + '%' :
+              anomaly.parameter === 'datetime' ? anomaly.value.substr(0, 8) : anomaly.value,
             anomaly.condition_type,
-            anomaly.parameter === 'ML model' ? anomaly.condition_value * 100 + '%' : anomaly.condition_value
+            anomaly.parameter === 'ml_model' ? (anomaly.condition_value * 100).toFixed(2) + '%' : anomaly.condition_value
           )
         ));
+        // tslint:disable-next-line:max-line-length
+        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index)];
         this.filter();
       }, err => {
         console.log(err);
@@ -189,20 +202,19 @@ export class MeetingHistoryComponent implements OnInit {
     this.meetingsService.fetchAnomalies(this.meeting).subscribe(
       res => {
         const tmp = res.anomalies;
-        console.log('anomaly');
-        console.log(tmp);
         this.anomaliesHistory = tmp.flatMap(anomalyGroup => anomalyGroup.anomaly_reason.map(
           (anomaly, index) => new HistorySpec(
-            'warning',
+            anomaly.parameter,
             new Date(Date.parse(anomalyGroup.datetime)),
             anomaly.parameter,
-            anomaly.parameter === 'ML model' ? anomaly.value * 100 + '%' : anomaly.value,
+            anomaly.parameter === 'ml_model' ? (anomaly.value * 100).toFixed(2) + '%' :
+              anomaly.parameter === 'datetime' ? anomaly.value.substr(0, 8) : anomaly.value,
             anomaly.condition_type,
-            anomaly.parameter === 'ML model' ? anomaly.condition_value * 100 + '%' : anomaly.condition_value
+            anomaly.parameter === 'ml_model' ? (anomaly.condition_value * 100).toFixed(2) + '%' : anomaly.condition_value
           )
         ));
-        console.log('anomaly 2');
-        console.log(this.anomaliesHistory);
+        // tslint:disable-next-line:max-line-length
+        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index)];
         this.filter();
       }, err => {
         console.log(err);
@@ -222,6 +234,24 @@ export class MeetingHistoryComponent implements OnInit {
 
   onExitClick(): void {
     this.exitClick.emit();
+  }
+
+  downloadZip() {
+    let sub: Observable<any>;
+    if (this.selectedMeeting === 'all') {
+      sub = this.meetingsService.downloadZips(this.meeting);
+    } else {
+      const historyMeeting = this.meetingsHistory.find(el => el.start.toISOString() === this.selectedMeeting);
+      sub = this.meetingsService.downloadZip(this.meeting, historyMeeting);
+    }
+    sub.subscribe(
+      next => {
+        saveAs(next, 'log.zip');
+      },
+      err => {
+        console.log(err);
+      }
+    );
   }
 
   generateReport() {

@@ -273,7 +273,6 @@ export class MeetingInferenceComponent implements OnInit {
 
   onEvaluateClick() {
     if (!this.trueSelectedMeeting) {
-      console.log('FAILED - selected meeting');
     } else if (this.selectedModel === 'ml model') {
       this.evaluateModel();
     } else {
@@ -291,8 +290,10 @@ export class MeetingInferenceComponent implements OnInit {
         } else {
           this.meetingSSEService.evaluateModel(this.meeting, calls, this.threshold, this.trueSelectedMeeting).subscribe(
             () => {
-              this.notificationService.success(`ML model evaluation scheduled successfully. Model will be trained on ${calls.length} meetings`);
-              this.successClick.emit(this.meeting);
+              setTimeout(() => {
+                this.successClick.emit(this.meeting);
+                this.notificationService.success(`ML model evaluation scheduled successfully. Model will be trained on ${calls.length} meetings`);
+              }, 1000);
             },
             err => {
               console.log(err);
@@ -313,8 +314,10 @@ export class MeetingInferenceComponent implements OnInit {
       this.preparePayload()
     ), this.trueSelectedMeeting).subscribe(
       () => {
-        this.notificationService.success(`Conditions evaluation scheduled successfully.`);
-        this.successClick.emit(this.meeting);
+        setTimeout(() => {
+          this.notificationService.success(`Conditions evaluation scheduled successfully.`);
+          this.successClick.emit(this.meeting);
+        }, 1000);
       },
       err => {
         console.log(err);

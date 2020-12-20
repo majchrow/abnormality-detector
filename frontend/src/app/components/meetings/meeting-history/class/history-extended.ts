@@ -1,5 +1,5 @@
 export class HistorySpecExtended {
-  constructor(type: string, startDate: Date, endDate: Date, parameter: string, reason: string, occurrence: number, conditionType: string, conditionValue: string) {
+  constructor(type: string, startDate: Date, endDate: Date, parameter: string, reason: any, occurrence: number, conditionType: string, conditionValue: any) {
     this.startDate = startDate;
     this.endDate = endDate;
     this.parameter = parameter;
@@ -11,12 +11,12 @@ export class HistorySpecExtended {
   }
 
 
-  conditionValue: string;
+  conditionValue: any;
   conditionType: string;
   occurrence: number;
   parameter: string;
   type: string;
   endDate: Date;
   startDate: Date;
-  reason: string;
+  reason: any;
 }

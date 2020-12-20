@@ -100,7 +100,7 @@ export class MeetingSSEService {
   }
 
   evaluateAdminModel(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.evaluate}/${meeting.name}`;
+    const url = `${this.backend.url}/${this.backend.evaluate_admin}/${meeting.name}`;
     let end;
     try {
       end = historyMeeting.end.toISOString();
@@ -113,12 +113,12 @@ export class MeetingSSEService {
       start: historyMeeting.start.toISOString(),
       end
     };
+    console.log(payload);
     return this.http.put(url, payload);
   }
 
   getMLMonitoring(meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.ml}/${meeting.name}`;
-    console.log(url);
     return this.http.get(url, {});
   }
 

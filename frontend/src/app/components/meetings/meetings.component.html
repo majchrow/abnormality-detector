@@ -10,12 +10,14 @@
       <app-meeting-setting
         [meeting]="settingMeeting"
         (exitClick)="initAllMeetings()"
+        (successClick)="onSuccessCriteria()"
       ></app-meeting-setting>
     </ng-container>
     <ng-container *ngSwitchCase="'model'">
       <app-meeting-model
         [meeting]="modelMeeting"
         (exitClick)="initAllMeetings()"
+        (successClick)="onSuccessCriteria()"
       ></app-meeting-model>
     </ng-container>
     <ng-container *ngSwitchCase="'inference'">

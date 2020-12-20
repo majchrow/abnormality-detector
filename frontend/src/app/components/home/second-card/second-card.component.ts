@@ -1,5 +1,6 @@
 import {Component, OnInit} from '@angular/core';
 import {Meetinginfo} from './class/meetinginfo';
+import {MeetingsService} from '../../../services/meetings.service';
 
 @Component({
   selector: 'app-second-card',
@@ -8,32 +9,80 @@ import {Meetinginfo} from './class/meetinginfo';
 })
 export class SecondCardComponent implements OnInit {
 
-  constructor() {
+  constructor(
+    private meetingsService: MeetingsService
+  ) {
   }
 
-  infos: Array<Meetinginfo> = [
-    new Meetinginfo(
-      'biologia',
-      '10/11/2011 10:15',
-      '10 new warnings'
-    ),
-    new Meetinginfo(
-      'chemia',
-      '10/11/2011 15:15',
-      '3 new warnings'
-    ),
-    new Meetinginfo(
-      'informatyka',
-      '10/11/2011 14:15',
-      '1 new warning'
-    )
+  options = {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
 
-  ];
+  infos: Array<Meetinginfo>;
+
 
   ngOnInit(): void {
+    this.fetchNotifications();
   }
 
-  move(event: MouseEvent) {
-    console.log(event);
+  manualSwitch(info: string) {
+    switch (info) {
+      case 'info': {
+        return 'info';
+      }
+      case 'failure': {
+        return 'warning';
+      }
+      case 'success': {
+        return 'feedback';
+      }
+      default: {
+        return 'info';
+      }
+    }
   }
+
+  fetchNotifications() {
+    this.meetingsService.fetchNotifications(5).subscribe(
+      res => {
+        const data: Meetinginfo[] = res.last.map(
+          el => new Meetinginfo(
+            el.name,
+            new Date(Date.parse(el.timestamp)),
+            el.event,
+            this.manualSwitch(el.status)
+          ));
+        this.infos = data.reverse();
+      }, err => {
+        this.infos = [];
+        console.log(err);
+      }
+    );
+  }
+
+  getStyle(info: string) {
+    switch (info) {
+      case 'info': {
+        return {};
+      }
+      case 'warning': {
+        return {color: 'red'};
+      }
+      case 'feedback': {
+        return {color: '#388E3C'};
+      }
+      default: {
+        return {};
+      }
+    }
+  }
+
+  move(event: MouseEvent) {}
 }

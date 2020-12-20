@@ -1,7 +1,3 @@
-table {
-  width: 100%;
-}
-
 .mat-row {
   height: auto;
 }
@@ -17,4 +13,18 @@ table {
 
 #green {
   color: #388E3C;
+}
+
+.highlight{
+  background: grey;
+}
+
+.main {
+  max-height: 600px;
+}
+
+.mat-table {
+  overflow-x: auto;
+  width: 100%;
+
 }

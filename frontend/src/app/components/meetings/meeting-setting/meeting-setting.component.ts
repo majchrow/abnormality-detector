@@ -24,6 +24,7 @@ export class MeetingSettingComponent implements OnInit {
 
   @Input() meeting: Meeting;
   @Output() exitClick = new EventEmitter<any>();
+  @Output() successClick = new EventEmitter<any>();
 
   config: Record<string, any>;
 
@@ -45,42 +46,42 @@ export class MeetingSettingComponent implements OnInit {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day1: {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day2: {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day3: {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day4: {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day5: {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       },
       day6: {
@@ -94,7 +95,7 @@ export class MeetingSettingComponent implements OnInit {
         checked: false,
         conditions: {
           min_hour: 0,
-          max_hour: 0
+          max_hour: 1
         },
       }
     };
@@ -191,7 +192,10 @@ export class MeetingSettingComponent implements OnInit {
           this.preparePayload()
         )).subscribe(
           () => {
-            this.notificationService.success('Updates successfully');
+            setTimeout(() => {
+              this.notificationService.success('Updates successfully');
+              this.successClick.emit(this.meeting);
+            }, 1000);
           },
           () => {
             this.notificationService.warn('Update failed');

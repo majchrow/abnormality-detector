@@ -11,7 +11,11 @@ export const environment = {
       public_meetings: 'meetings',
       anomalies: 'anomalies',
       reports: 'reports',
-      models: 'models'
+      models: 'models',
+      notifications: 'notifications',
+      monitoring: 'monitoring',
+      logs: 'logs'
+
     },
     sse: {
       url: 'http://localhost:5001',
@@ -20,7 +24,8 @@ export const environment = {
       all: 'notifications',
       ml: 'anomaly-detection',
       train: 'anomaly-detection/train',
-      evaluate: 'anomaly-detection/once'
+      evaluate: 'anomaly-detection/once',
+      evaluate_admin: 'monitoring/once'
     }
   }
 };

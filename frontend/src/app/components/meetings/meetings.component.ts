@@ -44,6 +44,13 @@ export class MeetingsComponent implements OnInit {
     this.subscribeRest();
   }
 
+  onSuccessCriteria() {
+    this.selected = '';
+    this.meetingType = 'created';
+    this.resetMeetings();
+    this.subscribeRest();
+  }
+
   onSettingClick(meeting: Meeting) {
     this.settingMeeting = meeting;
     this.selected = 'setting';

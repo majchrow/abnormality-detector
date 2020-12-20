@@ -26,6 +26,7 @@ export class MeetingModelComponent implements OnInit {
 
   @Input() meeting: Meeting;
   @Output() exitClick = new EventEmitter<any>();
+  @Output() successClick = new EventEmitter<any>();
 
   date = {begin: new Date(), end: new Date()};
   participants = 0;
@@ -49,7 +50,6 @@ export class MeetingModelComponent implements OnInit {
   getLast() {
     this.meetingsService.getModelInfo(this.meeting).subscribe(
       res => {
-        console.log(res.last);
         if (res.last) {
           this.last = new Date(Date.parse(res.last)).toLocaleString('en-GB', this.options);
         } else {
@@ -119,7 +119,10 @@ export class MeetingModelComponent implements OnInit {
         } else {
           this.meetingSSEService.trainModel(this.meeting, calls, this.threshold).subscribe(
             () => {
-              this.notificationService.success(`Model scheduled to train on ${calls.length} meetings`);
+              setTimeout(() => {
+                this.notificationService.success(`Model scheduled to train on ${calls.length} meetings`);
+                this.successClick.emit(this.meeting);
+              }, 1000);
             },
             error => {
               console.log(error);

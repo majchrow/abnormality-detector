@@ -48,7 +48,6 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
   fetchMl() {
     this.meetingsService.getModelInfo(this.meeting).subscribe(
       res => {
-        console.log(res);
         this.last = !!res.last;
         if (this.last) {
           this.meetingSSEService.getMLMonitoring(this.meeting).subscribe(
@@ -72,7 +71,6 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
   fetchMonitoring() {
     this.meetingSSEService.fetchMonitoring(this.meeting.name).subscribe(
       res => {
-        console.log(res);
         this.monitored = !!res.monitored;
         if (this.monitored) {
           this.subscribeMonitoring();
@@ -89,11 +87,10 @@ export class MeetingCardCreatedComponent implements OnInit, OnDestroy {
     this.subscription = this.monitoring.subscribe(
       res => {
         this.count += 1;
-        console.log(res);
       },
       error => {
         console.log(error);
-        this.subscribeMonitoring();
+        setTimeout(() => this.subscribeMonitoring(), 3000);
       });
   }
 

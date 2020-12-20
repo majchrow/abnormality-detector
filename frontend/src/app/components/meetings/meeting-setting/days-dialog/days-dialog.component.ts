@@ -40,11 +40,7 @@ export class DaysDialogComponent implements OnInit {
   }
 
   onSaveClick(): void {
-    this.dialogService.openConfirmDialog('Are you sure you want to save changes?')
-      .afterClosed().subscribe(res => {
-        this.dialogRef.close(this.data);
-      }
-    );
+    this.dialogRef.close(this.data);
   }
 
   onChange(key: any) {

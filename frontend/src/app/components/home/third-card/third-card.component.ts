@@ -1,6 +1,5 @@
 import {Component, OnInit} from '@angular/core';
 import {MeetingsService} from '../../../services/meetings.service';
-import {AllMeetings} from '../../meetings/class/all-meetings';
 
 @Component({
   selector: 'app-third-card',
@@ -18,10 +17,31 @@ export class ThirdCardComponent implements OnInit {
   observedMeetings: string;
   activeMeetings: string;
   historicalMeetings: string;
+  mlMonitoring: string;
+  adminMonitoring: string;
+  adminCriteria: string;
+  mlCriteria: string;
 
 
   ngOnInit(): void {
     this.fetchMeetings();
+    this.fetchMonitoring();
+  }
+
+  fetchMonitoring() {
+    this.meetingsService.fetchMonitoring().subscribe(
+      res => {
+        this.mlMonitoring = '' + res.ml_monitored.length;
+        this.adminMonitoring = '' + res.admin_monitored.length;
+        this.adminCriteria = '' + res.with_criteria.length;
+        this.mlCriteria = '' + res.with_model.length;
+      }, err => {
+        console.log(err);
+        this.mlMonitoring = '?';
+        this.adminMonitoring = '?';
+        this.adminCriteria = '?';
+        this.mlCriteria = '?';
+      });
   }
 
   fetchMeetings() {

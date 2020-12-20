@@ -127,7 +127,8 @@
                   <div fxFlex="60%" fxLayoutAlign="center center">
                     <div class="custom-slider">
                       <ngx-slider [(value)]="this.config.time_diff.conditions.min"
-                                  [(highValue)]="this.config.time_diff.conditions.max" [options]="sliderOptions()"></ngx-slider>
+                                  [(highValue)]="this.config.time_diff.conditions.max"
+                                  [options]="sliderOptions()"></ngx-slider>
                     </div>
                   </div>
                 </div>
@@ -223,7 +224,8 @@
                     Allowed days of the week:
                   </div>
                   <div fxFlex="60%" fxLayoutAlign="center center">
-                    <button mat-icon-button color="primary" [disabled]="!this.config.days.checked" (click)="openDaysDialog()">
+                    <button mat-icon-button color="primary" [disabled]="!this.config.days.checked"
+                            (click)="openDaysDialog()">
                       <mat-icon style="cursor: pointer;">calendar_today</mat-icon>
                     </button>
                   </div>

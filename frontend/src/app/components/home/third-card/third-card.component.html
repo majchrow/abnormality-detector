@@ -1,7 +1,7 @@
 <mat-card class="third-card" fxFlex>
   <mat-card-content>
     <h2>Running application statistics:</h2>
-    <ng-container *ngIf="activeMeetings; then infosOn; else infosOff">
+    <ng-container *ngIf="activeMeetings && mlMonitoring; then infosOn; else infosOff">
     </ng-container>
     <ng-template #infosOn>
       <div class="info-style">
@@ -13,6 +13,19 @@
       <div class="info-style">
         Historical rooms: {{ this.historicalMeetings }}
       </div>
+      <div class="info-style">
+        Rooms with ml model trained: {{ this.mlCriteria }}
+      </div>
+      <div class="info-style">
+        Rooms with ml model monitoring: {{ this.mlMonitoring }}
+      </div>
+      <div class="info-style">
+        Rooms with with admin criteria set: {{ this.adminCriteria }}
+      </div>
+      <div class="info-style">
+        Rooms with admin criteria monitoring: {{ this.adminMonitoring }}
+      </div>
+
     </ng-template>
     <ng-template #infosOff>
       <div fxLayoutAlign="center center">
