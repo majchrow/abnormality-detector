@@ -1,3 +1,4 @@
+from datetime import timezone
 from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
@@ -55,6 +56,7 @@ class Meetings(Resource):
                 return {'message': f'failed to unschedule monitoring and inference for meeting {name}'}, 400
 
             dao.clear_meeting(name)
+            dao.delete_model(name)
             return {
                 "message": f"successfully removed {name} from monitored conferences"
             }, 200
@@ -219,6 +221,23 @@ class Monitoring(Resource):
         return dao.get_monitoring_summary(), 200
 
 
+class Logs(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        try:
+            start_date = request.args.get("start")
+            start_date = parse(start_date).replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw'))
+        except KeyError:
+            return {'message': '"start" is required'}, 400
+        except ParserError:
+            return {'message': 'incorrect date format'}, 400
+
+        call_info = dao.get_call_info_data_for_meeting(meeting_name, start_date)
+        roster = dao.get_roster_data_for_meeting(meeting_name, start_date)
+        current_app.logger.info(str(call_info) + str(roster))
+        return '', 200
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Report, "/reports/<string:meeting_name>")
@@ -230,4 +249,5 @@ def setup_resources(app):
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
     api.add_resource(Models, "/models/<string:meeting_name>")
     api.add_resource(Monitoring, "/monitoring")
+    api.add_resource(Logs, "/logs/<string:meeting_name>")
 

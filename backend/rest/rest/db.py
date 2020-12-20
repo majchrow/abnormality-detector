@@ -197,6 +197,12 @@ class CassandraDAO:
             return meetings[0]
         return {}
 
+    def delete_model(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM models WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
+
     def get_last_training(self, meeting_name):
         result = self.session.execute(
             f'SELECT submission_datetime FROM training_jobs '
