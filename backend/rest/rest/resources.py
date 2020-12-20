@@ -216,11 +216,7 @@ class Notifications(Resource):
 class Monitoring(Resource):
     @cross_origin()
     def get(self):
-        # TODO:
-        #  - number of admin/ML actively monitored meetings
-        #  - number of meetings with ML model trained/criteria set
-        #  - ???
-        return {}, 200
+        return dao.get_monitoring_summary(), 200
 
 
 def setup_resources(app):

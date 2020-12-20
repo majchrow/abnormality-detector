@@ -248,6 +248,21 @@ class CassandraDAO:
             res["ml_threshold"] = ml_threshold
         return {"anomalies": sorted(results, key=lambda r: r["datetime"])}
 
+    def get_monitoring_summary(self):
+        meeting_result = sorted(self.session.execute(
+            f'SELECT meeting_name as name, monitored, ml_monitored, criteria FROM {self.meetings_table};'
+        ).all(), key=lambda m: m['name'])
+        models_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM models;'
+        ).all(), key=lambda m: m['name'])
+
+        return {
+            'with_criteria': [m['name'] for m in meeting_result if m['criteria'] and m['criteria'] != '[]'],
+            'with_model': [m['name'] for m in models_result],
+            'admin_monitored': [m['name'] for m in meeting_result if m['monitored']],
+            'ml_monitored': [m['name'] for m in meeting_result if m['ml_monitored']],
+        }
+
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
         return True
