@@ -195,6 +195,7 @@ class Notifications(Resource):
     @staticmethod
     def process_msg(msg):
         topic = msg['topic']
+        ts = msg['timestamp']
         msg =  msg['content']
         name = msg['meeting_name']
 
@@ -207,7 +208,7 @@ class Notifications(Resource):
                 event = 'started'
             else:
                 return None
-        return {'name': name, 'event': event}
+        return {'name': name, 'timestamp': ts, 'event': event}
 
 
 def setup_resources(app):
