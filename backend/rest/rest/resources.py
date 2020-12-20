@@ -121,14 +121,15 @@ class Anomalies(Resource):
         result["anomalies"] = list(map(anomaly_schema.dump, result["anomalies"]))
         for res in result['anomalies']:
             ml_score, ml_thresh = res.pop('ml_anomaly_score'), res.pop('ml_threshold')
-            res['anomaly_reason'].append(
-                {
-                    'parameter': 'ml_model', 
-                    'value': ml_score, 
-                    'condition_type': 'prob', 
-                    'condition_value': ml_thresh
-                }
-            )
+            if ml_score and ml_thresh:
+                res['anomaly_reason'].append(
+                    {
+                        'parameter': 'ml_model', 
+                        'value': ml_score, 
+                        'condition_type': 'prob', 
+                        'condition_value': ml_thresh
+                    }
+                )
         return result
 
 
