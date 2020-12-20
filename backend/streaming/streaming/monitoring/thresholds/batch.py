@@ -41,14 +41,20 @@ def main(serialized_job):
     results = {MsgType.CALLS: [], MsgType.CALL_INFO: [], MsgType.ROSTER: []}
     cnt = 0
 
-    for rec, tpe in call_records + ci_records + roster_records:
-        anomalies = check(rec, tpe, criteria)
-        reason = json.dumps([a.dict() for a in anomalies])
-        timestamp = rec['start_datetime'] if tpe == MsgType.CALLS else rec['datetime']
-        results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
-        if anomalies:
-            cnt += 1
-    report(f'Detected {cnt} anomalies')
+    try:
+        for rec, tpe in call_records + ci_records + roster_records:
+            anomalies = check(rec, tpe, criteria)
+            reason = json.dumps([a.dict() for a in anomalies])
+            timestamp = rec['start_datetime'] if tpe == MsgType.CALLS else rec['datetime']
+            results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
+            if anomalies:
+                cnt += 1
+        report(f'Detected {cnt} anomalies')
+    except Exception as e:
+        report(f'inference job failed with {e}')
+        msg = {'meeting_name': job['meeting_name'], 'status': 'failure', 'event': 'Condition check failed!'}
+        push_to_kafka(msg, producer)
+        return
 
     dao.save_anomaly_status(results[MsgType.CALLS], results[MsgType.CALL_INFO], results[MsgType.ROSTER])
     report(f'inference job finished: run thresholds on {meeting_name} from {start} to {end}')

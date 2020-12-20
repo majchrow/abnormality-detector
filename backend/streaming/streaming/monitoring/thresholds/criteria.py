@@ -220,7 +220,7 @@ class DaysCriterion(StrictModel, Criterion):
             return
         
         if isinstance(message['datetime'], datetime):
-            week_day, date_time = message['week_day_number'], message['datetime']
+            week_day, date_time = message['week_day_number'], message['datetime'].time()
         else:
             week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
 
@@ -231,14 +231,14 @@ class DaysCriterion(StrictModel, Criterion):
                         parameter='datetime',
                         value=str(date_time),
                         condition_type='min',
-                        condition_value=c.min_hour
+                        condition_value=str(c.min_hour)
                     )
                 if not c.max_satisfies(date_time):
                     return Anomaly(
                         parameter='datetime',
                         value=str(date_time),
                         condition_type='max',
-                        condition_value=c.max_hour
+                        condition_value=str(c.max_hour)
                     )
                 break
         else:

@@ -20,10 +20,6 @@ def push_to_kafka(msg, producer):
         report(f'Failed to send {msg} to Kafka!')
 
 
-# TODO:
-#  - job doesn't exist
-#  - no training data
-#  - other failures during training?
 def main(serialized_job):
     config = Config()
     producer = KafkaProducer(bootstrap_servers=[config.kafka_bootstrap_server])
@@ -93,3 +89,4 @@ def map_anomaly_status(meeting, threshold, scores_df):
 
 if __name__ == '__main__':
     main(sys.argv[1])
+
