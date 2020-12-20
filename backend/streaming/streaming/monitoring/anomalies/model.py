@@ -4,15 +4,17 @@ import pickle as pkl
 
 from datetime import datetime, timedelta
 from pyod.models.hbos import HBOS
+from pyod.models.iforest import IForest
 
 
 class Model:
     def __init__(self, meeting_name):
         self.meeting_name = meeting_name
         self.model = None
+        self.model_cls = HBOS  # IForest
 
     def _init_model(self):
-        self.model = HBOS()
+        self.model = self.model_cls()
 
     @staticmethod
     def get_columns():
@@ -50,7 +52,9 @@ class Model:
 
     def predict(self, batch):
         if not batch.empty:
-            predictions = self.model.predict_proba(batch)
-            return pd.DataFrame(predictions, index=batch.index, columns=['p0', 'p1'])
+            # IsolationForest has decision_function - but values are weird
+            # predictions = self.model.decision_function(batch)
+            predictions = self.model.predict_proba(batch)[:, 1]
+            return pd.DataFrame(predictions, index=batch.index, columns=['score'])
         else:
-            return pd.DataFrame([], columns=['p0', 'p1'])
+            return pd.DataFrame([], columns=['score'])

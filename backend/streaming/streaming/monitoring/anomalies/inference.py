@@ -64,9 +64,9 @@ def filter_anomalies(meeting, threshold, scores_df):
     cnt = 0
 
     for ts, p in scores_df.iterrows():
-        if p[1] > threshold:
+        if p[0] > threshold:
             cnt += 1
-            anomalies.append((p[1], meeting, ts))
+            anomalies.append((threshold, str(p[0]), meeting, ts))
     report(f'Detected {cnt} anomalies')
     return anomalies
 
