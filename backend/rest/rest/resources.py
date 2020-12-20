@@ -2,11 +2,13 @@ from datetime import timezone
 from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
-from flask import current_app, request
+from flask import current_app, request, send_file
+from io import BytesIO
 from marshmallow import ValidationError
 import pandas as pd
 import pytz
 import requests
+import zipfile
 
 from .db import dao
 from .bridge import dao as bridge_dao
@@ -234,8 +236,16 @@ class Logs(Resource):
 
         call_info = dao.get_call_info_data_for_meeting(meeting_name, start_date)
         roster = dao.get_roster_data_for_meeting(meeting_name, start_date)
-        current_app.logger.info(str(call_info) + str(roster))
-        return '', 200
+        ci = ('call_info_update.csv', call_info.to_csv().encode())
+        roster = ('roster_update.csv', roster.to_csv().encode())
+        
+        compression = zipfile.ZIP_DEFLATED
+        memory_file = BytesIO()
+        with zipfile.ZipFile(memory_file, mode="w") as zf:
+            for file_name, bts in [ci, roster]:
+                zf.writestr(file_name, bts, compress_type=compression)
+        memory_file.seek(0)
+        return send_file(memory_file, mimetype='application/zip', as_attachment=True, attachment_filename='log.zip')
 
 
 def setup_resources(app):
