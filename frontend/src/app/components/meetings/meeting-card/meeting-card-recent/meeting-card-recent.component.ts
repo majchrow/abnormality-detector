@@ -10,6 +10,7 @@ export class MeetingCardRecentComponent implements OnInit {
 
   @Input() meeting: Meeting;
   @Output() historyEmitter = new EventEmitter<Meeting>();
+  @Output() inferenceEmitter = new EventEmitter<Meeting>();
 
   constructor() {
   }
@@ -19,6 +20,10 @@ export class MeetingCardRecentComponent implements OnInit {
 
   onHistoryClick() {
     this.historyEmitter.emit(this.meeting);
+  }
+
+  onInferenceClick() {
+    this.inferenceEmitter.emit(this.meeting);
   }
 
 }

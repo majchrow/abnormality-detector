@@ -18,6 +18,13 @@
         (exitClick)="initAllMeetings()"
       ></app-meeting-model>
     </ng-container>
+    <ng-container *ngSwitchCase="'inference'">
+      <app-meeting-inference
+        [meeting]="inferenceMeeting"
+        (exitClick)="initAllMeetings()"
+        (successClick)="onHistoryClick($event)"
+      ></app-meeting-inference>
+    </ng-container>
     <ng-container *ngSwitchDefault>
       <mat-card>
         <mat-card-header style="justify-content: center">
@@ -61,6 +68,7 @@
                   (historyEmitter)="onHistoryClick(meeting)"
                   (deleteEmitter)="onDeleteClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
+                  (inferenceEmitter)="onInferenceClick(meeting)"
                 >
                 </app-meeting-card-created>
               </div>
@@ -74,6 +82,7 @@
                   (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
                   (settingEmitter)="onSettingClick(meeting)"
+                  (inferenceEmitter)="onInferenceClick(meeting)"
                 >
                 </app-meeting-card-current>
               </div>
@@ -85,6 +94,7 @@
                 <app-meeting-card-recent
                   [meeting]="meeting"
                   (historyEmitter)="onHistoryClick(meeting)"
+                  (inferenceEmitter)="onInferenceClick(meeting)"
                 >
                 </app-meeting-card-recent>
               </div>
@@ -95,21 +105,21 @@
                   (click)="newMeetingDialog()"
                 >
                   <mat-card-header fxLayout="row" fxLayoutAlign="center center">
-                    <mat-card-title> Add room to monitored</mat-card-title>
+                    <mat-card-title> Add room to observed</mat-card-title>
                   </mat-card-header>
                 </mat-card>
               </div>
 
-<!--              <div class="footer" *ngIf="allMeetings.current.length !== 0">-->
-<!--                &lt;!&ndash; todo - make it working &ndash;&gt;-->
-<!--                <mat-paginator-->
-<!--                  [length]="paginatorSize"-->
-<!--                  [pageSize]="numberOfProductsDisplayedInPage"-->
-<!--                  [pageSizeOptions]="pageSizeOptions"-->
-<!--                  (page)="updateMeetingsDisplayedInPage($event)"-->
-<!--                >-->
-<!--                </mat-paginator>-->
-<!--              </div>-->
+              <!--              <div class="footer" *ngIf="allMeetings.current.length !== 0">-->
+              <!--                &lt;!&ndash; todo - make it working &ndash;&gt;-->
+              <!--                <mat-paginator-->
+              <!--                  [length]="paginatorSize"-->
+              <!--                  [pageSize]="numberOfProductsDisplayedInPage"-->
+              <!--                  [pageSizeOptions]="pageSizeOptions"-->
+              <!--                  (page)="updateMeetingsDisplayedInPage($event)"-->
+              <!--                >-->
+              <!--                </mat-paginator>-->
+              <!--              </div>-->
             </div>
           </mat-card-content>
         </ng-template>

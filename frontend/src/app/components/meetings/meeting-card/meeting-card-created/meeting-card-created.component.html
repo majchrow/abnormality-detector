@@ -19,6 +19,8 @@
     <ng-template #monitoringOn>
       <div>
         ML
+        <span class="space"></span>
+        <span class="down">
         <mat-slide-toggle class="setting-toogle"
                           color="warn"
                           [checked]="this.mlMonitored"
@@ -26,8 +28,10 @@
                           [disabled]="!this.last">
 
         </mat-slide-toggle>
+          </span>
         <span class="admin">
            Admin
+          <span class="space"></span>
         <mat-slide-toggle class="setting-toogle"
                           color="warn"
                           [checked]="this.monitored"
@@ -49,10 +53,11 @@
 
 
     <span class="app-spacer"></span>
-    <i class="app-icon fa fa-lightbulb-o" (click)="onModelClick()"></i>
-    <i class="app-icon fa fa-cog" (click)="onSettingClick()"></i>
-    <i class="app-icon fa fa-history" (click)="onHistoryClick()"></i>
-    <i class="app-icon fa fa-trash" (click)="onDeleteClick()"></i>
+    <i class="app-icon fa fa-lightbulb-o" title="Train anomaly model" (click)="onModelClick()"></i>
+    <i class="app-icon fa fa-pencil-square-o" title="Set manual anomaly conditions" (click)="onSettingClick()"></i>
+    <i class="app-icon fa fa-retweet" title="Evaluate models on historical data" (click)="onInferenceClick()"></i>
+    <i class="app-icon fa fa-history" title="Check anomaly history" (click)="onHistoryClick()"></i>
+    <i class="app-icon fa fa-trash" title="Delete observed room" (click)="onDeleteClick()"></i>
   </mat-card-actions>
 
 

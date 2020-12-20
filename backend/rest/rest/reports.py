@@ -330,15 +330,17 @@ class PlotGenerator:
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
 
-    def plot_line(self, timestamp, label=None):
+    def plot_line(self, timestamp, is_last=False):
         line = plt.axvline(
-            pd.Timestamp(timestamp), c="black", linewidth=1.5, linestyle="--"
+            pd.Timestamp(timestamp), c="black", linewidth=2, linestyle="--"
         )
+        if is_last:
+            plt.text(x=pd.Timestamp(timestamp), y=-.7, s=f"{str(timestamp)[11:19]}", weight='bold', fontsize=12, color='black',ha='center', va='top')
         return line
 
     def create_plot(self, data, filename, start, end):
         fig = plt.figure(figsize=(17, 12))
-        gs = gridspec.GridSpec(6, 1, height_ratios=[4, 3, 1, 1, 1, 1])
+        gs = gridspec.GridSpec(6, 1, height_ratios=[6, 2, 1, 1, 1, 1])
 
         interval = 5  # TODO: duration (in min) / 20 ???
 
@@ -461,7 +463,7 @@ class PlotGenerator:
         ax0.set_ylim(-0.5, max(1, max_value) + 0.5)
         ax0.yaxis.set_ticks(np.arange(0, max(1, max_value) + 1, step))
 
-        start_line = line = self.plot_line(start_time)
+        start_line = self.plot_line(start_time)
         if end_time:
             self.plot_line(end_time)
 
@@ -511,9 +513,9 @@ class PlotGenerator:
         if not is_last:
             plt.setp(ax1.get_xticklabels(), visible=False)
 
-        self.plot_line(start_time)
+        self.plot_line(start_time, is_last)
         if end_time:
-            self.plot_line(end_time)
+            self.plot_line(end_time, is_last)
 
         return line1, ax1
 
@@ -526,9 +528,9 @@ class PlotGenerator:
         line1 = ax1.plot(
             anomalies.index, anomalies["ml_anomaly_reason"], marker="x", c="r", linestyle=""
         )
-        self.plot_line(start_time)
+        self.plot_line(start_time, True)
         if end_time:
-            self.plot_line(end_time)
+            self.plot_line(end_time, True)
         return line1, ax1
 
 

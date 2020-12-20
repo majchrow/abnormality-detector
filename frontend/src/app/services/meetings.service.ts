@@ -84,8 +84,13 @@ export class MeetingsService {
   }
 
   fetchAnomaliesHistory(meeting: Meeting, historyMeeting: HistoryMeeting): Observable<any> {
-    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start.toISOString()}&end=${historyMeeting.end.toISOString()}`;
-    console.log(url);
+    let end;
+    try {
+      end = historyMeeting.end.toISOString();
+    } catch (e) {
+      end = new Date().toISOString();
+    }
+    const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start.toISOString()}&end=${end}`;
     return this.http.get<any>(url);
   }
 

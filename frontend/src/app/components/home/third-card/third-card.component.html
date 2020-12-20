@@ -1,8 +1,24 @@
-<mat-card class="third-card">
+<mat-card class="third-card" fxFlex>
   <mat-card-content>
-    <div class="info-style" *ngFor="let info of infos">
-      {{ info }}
-    </div>
+    <h2>Running application statistics:</h2>
+    <ng-container *ngIf="activeMeetings; then infosOn; else infosOff">
+    </ng-container>
+    <ng-template #infosOn>
+      <div class="info-style">
+        Observed rooms: {{ this.observedMeetings }}
+      </div>
+      <div class="info-style">
+        Active rooms: {{ this.activeMeetings }}
+      </div>
+      <div class="info-style">
+        Historical rooms: {{ this.historicalMeetings }}
+      </div>
+    </ng-template>
+    <ng-template #infosOff>
+      <div fxLayoutAlign="center center">
+        <app-progress-bar></app-progress-bar>
+      </div>
+    </ng-template>
   </mat-card-content>
 
 </mat-card>

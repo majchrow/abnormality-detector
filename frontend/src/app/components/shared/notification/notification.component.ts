@@ -43,7 +43,8 @@ export class NotificationComponent implements OnInit {
         this.count += 1;
       },
       error => {
-        this.notificationService.warn(error.data);
+        console.log(error);
+        this.subscribeSSEs();
       }
     );
   }
