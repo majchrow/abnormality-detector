@@ -39,7 +39,7 @@ def main(job_id):
         report('job invalid - no data')
         report('all done')
 
-        msg = {'meeting_name': job['meeting_name'], 'status': 'failed - no training data'}
+        msg = {'meeting_name': job['meeting_name'], 'status': 'Training job finished with status: failed - no training data'}
         push_to_kafka(msg, producer)
         return
 
@@ -58,7 +58,7 @@ def main(job_id):
     dao.complete_training_job(job_id)
     report('all done')
 
-    msg = {'meeting_name': job['meeting_name'], 'status': 'success'}
+    msg = {'meeting_name': job['meeting_name'], 'status': 'Training job finished with status: success'}
     push_to_kafka(msg, producer)
 
 

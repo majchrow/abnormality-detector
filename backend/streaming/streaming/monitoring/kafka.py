@@ -42,7 +42,7 @@ class KafkaListener:
 
                 if msg.topic == 'anomalies-training' and self.call_event_listeners:
                     call_name, status = msg_dict['meeting_name'], msg_dict['status']
-                    msg = {'name': call_name, 'event': f'Training job finished with status: {status}'}
+                    msg = {'name': call_name, 'event': status}
                     logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
                     for queue in self.call_event_listeners:
                         queue.put_nowait(msg)
