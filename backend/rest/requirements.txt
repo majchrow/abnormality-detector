@@ -14,3 +14,4 @@ apscheduler==3.6.3
 python-dateutil==2.8.1
 pydantic==1.7.2
 unidecode==1.1.1
+kafka-python==2.0.2

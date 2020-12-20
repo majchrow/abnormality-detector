@@ -10,6 +10,7 @@ import requests
 from .db import dao
 from .bridge import dao as bridge_dao
 from .exceptions import NotFoundError
+from .kafka import kafka_consumer
 from .reports import RoomReportGenerator, MeetingReportGenerator
 from .schema import (
     anomaly_schema,
@@ -175,6 +176,17 @@ class Models(Resource):
         return {'last': result}
 
 
+class Notifications(Resource):
+    @cross_origin()
+    def get(self):
+        try:
+            num_msgs = request.args.get("count")
+            result = kafka_consumer.get_last(num_msgs)
+            return {'last': result}
+        except KeyError:
+            return {'message': '"count" is mandatory'}, 400
+
+
 def setup_resources(app):
     api = Api(app)
     api.add_resource(Report, "/reports/<string:meeting_name>")
@@ -182,6 +194,7 @@ def setup_resources(app):
     api.add_resource(MeetingDetails, "/meetings/<string:meeting_name>")
     api.add_resource(Calls, "/calls")
     api.add_resource(CallHistory, "/calls/<string:meeting_name>")
+    api.add_resource()
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
     api.add_resource(Models, "/models/<string:meeting_name>")
 

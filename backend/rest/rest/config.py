@@ -16,4 +16,4 @@ class Config:
     bridge_username = os.environ['BRIDGE_USER']
     bridge_password = os.environ['BRIDGE_PASSWORD']
     meetings_update_period_d = int(os.environ['MEETINGS_UPDATE_PERIOD_DAYS'])
-
+    kafka_bootstrap_server = os.environ["KAFKA"]
