@@ -39,7 +39,7 @@ def main(serialized_job):
         report('job invalid - no data')
         report('all done')
 
-        msg = {'meeting_name': job['meeting_name'], 'status': 'Training job finished with status: failed - no training data'}
+        msg = {'meeting_name': job['meeting_name'], 'status': 'failure', 'event': 'No training data'}
         push_to_kafka(msg, producer)
         return
 
@@ -53,7 +53,7 @@ def main(serialized_job):
     roster_model.train(roster_df)
     report('roster training finished')
 
-    msg = {'meeting_name': job['meeting_name'], 'status': 'Training job finished with status: success'}
+    msg = {'meeting_name': job['meeting_name'], 'status': 'success', 'event': 'Training job finished'}
     push_to_kafka(msg, producer)
 
     # Inference
@@ -73,7 +73,7 @@ def main(serialized_job):
 
     report(f'inference job finished: run model on {meeting_name} from {start} to {end}')
 
-    msg = {'meeting_name': job['meeting_name'], 'status': 'Inference job finished with status: success'}
+    msg = {'meeting_name': job['meeting_name'], 'status': 'success', 'event': 'Inference job finished'}
     push_to_kafka(msg, producer)
 
 

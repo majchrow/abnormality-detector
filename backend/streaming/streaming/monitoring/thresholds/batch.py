@@ -53,7 +53,7 @@ def main(serialized_job):
     dao.save_anomaly_status(results[MsgType.CALLS], results[MsgType.CALL_INFO], results[MsgType.ROSTER])
     report(f'inference job finished: run thresholds on {meeting_name} from {start} to {end}')
 
-    msg = {'meeting_name': job['meeting_name'], 'status': 'Monitoring job finished with status: success'}
+    msg = {'meeting_name': job['meeting_name'], 'status': 'success', 'event': 'Monitoring job finished'}
     push_to_kafka(msg, producer)
 
 

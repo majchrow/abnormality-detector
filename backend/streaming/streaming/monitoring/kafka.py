@@ -34,15 +34,15 @@ class KafkaListener:
                     else:
                         event = None
                     if event and self.call_event_listeners:
-                        msg = {'name': call_name, 'event': event}
+                        msg = {'name': call_name, 'status': 'info', 'event': event}
                         logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
                         for queue in self.call_event_listeners:
                             queue.put_nowait(msg)
                     continue
 
                 if msg.topic == 'anomalies-training' and self.call_event_listeners:
-                    call_name, status = msg_dict['meeting_name'], msg_dict['status']
-                    msg = {'name': call_name, 'event': status}
+                    call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
+                    msg = {'name': call_name, 'status': status, 'event': event}
                     logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
                     for queue in self.call_event_listeners:
                         queue.put_nowait(msg)

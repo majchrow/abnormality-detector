@@ -200,15 +200,17 @@ class Notifications(Resource):
         name = msg['meeting_name']
 
         if topic != 'preprocessed_callListUpdate':
-            event = msg['status']
+            status = msg['status']
+            event = msg['event']
         else:
+            status = 'info'
             if msg['finished']:
                 event = 'finished'
             elif msg['start_datetime'] == msg['last_update']:
                 event = 'started'
             else:
                 return None
-        return {'name': name, 'timestamp': ts, 'event': event}
+        return {'name': name, 'timestamp': ts, 'status': status, 'event': event}
 
 
 def setup_resources(app):
