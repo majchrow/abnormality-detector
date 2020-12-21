@@ -203,6 +203,12 @@ class CassandraDAO:
             (meeting_name,)
         )
 
+    def delete_retraining(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM retraining WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
+
     def get_last_training(self, meeting_name):
         result = self.session.execute(
             f'SELECT submission_datetime FROM training_jobs '

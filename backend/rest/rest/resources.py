@@ -59,6 +59,7 @@ class Meetings(Resource):
 
             dao.clear_meeting(name)
             dao.delete_model(name)
+            dao.delete_retraining(name)
             return {
                 "message": f"successfully removed {name} from monitored conferences"
             }, 200
