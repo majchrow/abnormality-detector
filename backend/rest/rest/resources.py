@@ -237,6 +237,7 @@ class Logs(Resource):
             for file_name, bts in [ci, roster]:
                 zf.writestr(file_name, bts, compress_type=compression)
         memory_file.seek(0)
+        
         return send_file(memory_file, mimetype='application/zip', as_attachment=True, attachment_filename='log.zip')
 
 
