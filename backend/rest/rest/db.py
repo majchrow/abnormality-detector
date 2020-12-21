@@ -53,13 +53,11 @@ class CassandraDAO:
         interval = 604800  # one week in seconds
         current_datetime = datetime.datetime.now()
 
-        for call in calls:
-            if call["finished"] and self.__is_recent(
-                interval, current_datetime, call["start_datetime"]
-            ):
-                recent.add(call["name"])
-            else:
-                current.add(call["name"])
+        current = {call["name"] for call in calls if not call["finished"]}
+        recent = {
+            call["name"] for call in calls 
+            if call["name"] not in current and self.__is_recent(interval, current_datetime, call["start_datetime"])
+        }
 
         meeting_numbers = {
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
