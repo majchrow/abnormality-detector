@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List
 
-from .kafka import KafkaListener
+from .kafka import KafkaEndpoint
 from .serializers import DateTimeEncoder
 from .subprocess import BaseWorkerManager, run_for_result
 from .thresholds import STREAM_FINISHED, validate
@@ -26,7 +26,7 @@ class Manager:
         self.dao = dao
 
         self.anomaly_manager = AnomalyManager(dao, config)
-        self.kafka_manager = KafkaListener(config.kafka_bootstrap_server, config.kafka_call_list_topic)
+        self.kafka_manager = KafkaEndpoint(config.kafka_bootstrap_server, config.kafka_call_list_topic)
         self.threshold_manager = ThresholdManager(dao, config)
 
     def start(self):
@@ -36,6 +36,7 @@ class Manager:
         kafka_producer = AIOKafkaProducer(bootstrap_servers=self.config.kafka_bootstrap_server)
         await kafka_producer.start()
         self.anomaly_manager.init(kafka_producer)
+        self.kafka_manager.init(kafka_producer)
         self.threshold_manager.init(kafka_producer)
 
         try:
@@ -278,8 +279,8 @@ class AnomalyManager(BaseWorkerManager):
 
                 logging.info(f'{self.TAG}: obtained inference-schedule lock')
                 monitored = await self.dao.get_anomaly_monitored_meetings()
-                last_inferences = await self.dao.get_last_inferences(monitored)
 
+                last_inferences = await self.dao.get_last_inferences(monitored)
                 # add inference jobs for meetings with stale results
                 now = datetime.now()
                 jobs = []
@@ -290,7 +291,6 @@ class AnomalyManager(BaseWorkerManager):
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
                 if jobs:
                     logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
-
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
             # actually schedule them (lock not necessary anymore)
@@ -299,12 +299,8 @@ class AnomalyManager(BaseWorkerManager):
                 logging.info(f'{self.TAG}: pushed to workers')
 
     async def push_inference_job(self, job):
-        payload = json.dumps(job).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=payload, cls=DateTimeEncoder)
-
-    @staticmethod
-    def fmt_dt(dt):
-        return dt
+        payload = json.dumps(job, cls=DateTimeEncoder).encode()
+        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=payload)
 
     async def shutdown(self):
         await super().shutdown()

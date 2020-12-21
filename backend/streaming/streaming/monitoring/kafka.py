@@ -5,9 +5,9 @@ from aiokafka import AIOKafkaConsumer
 from datetime import datetime as dt, timezone
 
 
-class KafkaListener:
+class KafkaEndpoint:
 
-    TAG = 'KafkaListener'
+    TAG = 'KafkaEndpoint'
 
     def __init__(self, bootstrap_server, call_list_topic):
         self.bootstrap_server = bootstrap_server
@@ -16,10 +16,14 @@ class KafkaListener:
         self.anomaly_listeners = {}
 
         self.consumer = None
+        self.producer = None
+
+    def init(self, kafka_producer):
+        self.producer = kafka_producer
 
     async def run(self):
         self.consumer = AIOKafkaConsumer(
-            self.call_list_topic, 'monitoring-results-anomalies', 'anomalies-training', bootstrap_servers='kafka:29092',
+            self.call_list_topic, 'monitoring-results-anomalies', 'anomalies-job-status', bootstrap_servers='kafka:29092',
         )
         await self.consumer.start()
 
@@ -36,14 +40,21 @@ class KafkaListener:
                         event = 'Meeting started'
                     else:
                         event = None
-                    if event and self.call_event_listeners:
+                    if event:
                         msg = {'name': call_name, 'status': 'info', 'event': event, 'timestamp': timestamp}
-                        logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
-                        for queue in self.call_event_listeners:
-                            queue.put_nowait(msg)
+
+                        if self.call_event_listeners:
+                            logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
+                            for queue in self.call_event_listeners:
+                                queue.put_nowait(msg)
+                   
+                        msg = msg.copy()
+                        msg['meeting_name'] = msg.pop('name')
+                        await self.producer.send_and_wait(topic='call-events', value=json.dumps(msg).encode())
+
                     continue
 
-                if msg.topic == 'anomalies-training' and self.call_event_listeners:
+                if msg.topic == 'anomalies-job-status' and self.call_event_listeners:
                     call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
                     msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
                     logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')

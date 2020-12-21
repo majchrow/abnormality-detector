@@ -14,7 +14,6 @@ class Worker:
         self.dao = dao
         self.job_consumer = job_consumer
         self.kafka_producer = producer
-        self.meeting_models = {}
 
         self.loop = None
 
@@ -57,6 +56,8 @@ class Worker:
             self.dao.complete_inference_job(meeting_name, end)
 
             report(f'job finished: run model on {meeting_name} from {start} to {end}')
+            msg = {'meeting_name': meeting_name, 'status': 'success', 'event': 'Inference job finished'}
+            await self.kafka_producer.send_and_wait(topic='anomalies-job-status', value=json.dumps(msg).encode())
 
 
 def filter_anomalies(meeting, threshold, scores_df):
