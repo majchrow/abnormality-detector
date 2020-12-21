@@ -60,6 +60,9 @@ class Manager:
         if min_duration is not None and max_participants is not None:
             await self.dao.set_retraining(meeting_name, min_duration, max_participants, threshold)
             logging.info(f'{self.TAG}: setup model retraining on {meeting_name} with threshold = {threshold} {max_participants} <= participants and {min_duration} <= duration')
+        else:
+            await self.dao.unset_retraining(meeting_name)
+            logging.info(f'{self.TAG}: setup model retraining on {meeting_name} with threshold = {threshold} {max_participants} <= participants and {min_duration} <= duration')
 
     async def schedule_inference(self, meeting_name: str):
         await self.anomaly_manager.schedule(meeting_name)

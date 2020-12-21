@@ -135,6 +135,14 @@ class CassandraDAO:
         logging.info(f'{self.TAG}: retraining set for {meeting_name} with {threshold} threshold {min_duration} duration '
                      f'and {max_participants} participants')
 
+    async def unset_retraining(self, meeting_name: str):
+        await self.async_exec(
+            'unset_retraining',
+            f"DELETE FROM retraining WHERE meeting_name=%s;",
+            (meeting_name,)
+        )
+        logging.info(f'{self.TAG}: retraining unset for {meeting_name}')
+
     async def get_retraining(self, meeting_name):
         result = await self.async_exec(
             'get_retraining',
