@@ -267,10 +267,14 @@ class CassandraDAO:
         models_result = sorted(self.session.execute(
             'SELECT meeting_name as name FROM models;'
         ).all(), key=lambda m: m['name'])
+        retraining_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM retraining;'
+        ).all(), key=lambda m: m['name'])
 
         return {
             'with_criteria': [m['name'] for m in meeting_result if m['criteria'] and m['criteria'] != '[]'],
             'with_model': [m['name'] for m in models_result],
+            'with_online_model': [m['name'] for m in retraining_result],
             'admin_monitored': [m['name'] for m in meeting_result if m['monitored']],
             'ml_monitored': [m['name'] for m in meeting_result if m['ml_monitored']],
         }
