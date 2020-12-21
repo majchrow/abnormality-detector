@@ -125,14 +125,14 @@ class CassandraDAO:
         logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
         return uid
 
-    async def set_retraining(self, meeting_name: str, min_duration: int, max_participants: int):
+    async def set_retraining(self, meeting_name: str, min_duration: int, max_participants: int, threshold: float):
         await self.async_exec(
             'set_retraining',
-            f"INSERT INTO retraining (meeting_name, min_duration, max_participants) "
-            f"VALUES (%s, %s, %s);",
-            (meeting_name, min_duration, max_participants)
+            f"INSERT INTO retraining (meeting_name, min_duration, max_participants, threshold) "
+            f"VALUES (%s, %s, %s, %s);",
+            (meeting_name, min_duration, max_participants, threshold)
         )
-        logging.info(f'{self.TAG}: retraining set for {meeting_name} with {min_duration} duration '
+        logging.info(f'{self.TAG}: retraining set for {meeting_name} with {threshold} threshold {min_duration} duration '
                      f'and {max_participants} participants')
 
     async def get_retraining(self, meeting_name):
@@ -146,6 +146,7 @@ class CassandraDAO:
             'min_duration': result[0]['min_duration'],
             'max_participants': result[0]['max_participants'],
             'last_update': result[0]['last_update'],
+            'threshold': result[0]['threshold']
         } if result else None
 
     async def update_retraining(self, meeting_name, timestamp):
@@ -157,7 +158,7 @@ class CassandraDAO:
             (timestamp, meeting_name)
         )
 
-    def get_call_details(self, meeting_name, start_datetime):
+    async def get_call_details(self, meeting_name, start_datetime):
         result_dur = (await self.async_exec(
             'get_call_duration',
             f'SELECT duration, last_update FROM calls '
@@ -175,7 +176,7 @@ class CassandraDAO:
         max_participants = result_mp[0]['mp'] if result_mp else 0
         return duration, max_participants
 
-    def get_model(self, meeting_name):
+    async def get_model(self, meeting_name):
         result_model = await self.async_exec(
             'get_model',
             f'SELECT training_call_starts, threshold FROM models '

@@ -5,7 +5,7 @@ services:
       context: ./bridge-connector/test
     networks:
       - preprocessing
-    command: python server.py --host 0.0.0.0 --run-forever --port 8888 --interval_s 1 --dumpfile log-4-bridges-1204-1211.json 
+    command: python server.py --host 0.0.0.0 --port 8888 --interval_s 1 --dumpfile log-4-bridges-1204-1211.json 
 
   bridge-connector:
     build:

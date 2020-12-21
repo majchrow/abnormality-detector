@@ -6,6 +6,7 @@ from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from dateutil.parser import parse
 from typing import List
 
 from .kafka import KafkaEndpoint
@@ -54,8 +55,11 @@ class Manager:
     ###################
     async def schedule_training(self, meeting_name: str, calls: List[str], threshold: float, min_duration: int, max_participants: int):
         await self.anomaly_manager.train(meeting_name, calls, threshold)
-        await self.dao.set_retraining(meeting_name, min_duration, max_participants)
         logging.info(f'{self.TAG}: scheduled model training for meeting {meeting_name} on calls {calls}')
+
+        if min_duration is not None and max_participants is not None:
+            await self.dao.set_retraining(meeting_name, min_duration, max_participants, threshold)
+            logging.info(f'{self.TAG}: setup model retraining on {meeting_name} with threshold = {threshold} {max_participants} <= participants and {min_duration} <= duration')
 
     async def schedule_inference(self, meeting_name: str):
         await self.anomaly_manager.schedule(meeting_name)
@@ -104,7 +108,7 @@ class Manager:
         queue = Queue()
 
         async def _listen():
-            self.kafka_manager.call_event_subscribe(queue)
+            self.kafka_manager.user_notifications_subscribe(queue)
             while True:
                 msg = await queue.get()
                 yield msg
@@ -112,7 +116,7 @@ class Manager:
         try:
             yield _listen
         finally:
-            self.kafka_manager.call_event_unsubscribe(queue)
+            self.kafka_manager.user_notifications_unsubscribe(queue)
 
     async def monitoring_receiver(self, call_name):
         if not (await self.is_monitored(call_name)):
@@ -312,44 +316,48 @@ class AnomalyManager(BaseWorkerManager):
         queue = asyncio.Queue()
 
         try:
-            self.kafka_endpoint.call_event_subscribe(queue)
+            self.kafka_endpoint.call_events_subscribe(queue)
             while True:
                 msg = await queue.get()
                 meeting_name, event = msg['meeting_name'], msg['event']
                 if event != 'Meeting finished':
                     continue
 
-                start_datetime, timestamp = msg['start_datetime'], msg['datetime']
+                start_datetime, timestamp = parse(msg['start_datetime']).replace(tzinfo=None), parse(msg['datetime']).replace(tzinfo=None)
 
                 if not (retraining := await self.dao.get_retraining(meeting_name)):
                     continue
+                logging.info(f'{self.TAG}: retraining applicable to {meeting_name}...')
 
-                with self.dao.try_lock('retraining-update') as locked:
+                async with self.dao.try_lock('retraining-update') as locked:
                     if not locked:
                         logging.info(f'{self.TAG}: failed to obtain retraining-update lock')
                         continue
 
-                    if retraining['last_update'] >= timestamp:
+                    if retraining['last_update'] and retraining['last_update'] >= timestamp:
+                        logging.info(f'{self.TAG}: last retraining covered finished call')
                         continue
+                    logging.info(f'{self.TAG}: last retraining till {retraining["last_update"]}')
 
                     await self.dao.update_retraining(meeting_name, timestamp)
+                    logging.info(f'{self.TAG}: retraining updated on {timestamp}')
 
                 duration, max_participants = await self.dao.get_call_details(meeting_name, start_datetime)
                 if duration < retraining['min_duration'] or max_participants < retraining['max_participants']:
                     continue
+                logging.info(f'{self.TAG}: duration: {duration}, max_participants: {max_participants}')
 
-                if not (model := await self.dao.get_model(meeting_name)):
+                if (model := await self.dao.get_model(meeting_name)) and start_datetime in model['training_call_starts']:
+                    logging.info(f'{self.TAG}: model already trained on last call!')
                     continue
-
-                if start_datetime in model['training_call_starts']:
-                    continue
-
-                await self.train(meeting_name, model['training_call_starts'] + [start_datetime], model['threshold'])
-                # TODO:
-                #  add logging
-
+                
+                logging.info(f'{self.TAG}: launching retraining...')
+                calls = [start_datetime] + (model['training_call_starts'] if model else [])
+                await self.train(meeting_name, calls, retraining['threshold'])
+        except Exception as e:
+            raise e
         finally:
-            self.kafka_endpoint.call_event_unsubscribe(queue)
+            self.kafka_endpoint.call_events_unsubscribe(queue)
 
     async def shutdown(self):
         await super().shutdown()

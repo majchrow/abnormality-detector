@@ -32,8 +32,8 @@ async def schedule_training(request):
 
     try:
         if retraining:
-            min_duration = int(payload['min_duration'])
-            max_participants = int(payload['max_participants'])
+            min_duration = int(retraining['min_duration'])
+            max_participants = int(retraining['max_participants'])
         else:
             min_duration = max_participants = None
     except KeyError:
