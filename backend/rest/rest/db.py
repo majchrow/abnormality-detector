@@ -180,7 +180,7 @@ class CassandraDAO:
     def clear_meeting(self, name):
         self.session.execute(
             f"UPDATE {self.meetings_table} "
-            f"SET monitored=false, criteria='' "
+            f"SET monitored=false, ml_monitored=false, criteria='' "
             f"WHERE meeting_name=%s IF EXISTS;",
             (name,),
         )

@@ -44,20 +44,21 @@ class KafkaEndpoint:
                         msg = {'name': call_name, 'status': 'info', 'event': event, 'timestamp': timestamp}
 
                         if self.call_event_listeners:
-                            logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
+                            logging.info(f'{self.TAG}: pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
                             for queue in self.call_event_listeners:
                                 queue.put_nowait(msg)
                    
                         msg = msg.copy()
                         msg['meeting_name'] = msg.pop('name')
                         await self.producer.send_and_wait(topic='call-events', value=json.dumps(msg).encode())
+                        logging.info(f'{self.TAG}: pushed {msg} to call-events topic')
 
                     continue
 
                 if msg.topic == 'anomalies-job-status' and self.call_event_listeners:
                     call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
                     msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
-                    logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
+                    logging.info(f'{self.TAG}: pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
                     for queue in self.call_event_listeners:
                         queue.put_nowait(msg)
                     continue
