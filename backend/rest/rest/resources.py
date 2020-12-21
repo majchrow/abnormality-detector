@@ -190,7 +190,7 @@ class Notifications(Resource):
             return {'message': '"count" is mandatory'}, 400
         except ValueError:
             return {'message': '"count" must be an integer'}, 400
-        
+
         messages = kafka_consumer.get_last(num_msgs)
         result = list(map(self.process_msg, messages))
         result = [r for r in result if r]
@@ -201,19 +201,11 @@ class Notifications(Resource):
         topic = msg['topic']
         ts = msg['timestamp']
         msg =  msg['content']
+        
         name = msg['meeting_name']
+        status = msg['status']
+        event = msg['event']
 
-        if topic != 'preprocessed_callListUpdate':
-            status = msg['status']
-            event = msg['event']
-        else:
-            status = 'info'
-            if msg['finished']:
-                event = 'finished'
-            elif msg['start_datetime'] == msg['last_update']:
-                event = 'started'
-            else:
-                return None
         return {'name': name, 'timestamp': ts, 'status': status, 'event': event}
 
 

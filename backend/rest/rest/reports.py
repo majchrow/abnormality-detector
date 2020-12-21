@@ -333,14 +333,15 @@ class PlotGenerator:
         with open(filepath, "rb") as f:
             return base64.b64encode(f.read()).decode()
 
-    def plot_line(self, timestamp, is_last=False, ax=None):
+    def plot_line(self, timestamp, is_last=False, anomalies=False):
         line = plt.axvline(
             pd.Timestamp(timestamp), c="black", linewidth=2, linestyle="--"
         )
         if is_last:
+            yvalue = -0.1 if anomalies else -0.7
             plt.text(
                 x=pd.Timestamp(timestamp),
-                y=-0.7,
+                y=yvalue,
                 s=f"{str(timestamp)[11:19]}",
                 weight="bold",
                 fontsize=12,
@@ -556,9 +557,9 @@ class PlotGenerator:
             c="r",
             linestyle="",
         )
-        self.plot_line(start_time, True)
+        self.plot_line(start_time, True, True)
         if end_time:
-            self.plot_line(end_time, True)
+            self.plot_line(end_time, True, True)
 
         # ax1.spines["bottom"].set_color("black")
         # ax1.spines["left"].set_color("black")
