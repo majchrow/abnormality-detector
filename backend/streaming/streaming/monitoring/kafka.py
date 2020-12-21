@@ -50,6 +50,8 @@ class KafkaEndpoint:
                    
                         msg = msg.copy()
                         msg['meeting_name'] = msg.pop('name')
+                        msg['datetime'] = msg_dict['last_update']
+                        msg['start_datetime'] = msg_dict['start_datetime']
                         await self.producer.send_and_wait(topic='call-events', value=json.dumps(msg).encode())
                         logging.info(f'{self.TAG}: pushed {msg} to call-events topic')
 

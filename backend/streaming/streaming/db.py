@@ -88,7 +88,7 @@ class CassandraDAO:
             result = await self.async_exec(
                 'set_monitoring_status',
                 f'UPDATE {self.meetings_table} '
-                f'SET monitored=%s, criteria=%s'
+                f'SET monitored=%s, criteria=%s '
                 f'WHERE meeting_name=%s IF EXISTS;',
                 (monitored, json.dumps(criteria), call_name)
             )
@@ -124,6 +124,65 @@ class CassandraDAO:
         )
         logging.info(f'{self.TAG}: added training job for {meeting_name} on {calls}')
         return uid
+
+    async def set_retraining(self, meeting_name: str, min_duration: int, max_participants: int):
+        await self.async_exec(
+            'set_retraining',
+            f"INSERT INTO retraining (meeting_name, min_duration, max_participants) "
+            f"VALUES (%s, %s, %s);",
+            (meeting_name, min_duration, max_participants)
+        )
+        logging.info(f'{self.TAG}: retraining set for {meeting_name} with {min_duration} duration '
+                     f'and {max_participants} participants')
+
+    async def get_retraining(self, meeting_name):
+        result = await self.async_exec(
+            'get_retraining',
+            f'SELECT * FROM retraining '
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
+        )
+        return {
+            'min_duration': result[0]['min_duration'],
+            'max_participants': result[0]['max_participants'],
+            'last_update': result[0]['last_update'],
+        } if result else None
+
+    async def update_retraining(self, meeting_name, timestamp):
+        await self.async_exec(
+            'update_retraining',
+            f'UPDATE retraining '
+            f'SET last_update=%s '
+            f'WHERE meeting_name=%s IF EXISTS;',
+            (timestamp, meeting_name)
+        )
+
+    def get_call_details(self, meeting_name, start_datetime):
+        result_dur = (await self.async_exec(
+            'get_call_duration',
+            f'SELECT duration, last_update FROM calls '
+            f'WHERE meeting_name=%s AND start_datetime=%s;',
+            (meeting_name, start_datetime)
+        ))[0]
+        duration = result_dur['duration']
+
+        result_mp = await self.async_exec(
+            'get_call_duration',
+            f'SELECT MAX(max_participants) AS mp FROM call_info_update '
+            f'WHERE meeting_name=%s AND datetime >= %s AND datetime <= %s;',
+            (meeting_name, start_datetime, result_dur['last_update'])
+        )
+        max_participants = result_mp[0]['mp'] if result_mp else 0
+        return duration, max_participants
+
+    def get_model(self, meeting_name):
+        result_model = await self.async_exec(
+            'get_model',
+            f'SELECT training_call_starts, threshold FROM models '
+            f'WHERE meeting_name=%s;',
+            (meeting_name,)
+        )
+        return result_model[0] if result_model else None
 
     async def meeting_exists(self, meeting_name):
         result = await self.async_exec(

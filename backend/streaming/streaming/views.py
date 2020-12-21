@@ -24,14 +24,24 @@ async def schedule_training(request):
         payload = await request.json()
         calls = payload['calls']
         threshold = float(payload['threshold'])
+        retraining = payload.get('retrain', None)
     except JSONDecodeError:
         raise web.HTTPBadRequest(reason='Failed to parse JSON')
     except KeyError:
         raise web.HTTPBadRequest(reason='fields "calls" and "threshold" are mandatory')
 
+    try:
+        if retraining:
+            min_duration = int(payload['min_duration'])
+            max_participants = int(payload['max_participants'])
+        else:
+            min_duration = max_participants = None
+    except KeyError:
+        raise web.HTTPBadRequest(reason='fields "min_duration" and "max_participants" are mandatory for retraining')
+
     manager = request.app['monitoring']
     try:
-        await manager.schedule_training(conf_name, calls, threshold)
+        await manager.schedule_training(conf_name, calls, threshold, min_duration, max_participants)
         return web.Response()
     except ValidationError as e:
         return web.HTTPBadRequest(reason=str(e))
