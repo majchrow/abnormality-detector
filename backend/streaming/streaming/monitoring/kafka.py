@@ -27,7 +27,7 @@ class KafkaEndpoint:
         await self.consumer.start()
 
         try:
-            async for msg in self.consumer:               
+            async for msg in self.consumer:
                 call_event_listeners = self.subscriber_groups.get('call-events', None)
                 user_notification_listeners = self.subscriber_groups.get('user-notifications', None)
 
@@ -73,15 +73,13 @@ class KafkaEndpoint:
                         queue.put_nowait(msg)
                     continue
 
-                if not (listeners := self.subscriber_groups.get(f"monitoring-anomalies: {msg_dict['meeting_name']}", None)):
+                if not (listeners := self.subscriber_groups.get(f"monitoring-anomalies: {msg_dict['meeting']}", None)):
                     continue
 
                 logging.info(f'{self.TAG}: pushing anomaly msg to {len(listeners)} listeners')
                 for queue in listeners:
                     queue.put_nowait(msg_dict['anomalies'])
         except Exception as e:
-            logging.error(str(e))
-            # TODO: restart!
             raise e
         finally:
             await self.consumer.stop()

@@ -18,6 +18,24 @@ from ..config import Config
 from ..exceptions import AppException
 
 
+def async_partial(coro_fun, *args, **kwargs):
+    def run():
+        return coro_fun(*args, **kwargs)
+    return run
+
+
+async def retry_on_failure(task, fmt_exc, retry_s=1):
+    while True:
+        try:
+            await task()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logging.exception(fmt_exc(e))
+            await asyncio.sleep(retry_s)
+
+
 class Manager:
 
     TAG = 'Manager'
@@ -40,11 +58,16 @@ class Manager:
         self.kafka_manager.init(kafka_producer)
         self.threshold_manager.init(kafka_producer)
 
+        kafka_task = retry_on_failure(
+            async_partial(self.kafka_manager.run),
+            lambda e: f'{self.TAG}: kafka_task failed with {e}!'
+        )
+
         try:
             await asyncio.gather(
                 self.anomaly_manager.run(),
                 self.threshold_manager.run(),
-                self.kafka_manager.run(),
+                kafka_task,
                 return_exceptions=True
             )
         finally:
@@ -196,11 +219,6 @@ class ThresholdManager(BaseWorkerManager):
         ))
 
 
-def async_partial(coro_fun, *args, **kwargs):
-    def run():
-        return coro_fun(*args, **kwargs)
-    return run
-
 
 # Assumptions:
 #  - when re-running old jobs, it may so happen that it gets completed multiple times (very
@@ -225,22 +243,17 @@ class AnomalyManager(BaseWorkerManager):
     def init(self, kafka_producer):
         self.kafka_producer = kafka_producer
 
-        dispatch_task = self._retry_on_failure(async_partial(self.periodic_dispatch), 'inference dispatch')
+        dispatch_task = retry_on_failure(
+            async_partial(self.periodic_dispatch), 
+            lambda e: f'{self.TAG}: inference dispatch failed with {e}'
+        )
         self.dispatch_task = asyncio.create_task(dispatch_task)
 
-        retrain_task = self._retry_on_failure(async_partial(self.retrain), 'automatic retraining')
+        retrain_task = retry_on_failure(
+            async_partial(self.retrain), 
+            lambda e: f'{self.TAG}: automatic retraining failed with {e}!'
+        )
         self.retrain_task = asyncio.create_task(retrain_task)
-
-    async def _retry_on_failure(self, task, name):
-        while True:
-            try:
-                await task()
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                logging.exception(f'{self.TAG}: {name} failed with {e}!')
-                await asyncio.sleep(1)
 
     async def train(self, meeting_name, calls, threshold):
         if not await self.dao.meeting_exists(meeting_name):

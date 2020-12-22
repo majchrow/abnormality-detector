@@ -52,7 +52,7 @@ def main(serialized_job):
         report('roster training finished')
     except Exception as e:
         report(f'training failed with {str(e)}')
-        report(f'{traceback.format_tb(e.__traceback__)}')
+        report(f'\n'.join(traceback.format_tb(e.__traceback__)))
         msg = {'meeting_name': job['meeting_name'], 'status': 'failure', 'event': 'Training job failed'}
         push_to_kafka(msg, producer)
         return
