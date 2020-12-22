@@ -65,12 +65,13 @@ class KafkaEndpoint:
 
                     continue
 
-                if msg.topic == 'anomalies-job-status' and user_notification_listeners:
-                    call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
-                    msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
-                    logging.info(f'{self.TAG}: pushing training job result to {len(user_notification_listeners)} subscribers')
-                    for queue in user_notification_listeners:
-                        queue.put_nowait(msg)
+                if msg.topic == 'anomalies-job-status':
+                    if user_notification_listeners:
+                        call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
+                        msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
+                        logging.info(f'{self.TAG}: pushing training job result to {len(user_notification_listeners)} subscribers')
+                        for queue in user_notification_listeners:
+                            queue.put_nowait(msg)
                     continue
 
                 if not (listeners := self.subscriber_groups.get(f"monitoring-anomalies: {msg_dict['meeting']}", None)):

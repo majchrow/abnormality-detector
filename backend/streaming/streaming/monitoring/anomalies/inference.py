@@ -37,15 +37,6 @@ class Worker:
             ci_predictions = ci_model.predict(ci_batch)
             roster_predictions = roster_model.predict(roster_batch)
 
-            report("CI batch")
-            report(str(ci_batch.shape))
-            report("ROSTER batch")
-            report(str(roster_batch.shape))
-            report("CI predictions")
-            report(str(ci_predictions.shape))
-            report("ROSTER predictions")
-            report(str(roster_predictions.shape))
-
             def anomaly_filter(df):
                 return filter_anomalies(meeting_name, threshold, df)
 
