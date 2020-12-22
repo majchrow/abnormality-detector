@@ -9,8 +9,7 @@ from .routes import setup_routes
 
 
 def create_app():
-    logging.basicConfig(level=logging.INFO)
-
+    logging.basicConfig(format='%(levelname)s %(asctime)s: %(message)s', level=logging.INFO)
     config = Config()
 
     app = web.Application(middlewares=[error_middleware])
