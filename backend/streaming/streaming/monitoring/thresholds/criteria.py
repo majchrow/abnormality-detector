@@ -106,13 +106,13 @@ class ThresholdCondition(StrictModel, Condition):
 
 nc_msg_params = {
     MsgType.CALLS: {},
-    MsgType.CALL_INFO: {'max_participants'},
+    MsgType.CALL_INFO: {'current_participants'},
     MsgType.ROSTER: {'active_speaker'}
 }
 
 
 class NumericCriterion(StrictModel, Criterion):
-    parameter: Literal['max_participants', 'active_speaker']
+    parameter: Literal['current_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, int]
 
     @validator('conditions', pre=True)
@@ -290,7 +290,7 @@ param_types = {
     'recording': BooleanCriterion,
     'streaming': BooleanCriterion,
     'time_diff': TimeCriterion,
-    'max_participants': NumericCriterion,
+    'current_participants': NumericCriterion,
     'active_speaker': NumericCriterion,
     'days': DaysCriterion
 }
