@@ -195,11 +195,11 @@ class Notifications(Resource):
         messages = kafka_consumer.get_last(num_msgs)
         result = list(map(self.process_msg, messages))
         result = [r for r in result if r]
+        
         return {'last': result}
 
     @staticmethod
     def process_msg(msg):
-        topic = msg['topic']
         ts = msg['timestamp']
         msg =  msg['content']
         
