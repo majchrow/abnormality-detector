@@ -46,7 +46,10 @@ def main(serialized_job):
             anomalies = check(rec, tpe, criteria)
             reason = json.dumps([a.dict() for a in anomalies])
             timestamp = rec['start_datetime'] if tpe == MsgType.CALLS else rec['datetime']
-            results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
+            if tpe == MsgType.CALLS:
+                results[tpe].append((bool(anomalies), reason, meeting_name, timestamp))
+            else:
+                results[tpe].append((reason, meeting_name, timestamp))
             if anomalies:
                 cnt += 1
         report(f'Detected {cnt} anomalies')

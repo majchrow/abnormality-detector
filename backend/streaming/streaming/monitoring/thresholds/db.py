@@ -3,6 +3,7 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, dict_factory
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import ValueSequence
+from itertools import repeat
 
 from ...config import Config
 
@@ -41,19 +42,40 @@ class CassandraDAO:
             )
             execute_concurrent_with_args(self.session, call_stmt, call_results)
         if ci_results:
+            meeting_name = ci_results[0][1]
             ci_stmt = self.session.prepare(
                 f"UPDATE call_info_update "
-                f"SET anomaly=?, anomaly_reason=?"
+                f"SET anomaly_reason=?"
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, ci_stmt, ci_results)
+            self.fix_anomaly_status('call_info_update', meeting_name, [r[2] for r in ci_results])
         if roster_results:
+            meeting_name = roster_results[0][1]
             roster_stmt = self.session.prepare(
                 f"UPDATE roster_update "
-                f"SET anomaly=?, anomaly_reason=? "
+                f"SET anomaly_reason=? "
                 f"WHERE meeting_name=? AND datetime=?;"
             )
             execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+            self.fix_anomaly_status('roster_update', meeting_name, [r[2] for r in roster_results])
+
+    def fix_anomaly_status(self, table, meeting_name, timestamps):
+        # TODO: with lock...
+        result_reasons = self.session.execute(
+            f'SELECT anomaly_reason, ml_anomaly_reason FROM {table} '
+            f'WHERE meeting_name = %s AND datetime IN %s;',
+            (meeting_name, ValueSequence(timestamps))
+        ).all()
+
+        status_values = [r['anomaly_reason'] != '[]' or bool(r['ml_anomaly_reason']) for r in result_reasons]
+        update_rows = list(zip(status_values, repeat(meeting_name), timestamps))
+        fix_stmt = self.session.prepare(
+            f"UPDATE {table} "
+            f"SET anomaly=? "
+            f"WHERE meeting_name=? AND datetime=?;"
+        )
+        execute_concurrent_with_args(self.session, fix_stmt, update_rows)
 
 
 def build_dao(config: Config):

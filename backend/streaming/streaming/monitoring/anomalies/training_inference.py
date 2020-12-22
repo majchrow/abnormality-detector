@@ -95,9 +95,9 @@ def map_anomaly_status(meeting, threshold, scores_df):
     for ts, p in scores_df.iterrows():
         if p[0] > threshold:
             cnt += 1
-            anomalies.append((True, threshold, str(p[0]), meeting, ts))
+            anomalies.append((threshold, str(p[0]), meeting, ts))
         else:
-            anomalies.append((False, None, None, meeting, ts))
+            anomalies.append((None, None, meeting, ts))
 
     report(f'Detected {cnt} anomalies')
     return anomalies
