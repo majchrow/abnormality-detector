@@ -93,5 +93,5 @@ CREATE TABLE locks(
     resource_name text PRIMARY KEY,
     lock_id text,
     last_locked timestamp
-) WITH default_time_to_live = 30;
+) WITH default_time_to_live = 30 AND gc_grace_seconds = 3600;
 
