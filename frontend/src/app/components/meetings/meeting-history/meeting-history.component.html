@@ -47,11 +47,11 @@
             </mat-form-field>
           <span class="big-pad"></span>
           <span class="report">
-               <button mat-icon-button (click)="generateReport()">
+               <button title="Generate pdf" mat-icon-button (click)="generateReport()">
                  <i class="app-icon fa fa-2x fa-file-pdf-o"></i>
                </button>
             <span class="fake-pad"></span>
-              <button mat-icon-button [disabled]="this.selectedMeeting === 'all'" (click)="downloadZip()">
+              <button title="Download logs" mat-icon-button [disabled]="this.selectedMeeting === 'all'" (click)="downloadZip()">
                 <i class="app-icon fa fa-2x fa-file-archive-o"></i>
               </button>
             </span>
