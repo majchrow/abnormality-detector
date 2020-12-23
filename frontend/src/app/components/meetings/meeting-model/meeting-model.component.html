@@ -38,11 +38,11 @@
 
         <div class="row" fxLayout="row" fxLayoutAlign="center center">
           <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
-            Minimum participants:
+            Minimum number of participants:
           </div>
           <div fxFlex="70%" fxLayoutAlign="center center">
             <div class="custom-one-slider">
-              <mat-slider [(ngModel)]="participants"
+              <mat-slider class="one" [(ngModel)]="participants"
                           [min]=0
                           [max]=250
                           [tickInterval]=1
@@ -53,7 +53,7 @@
 
         <div class="row" fxLayout="row" fxLayoutAlign="center center">
           <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
-            Minimum duration:
+            Minimum meeting duration:
           </div>
           <div fxFlex="70%" fxLayoutAlign="center center">
             <div class="custom-one-slider">
@@ -79,6 +79,22 @@
                           [displayWith]="formatPercent"
                           [tickInterval]=1
                           [thumbLabel]=true></mat-slider>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" fxLayout="row" fxLayoutAlign="center center">
+          <div class="lefter" fxFlex="20%" fxLayoutAlign="left center">
+            Online training:
+          </div>
+          <div fxFlex="70%" fxLayoutAlign="center center">
+            <div>
+              <mat-slide-toggle class="setting-toogle"
+                                color="warn"
+                                title="Keep training model on further meetings that satisfy given criteria"
+                                (change)="onSliderChange()"
+                                [checked]="this.retrain">
+              </mat-slide-toggle>
             </div>
           </div>
         </div>

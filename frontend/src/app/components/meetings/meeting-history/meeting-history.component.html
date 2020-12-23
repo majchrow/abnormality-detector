@@ -16,16 +16,8 @@
       </ng-container>
       <ng-template #historyOn>
         <span>
-        <mat-form-field class="first" appearance="fill">
-          <mat-label>Select parameter</mat-label>
-          <mat-select [(value)]="selected" (selectionChange)="onSelectChange()">
-            <mat-option *ngFor="let type of filterTypes" [value]="type">
-              {{ type }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
 
-        <mat-form-field class="second" appearance="fill">
+        <mat-form-field class="first" appearance="fill">
           <mat-label>Select meeting</mat-label>
           <mat-select [(ngModel)]="selectedMeeting" (selectionChange)="onSelectMeetingChange()">
             <mat-option value="all">
@@ -42,6 +34,15 @@
           <mat-select [(value)]="selectedModel" (selectionChange)="onSelectModelChange()">
             <mat-option *ngFor="let model of filterModels" [value]="model">
               {{ model }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+          <mat-form-field class="second" appearance="fill">
+          <mat-label>Select parameter</mat-label>
+          <mat-select [(value)]="selected" (selectionChange)="onSelectChange()">
+            <mat-option *ngFor="let type of filterTypes" [value]="type">
+              {{ type }}
             </mat-option>
           </mat-select>
         </mat-form-field>
@@ -72,8 +73,8 @@
                   <mat-icon mat-list-icon *ngSwitchCase="'streaming'">ondemand_video</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchCase="'max_participants'">group_add</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchCase="'active_speaker'">record_voice_over</mat-icon>
-                  <mat-icon mat-list-icon *ngSwitchCase="'day'">event_available</mat-icon>
-                  <mat-icon mat-list-icon *ngSwitchCase="'datetime'">event_available</mat-icon>
+                  <mat-icon mat-list-icon *ngSwitchCase="'day'">event_busy</mat-icon>
+                  <mat-icon mat-list-icon *ngSwitchCase="'datetime'">event_busy</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchDefault>warning</mat-icon>
                 </ng-container>
               </td>

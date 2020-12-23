@@ -82,6 +82,7 @@ export class MeetingsService {
 
   fetchAnomalies(meeting: Meeting): Observable<any> {
     const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}`;
+    console.log(url);
     return this.http.get<any>(url);
   }
 
@@ -93,6 +94,7 @@ export class MeetingsService {
       end = new Date().toISOString();
     }
     const url = `${this.backend.url}/${this.backend.anomalies}/${meeting.name}?start=${historyMeeting.start.toISOString()}&end=${end}`;
+    console.log(url);
     return this.http.get<any>(url);
   }
 

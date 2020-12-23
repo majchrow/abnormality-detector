@@ -21,6 +21,7 @@ export class ThirdCardComponent implements OnInit {
   adminMonitoring: string;
   adminCriteria: string;
   mlCriteria: string;
+  onlineModel: string;
 
 
   ngOnInit(): void {
@@ -35,12 +36,14 @@ export class ThirdCardComponent implements OnInit {
         this.adminMonitoring = '' + res.admin_monitored.length;
         this.adminCriteria = '' + res.with_criteria.length;
         this.mlCriteria = '' + res.with_model.length;
+        this.onlineModel = '' + res.with_online_model.length;
       }, err => {
         console.log(err);
         this.mlMonitoring = '?';
         this.adminMonitoring = '?';
         this.adminCriteria = '?';
         this.mlCriteria = '?';
+        this.onlineModel = '?';
       });
   }
 

@@ -3,7 +3,7 @@ import {Observable, Observer} from 'rxjs';
 import {environment} from '../../environments/environment';
 import {HttpClient} from '@angular/common/http';
 import {Meeting} from '../components/meetings/class/meeting';
-import {HistoryMeeting} from "../components/meetings/meeting-history/class/history-meeting";
+import {HistoryMeeting} from '../components/meetings/meeting-history/class/history-meeting';
 
 @Injectable({
   providedIn: 'root'
@@ -73,12 +73,18 @@ export class MeetingSSEService {
     return this._getObservable(url);
   }
 
-  trainModel(meeting: Meeting, calls: string[], threshold: number): Observable<any> {
+  trainModel(meeting: Meeting, calls: string[], threshold: number, minDuration: number, maxParticipants: number, retrain: boolean): Observable<any> {
     const url = `${this.backend.url}/${this.backend.train}/${meeting.name}`;
     const payload = {
       calls,
       threshold: threshold / 100,
     };
+    if (retrain) {
+      payload['retrain'] = {
+          min_duration: minDuration,
+          max_participants: maxParticipants
+      };
+    }
     return this.http.put(url, payload);
   }
 
@@ -96,6 +102,7 @@ export class MeetingSSEService {
       start: historyMeeting.start.toISOString(),
       end
     };
+    console.log(payload);
     return this.http.put(url, payload);
   }
 
