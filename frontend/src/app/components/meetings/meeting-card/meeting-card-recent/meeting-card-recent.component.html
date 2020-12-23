@@ -14,6 +14,8 @@
   </mat-card-content>
   <mat-card-actions fxLayout="row" fxLayoutAlign="end center">
     <span class="app-spacer"></span>
+    <i class="app-icon fa fa-lightbulb-o" title="Train anomaly model" (click)="onModelClick()"></i>
+    <i class="app-icon fa fa-pencil-square-o" title="Set manual anomaly conditions" (click)="onSettingClick()"></i>
     <i class="app-icon fa fa-retweet"  title="Evaluate model on historical data" (click)="onInferenceClick()"></i>
     <i class="app-icon fa fa-history" title="Check anomaly history" (click)="onHistoryClick()"></i>
   </mat-card-actions>
