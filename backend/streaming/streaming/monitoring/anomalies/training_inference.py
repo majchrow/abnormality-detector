@@ -1,5 +1,6 @@
 import json
 import sys
+import traceback
 from datetime import datetime as dt
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
@@ -14,16 +15,12 @@ from ...config import Config
 def push_to_kafka(msg, producer):
     try:
         msg = json.dumps(msg).encode()
-        future = producer.send('anomalies-training', msg)
+        future = producer.send('anomalies-job-status', msg)
         future.get(timeout=5)
     except KafkaError:
         report(f'Failed to send {msg} to Kafka!')
 
 
-# TODO:
-#  - job doesn't exist
-#  - no training data
-#  - other failures during training?
 def main(serialized_job):
     config = Config()
     producer = KafkaProducer(bootstrap_servers=[config.kafka_bootstrap_server])
@@ -47,11 +44,18 @@ def main(serialized_job):
     roster_model = Model(meeting_name)
 
     # Training
-    ci_model.train(ci_df)
-    report('call info training finished')
+    try:
+        ci_model.train(ci_df)
+        report('call info training finished')
 
-    roster_model.train(roster_df)
-    report('roster training finished')
+        roster_model.train(roster_df)
+        report('roster training finished')
+    except Exception as e:
+        report(f'training failed with {str(e)}')
+        report(f'\n'.join(traceback.format_tb(e.__traceback__)))
+        msg = {'meeting_name': job['meeting_name'], 'status': 'failure', 'event': 'Training job failed'}
+        push_to_kafka(msg, producer)
+        return
 
     msg = {'meeting_name': job['meeting_name'], 'status': 'success', 'event': 'Training job finished'}
     push_to_kafka(msg, producer)
@@ -60,10 +64,18 @@ def main(serialized_job):
     start = dt.strptime(job['start'], '%Y-%m-%d %H:%M:%S.%fZ')
     end = dt.strptime(job['end'], '%Y-%m-%d %H:%M:%S.%fZ')
     threshold = float(job['threshold'])
+    report(f'running with threshold {threshold} on {start} to {end}')
 
-    ci_batch, roster_batch = dao.load_data(meeting_name, start, end)
-    ci_predictions = ci_model.predict(ci_batch)
-    roster_predictions = roster_model.predict(roster_batch)
+    try:
+        ci_batch, roster_batch = dao.load_data(meeting_name, start, end)
+        ci_predictions = ci_model.predict(ci_batch)
+        roster_predictions = roster_model.predict(roster_batch)
+    except Exception as e:
+        report(f'inference failed with {str(e)}')
+        report(f'{traceback.format_tb(e.__traceback__)}')
+        msg = {'meeting_name': job['meeting_name'], 'status': 'failure', 'event': 'Inference job failed'}
+        push_to_kafka(msg, producer)
+        return
 
     def anomaly_filter(df):
         return map_anomaly_status(meeting_name, threshold, df)
@@ -83,9 +95,9 @@ def map_anomaly_status(meeting, threshold, scores_df):
     for ts, p in scores_df.iterrows():
         if p[0] > threshold:
             cnt += 1
-            anomalies.append((True, threshold, str(p[0]), meeting, ts))
+            anomalies.append((threshold, str(p[0]), meeting, ts))
         else:
-            anomalies.append((False, None, None, meeting, ts))
+            anomalies.append((None, None, meeting, ts))
 
     report(f'Detected {cnt} anomalies')
     return anomalies
@@ -93,3 +105,4 @@ def map_anomaly_status(meeting, threshold, scores_df):
 
 if __name__ == '__main__':
     main(sys.argv[1])
+

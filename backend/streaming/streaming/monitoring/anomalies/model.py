@@ -3,15 +3,20 @@ import pandas as pd
 import pickle as pkl
 
 from datetime import datetime, timedelta
+from pyod.models.cblof import CBLOF
 from pyod.models.hbos import HBOS
-from pyod.models.iforest import IForest
+from pyod.models.knn import KNN
+from pyod.models.lof import LOF
+from pyod.models.ocsvm import OCSVM
 
 
 class Model:
+    models = [OCSVM, HBOS, CBLOF, LOF, KNN]
+
     def __init__(self, meeting_name):
         self.meeting_name = meeting_name
         self.model = None
-        self.model_cls = HBOS  # IForest
+        self.model_cls = Model.models[1]
 
     def _init_model(self):
         self.model = self.model_cls()
@@ -37,7 +42,7 @@ class Model:
             "mean_participants",
             "recording",
             "streaming",
-            "time_diff",
+            # "time_diff",
         }
 
     def serialize(self):

@@ -1,11 +1,14 @@
+from datetime import timezone
 from dateutil.parser import parse, ParserError
 from flask_cors import cross_origin
 from flask_restful import Resource, Api
-from flask import current_app, request
+from flask import current_app, request, send_file
+from io import BytesIO
 from marshmallow import ValidationError
 import pandas as pd
 import pytz
 import requests
+import zipfile
 
 from .db import dao
 from .bridge import dao as bridge_dao
@@ -55,6 +58,8 @@ class Meetings(Resource):
                 return {'message': f'failed to unschedule monitoring and inference for meeting {name}'}, 400
 
             dao.clear_meeting(name)
+            dao.delete_model(name)
+            dao.delete_retraining(name)
             return {
                 "message": f"successfully removed {name} from monitored conferences"
             }, 200
@@ -186,31 +191,55 @@ class Notifications(Resource):
             return {'message': '"count" is mandatory'}, 400
         except ValueError:
             return {'message': '"count" must be an integer'}, 400
-        
+
         messages = kafka_consumer.get_last(num_msgs)
         result = list(map(self.process_msg, messages))
         result = [r for r in result if r]
+        
         return {'last': result}
 
     @staticmethod
     def process_msg(msg):
-        topic = msg['topic']
         ts = msg['timestamp']
         msg =  msg['content']
+        
         name = msg['meeting_name']
+        status = msg['status']
+        event = msg['event']
 
-        if topic != 'preprocessed_callListUpdate':
-            status = msg['status']
-            event = msg['event']
-        else:
-            status = 'info'
-            if msg['finished']:
-                event = 'finished'
-            elif msg['start_datetime'] == msg['last_update']:
-                event = 'started'
-            else:
-                return None
         return {'name': name, 'timestamp': ts, 'status': status, 'event': event}
+
+
+class Monitoring(Resource):
+    @cross_origin()
+    def get(self):
+        return dao.get_monitoring_summary(), 200
+
+
+class Logs(Resource):
+    @cross_origin()
+    def get(self, meeting_name):
+        try:
+            start_date = request.args.get("start")
+            start_date = parse(start_date).replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw'))
+        except KeyError:
+            return {'message': '"start" is required'}, 400
+        except ParserError:
+            return {'message': 'incorrect date format'}, 400
+
+        call_info = dao.get_call_info_data_for_meeting(meeting_name, start_date)
+        roster = dao.get_roster_data_for_meeting(meeting_name, start_date)
+        ci = ('call_info_update.csv', call_info.to_csv().encode())
+        roster = ('roster_update.csv', roster.to_csv().encode())
+        
+        compression = zipfile.ZIP_DEFLATED
+        memory_file = BytesIO()
+        with zipfile.ZipFile(memory_file, mode="w") as zf:
+            for file_name, bts in [ci, roster]:
+                zf.writestr(file_name, bts, compress_type=compression)
+        memory_file.seek(0)
+        
+        return send_file(memory_file, mimetype='application/zip', as_attachment=True, attachment_filename='log.zip')
 
 
 def setup_resources(app):
@@ -223,4 +252,6 @@ def setup_resources(app):
     api.add_resource(Notifications, "/notifications")
     api.add_resource(Anomalies, "/anomalies/<string:meeting_name>")
     api.add_resource(Models, "/models/<string:meeting_name>")
+    api.add_resource(Monitoring, "/monitoring")
+    api.add_resource(Logs, "/logs/<string:meeting_name>")
 

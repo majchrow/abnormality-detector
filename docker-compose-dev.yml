@@ -5,7 +5,7 @@ services:
       context: ./bridge-connector/test
     networks:
       - preprocessing
-    command: python server.py --host 0.0.0.0 --run-forever --port 8888 --interval_s 0.001 --dumpfile log-4-bridges-1204-1211.json 
+    command: python server.py --host 0.0.0.0 --port 8888 --interval_s 1 --dumpfile log-4-bridges-1211-1222.json 
 
   bridge-connector:
     build:
@@ -68,8 +68,6 @@ services:
     ports:
       - '7000:7000'
       - '9042:9042'
-    volumes:
-      - 'cassandra_data:/bitnami'
     restart: on-failure
     networks:
       - preprocessing
@@ -108,6 +106,7 @@ services:
       KAFKA_LISTENERS: LISTENER_DOCKER://0.0.0.0:29092,LISTENER_HOST://kafka:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LOG_RETENTION_HOURS: 24
       KAFKA_OPTS: -javaagent:/usr/app/jmx_prometheus_javaagent.jar=7072:/usr/app/prom-jmx-agent-config.yml
     depends_on:
       - zookeeper

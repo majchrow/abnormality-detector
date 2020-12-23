@@ -178,7 +178,7 @@ class CassandraDAO:
     def clear_meeting(self, name):
         self.session.execute(
             f"UPDATE {self.meetings_table} "
-            f"SET monitored=false, criteria='' "
+            f"SET monitored=false, ml_monitored=false, criteria='' "
             f"WHERE meeting_name=%s IF EXISTS;",
             (name,),
         )
@@ -194,6 +194,18 @@ class CassandraDAO:
         if meetings:
             return meetings[0]
         return {}
+
+    def delete_model(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM models WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
+
+    def delete_retraining(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM retraining WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
 
     def get_last_training(self, meeting_name):
         result = self.session.execute(
@@ -245,6 +257,25 @@ class CassandraDAO:
             res["ml_anomaly_score"] = ml_score
             res["ml_threshold"] = ml_threshold
         return {"anomalies": sorted(results, key=lambda r: r["datetime"])}
+
+    def get_monitoring_summary(self):
+        meeting_result = sorted(self.session.execute(
+            f'SELECT meeting_name as name, monitored, ml_monitored, criteria FROM {self.meetings_table};'
+        ).all(), key=lambda m: m['name'])
+        models_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM models;'
+        ).all(), key=lambda m: m['name'])
+        retraining_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM retraining;'
+        ).all(), key=lambda m: m['name'])
+
+        return {
+            'with_criteria': [m['name'] for m in meeting_result if m['criteria'] and m['criteria'] != '[]'],
+            'with_model': [m['name'] for m in models_result],
+            'with_online_model': [m['name'] for m in retraining_result],
+            'admin_monitored': [m['name'] for m in meeting_result if m['monitored']],
+            'ml_monitored': [m['name'] for m in meeting_result if m['ml_monitored']],
+        }
 
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):

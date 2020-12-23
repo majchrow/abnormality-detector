@@ -3,9 +3,14 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, dict_factory
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import ValueSequence
+from contextlib import contextmanager
+from datetime import datetime
+from itertools import repeat
+from uuid import uuid4
 
 from .exceptions import MissingDataError
 from .model import Model
+from ..workers import report
 from ...config import Config
 
 
@@ -96,37 +101,70 @@ class CassandraDAO:
         return ci_df, roster_df
 
     def save_anomalies(self, ci_results, roster_results):
-        # TODO: save explanation from the model to ml_anomaly_reason column
-        if ci_results:
-            ci_stmt = self.session.prepare(
-                f"UPDATE call_info_update "
-                f"SET anomaly=true, threshold=?, ml_anomaly_reason=? "
-                f"WHERE meeting_name=? AND datetime=?;"
-            )
-            execute_concurrent_with_args(self.session, ci_stmt, ci_results)
-        if roster_results:
-            roster_stmt = self.session.prepare(
-                f"UPDATE roster_update "
-                f"SET anomaly=true, threshold=?, ml_anomaly_reason=? "
-                f"WHERE meeting_name=? AND datetime=?;"
-            )
-            execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+        with self.try_lock('anomaly-status-update') as locked:
+            if not locked:
+                report('failed to obtain anomaly-status-update lock')
+                return
+            report('obtained anomaly-status-update lock')
+
+            if ci_results:
+                ci_stmt = self.session.prepare(
+                    f"UPDATE call_info_update "
+                    f"SET anomaly=true, threshold=?, ml_anomaly_reason=? "
+                    f"WHERE meeting_name=? AND datetime=?;"
+                )
+                execute_concurrent_with_args(self.session, ci_stmt, ci_results)
+            if roster_results:
+                roster_stmt = self.session.prepare(
+                    f"UPDATE roster_update "
+                    f"SET anomaly=true, threshold=?, ml_anomaly_reason=? "
+                    f"WHERE meeting_name=? AND datetime=?;"
+                )
+                execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+        report('released anomaly-status-update lock')
 
     def save_anomaly_status(self, ci_results, roster_results):
-        if ci_results:
-            ci_stmt = self.session.prepare(
-                f"UPDATE call_info_update "
-                f"SET anomaly=?, threshold=?, ml_anomaly_reason=? "
-                f"WHERE meeting_name=? AND datetime=?;"
-            )
-            execute_concurrent_with_args(self.session, ci_stmt, ci_results)
-        if roster_results:
-            roster_stmt = self.session.prepare(
-                f"UPDATE roster_update "
-                f"SET anomaly=?, threshold=?, ml_anomaly_reason=? "
-                f"WHERE meeting_name=? AND datetime=?;"
-            )
-            execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+        with self.try_lock('anomaly-status-update') as locked:
+            if not locked:
+                report('failed to obtain anomaly-status-update lock')
+                return
+            report('obtained anomaly-status-update lock')
+
+            if ci_results:
+                meeting_name = ci_results[0][2]
+                ci_stmt = self.session.prepare(
+                    f"UPDATE call_info_update "
+                    f"SET threshold=?, ml_anomaly_reason=? "
+                    f"WHERE meeting_name=? AND datetime=?;"
+                )
+                execute_concurrent_with_args(self.session, ci_stmt, ci_results)
+                self.fix_anomaly_status('call_info_update', meeting_name, [r[3].to_pydatetime() for r in ci_results])
+            if roster_results:
+                meeting_name = roster_results[0][2]
+                roster_stmt = self.session.prepare(
+                    f"UPDATE roster_update "
+                    f"SET threshold=?, ml_anomaly_reason=? "
+                    f"WHERE meeting_name=? AND datetime=?;"
+                )
+                execute_concurrent_with_args(self.session, roster_stmt, roster_results)
+                self.fix_anomaly_status('roster_update', meeting_name, [r[3].to_pydatetime() for r in roster_results])
+        report('released anomaly-status-update lock')
+
+    def fix_anomaly_status(self, table, meeting_name, timestamps):
+        result_reasons = self.session.execute(
+            f'SELECT anomaly_reason, ml_anomaly_reason FROM {table} '
+            f'WHERE meeting_name = %s AND datetime IN %s;',
+            (meeting_name, ValueSequence(timestamps))
+        ).all()
+
+        status_values = [r['anomaly_reason'] != '[]' or bool(r['ml_anomaly_reason']) for r in result_reasons]
+        update_rows = list(zip(status_values, repeat(meeting_name), timestamps))
+        fix_stmt = self.session.prepare(
+            f"UPDATE {table} "
+            f"SET anomaly=? "
+            f"WHERE meeting_name=? AND datetime=?;"
+        )
+        execute_concurrent_with_args(self.session, fix_stmt, update_rows)
 
     def complete_inference_job(self, meeting_name, end_datetime):
         self.session.execute(
@@ -135,6 +173,26 @@ class CassandraDAO:
             f"WHERE meeting_name=%s AND end_datetime=%s;",
             (meeting_name, end_datetime)
         )
+
+    @contextmanager
+    def try_lock(self, resource):
+        try:
+            # lock using Cassandra's lightweight transactions
+            now = datetime.now()
+            uid = str(uuid4())
+            result = self.session.execute(
+                f'UPDATE locks SET lock_id=%s, last_locked=%s '
+                f'WHERE resource_name=%s '
+                f'IF lock_id=null;',
+                (uid, now, resource)
+            ).all()
+            yield result[0]['[applied]']
+        finally:
+            self.session.execute(
+                'UPDATE locks SET lock_id=null '
+                'WHERE resource_name=%s;',
+                (resource,)
+            )
 
 
 def build_dao(config: Config):

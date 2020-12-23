@@ -81,6 +81,13 @@ CREATE TABLE models(
     roster_model blob
 );
 
+CREATE TABLE retraining(
+    meeting_name text PRIMARY KEY,
+    max_participants int,
+    min_duration int,
+    last_update timestamp
+);
+
 CREATE TABLE inference_jobs(
     meeting_name text,
     start_datetime timestamp,
