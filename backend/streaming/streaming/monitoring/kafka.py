@@ -1,31 +1,38 @@
 import json
 import logging
+import pytz
 from aiokafka import AIOKafkaConsumer
-from datetime import datetime as dt
+from datetime import datetime as dt, timezone
 
 
-class KafkaListener:
+class KafkaEndpoint:
 
-    TAG = 'KafkaListener'
+    TAG = 'KafkaEndpoint'
 
     def __init__(self, bootstrap_server, call_list_topic):
         self.bootstrap_server = bootstrap_server
         self.call_list_topic = call_list_topic
-        self.call_event_listeners = set()
-        self.anomaly_listeners = {}
+        self.subscriber_groups = {}
 
         self.consumer = None
+        self.producer = None
+
+    def init(self, kafka_producer):
+        self.producer = kafka_producer
 
     async def run(self):
         self.consumer = AIOKafkaConsumer(
-            self.call_list_topic, 'monitoring-results-anomalies', 'anomalies-training', bootstrap_servers='kafka:29092',
+            self.call_list_topic, 'monitoring-results-anomalies', 'anomalies-job-status', bootstrap_servers='kafka:29092',
         )
         await self.consumer.start()
 
         try:
             async for msg in self.consumer:
+                call_event_listeners = self.subscriber_groups.get('call-events', None)
+                user_notification_listeners = self.subscriber_groups.get('user-notifications', None)
+
                 msg_dict = json.loads(msg.value.decode())
-                timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).isoformat()
+                timestamp = dt.fromtimestamp(int(msg.timestamp / 1000)).replace(tzinfo=timezone.utc).astimezone(tz=pytz.timezone('Europe/Warsaw')).isoformat()
 
                 if msg.topic == self.call_list_topic:
                     call_name = msg_dict['meeting_name']
@@ -35,57 +42,84 @@ class KafkaListener:
                         event = 'Meeting started'
                     else:
                         event = None
-                    if event and self.call_event_listeners:
+                    if event:
                         msg = {'name': call_name, 'status': 'info', 'event': event, 'timestamp': timestamp}
-                        logging.info(f'pushing call info {msg} to {len(self.call_event_listeners)} subscribers')
-                        for queue in self.call_event_listeners:
+
+                        if user_notification_listeners:
+                            logging.info(f'{self.TAG}: pushing generic info msg to {len(user_notification_listeners)} subscribers')
+                            for queue in user_notification_listeners:
+                                queue.put_nowait(msg)
+                   
+                        msg = msg.copy()
+                        msg['meeting_name'] = msg.pop('name')
+                        msg['datetime'] = msg_dict['last_update']
+                        msg['start_datetime'] = msg_dict['start_datetime']
+
+                        if call_event_listeners:
+                            logging.info(f'{self.TAG}: pushing call event msg to {len(call_event_listeners)} subscribers')
+                            for queue in call_event_listeners:
+                                queue.put_nowait(msg)
+
+                        await self.producer.send_and_wait(topic='call-events', value=json.dumps(msg).encode())
+                        logging.info(f'{self.TAG}: msg pushed to call-events topic')
+
+                    continue
+
+                if msg.topic == 'anomalies-job-status':
+                    if user_notification_listeners:
+                        call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
+                        msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
+                        logging.info(f'{self.TAG}: pushing training job result to {len(user_notification_listeners)} subscribers')
+                        for queue in user_notification_listeners:
                             queue.put_nowait(msg)
                     continue
 
-                if msg.topic == 'anomalies-training' and self.call_event_listeners:
-                    call_name, status, event = msg_dict['meeting_name'], msg_dict['status'], msg_dict['event']
-                    msg = {'name': call_name, 'status': status, 'event': event, 'timestamp': timestamp}
-                    logging.info(f'pushing training job result {msg} to {len(self.call_event_listeners)} subscribers')
-                    for queue in self.call_event_listeners:
-                        queue.put_nowait(msg)
+                if not (listeners := self.subscriber_groups.get(f"monitoring-anomalies: {msg_dict['meeting']}", None)):
                     continue
 
-                if not (listeners := self.anomaly_listeners.get(msg_dict['meeting'], None)):
-                    continue
-
-                logging.info(f'{self.TAG}: pushing {msg_dict} to {len(listeners)} listeners')
+                logging.info(f'{self.TAG}: pushing anomaly msg to {len(listeners)} listeners')
                 for queue in listeners:
                     queue.put_nowait(msg_dict['anomalies'])
+        except Exception as e:
+            raise e
         finally:
             await self.consumer.stop()
 
-    def call_event_subscribe(self, queue):
-        logging.info(f'{self.TAG}: registered call event subscriber')
-        self.call_event_listeners.add(queue)
+    def user_notifications_subscribe(self, queue):
+        self.subscribe(queue, 'user-notifications')
 
-    def call_event_unsubscribe(self, queue):
-        if queue in self.call_event_listeners:
-            self.call_event_listeners.remove(queue)
-            logging.info(f'{self.TAG}: unregistered call event subscriber')
-        else:
-            logging.info(f'{self.TAG}: "unsubscribe call events" attempt - subscriber not found')
+    def user_notifications_unsubscribe(self, queue):
+        self.unsubscribe(queue, 'user-notifications')
 
-    def monitoring_subscribe(self, conf_name: str, queue):
-        logging.info(f'{self.TAG}: registered subscriber for {conf_name}')
+    def call_events_subscribe(self, queue):
+        self.subscribe(queue, 'call-events')
 
-        if (sinks := self.anomaly_listeners.get(conf_name, None)) is None:
+    def call_events_unsubscribe(self, queue):
+        self.unsubscribe(queue, 'call-events')
+
+    def monitoring_subscribe(self, meeting_name, queue):
+        self.subscribe(queue, f'monitoring-anomalies: {meeting_name}')
+
+    def monitoring_unsubscribe(self, meeting_name, queue):
+        self.unsubscribe(queue, f'monitoring-anomalies: {meeting_name}')
+
+    def subscribe(self, queue, resource: str):
+        logging.info(f'{self.TAG}: registered subscriber for {resource}')
+
+        if (sinks := self.subscriber_groups.get(resource, None)) is None:
             sinks = set()
-            self.anomaly_listeners[conf_name] = sinks
+            self.subscriber_groups[resource] = sinks
         sinks.add(queue)
 
-    def monitoring_unsubscribe(self, conf_name: str, queue):
-        if not (sinks := self.anomaly_listeners.get(conf_name, None)):
-            logging.warning(f'{self.TAG}: "unsubscribe" attempt for {conf_name} - conference unmonitored!')
+    def unsubscribe(self, queue, resource: str):
+        if not (sinks := self.subscriber_groups.get(resource, None)):
+            logging.warning(f'{self.TAG}: "unsubscribe" attempt for {resource} that\'s not been subscribed to!')
         else:
             try:
                 sinks.remove(queue)
-                logging.info(f'{self.TAG}: unregistered subscriber for {conf_name}')
+                logging.info(f'{self.TAG}: unregistered subscriber for {resource}')
                 if not sinks:
-                    del self.anomaly_listeners[conf_name]
+                    del self.subscriber_groups[resource]
             except KeyError:
-                logging.warning(f'{self.TAG}: "unsubscribe" attempt for {conf_name} - not a subscriber!')
+                logging.warning(f'{self.TAG}: "unsubscribe" attempt for {resource} - not a subscriber!')
+

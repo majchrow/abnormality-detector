@@ -19,7 +19,7 @@ CREATE TABLE roster_update(
     threshold double,
     start_datetime timestamp,
     PRIMARY KEY (meeting_name, datetime)
-); 
+) WITH default_time_to_live = 2592000 AND gc_grace_seconds = 3600; 
 
 CREATE TABLE calls(
     start_datetime timestamp,
@@ -30,7 +30,7 @@ CREATE TABLE calls(
     anomaly boolean,
     anomaly_reason text,
     PRIMARY KEY (meeting_name, start_datetime)
-);
+) WITH default_time_to_live = 2592000 AND gc_grace_seconds = 3600; 
 
 CREATE TABLE call_info_update(
     meeting_name text,
@@ -54,7 +54,7 @@ CREATE TABLE call_info_update(
     threshold double,
     start_datetime timestamp,
     PRIMARY KEY (meeting_name, datetime)
-);
+) WITH default_time_to_live = 2592000 AND gc_grace_seconds = 3600; 
 
 CREATE TABLE meetings(
     meeting_name text PRIMARY KEY, 
@@ -81,6 +81,13 @@ CREATE TABLE models(
     roster_model blob
 );
 
+CREATE TABLE retraining(
+    meeting_name text PRIMARY KEY,
+    max_participants int,
+    min_duration int,
+    last_update timestamp
+);
+
 CREATE TABLE inference_jobs(
     meeting_name text,
     start_datetime timestamp,
@@ -93,5 +100,5 @@ CREATE TABLE locks(
     resource_name text PRIMARY KEY,
     lock_id text,
     last_locked timestamp
-) WITH default_time_to_live = 30;
+) WITH default_time_to_live = 30 AND gc_grace_seconds = 3600;
 

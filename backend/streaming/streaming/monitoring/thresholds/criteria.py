@@ -106,13 +106,13 @@ class ThresholdCondition(StrictModel, Condition):
 
 nc_msg_params = {
     MsgType.CALLS: {},
-    MsgType.CALL_INFO: {'max_participants'},
+    MsgType.CALL_INFO: {'current_participants'},
     MsgType.ROSTER: {'active_speaker'}
 }
 
 
 class NumericCriterion(StrictModel, Criterion):
-    parameter: Literal['max_participants', 'active_speaker']
+    parameter: Literal['current_participants', 'active_speaker']
     conditions: Union[ThresholdCondition, int]
 
     @validator('conditions', pre=True)
@@ -220,7 +220,7 @@ class DaysCriterion(StrictModel, Criterion):
             return
         
         if isinstance(message['datetime'], datetime):
-            week_day, date_time = message['week_day_number'], message['datetime']
+            week_day, date_time = message['week_day_number'], message['datetime'].time()
         else:
             week_day, date_time = message['week_day_number'], isoparse(message['datetime']).time()
 
@@ -231,14 +231,14 @@ class DaysCriterion(StrictModel, Criterion):
                         parameter='datetime',
                         value=str(date_time),
                         condition_type='min',
-                        condition_value=c.min_hour
+                        condition_value=str(c.min_hour)
                     )
                 if not c.max_satisfies(date_time):
                     return Anomaly(
                         parameter='datetime',
                         value=str(date_time),
                         condition_type='max',
-                        condition_value=c.max_hour
+                        condition_value=str(c.max_hour)
                     )
                 break
         else:
@@ -290,7 +290,7 @@ param_types = {
     'recording': BooleanCriterion,
     'streaming': BooleanCriterion,
     'time_diff': TimeCriterion,
-    'max_participants': NumericCriterion,
+    'current_participants': NumericCriterion,
     'active_speaker': NumericCriterion,
     'days': DaysCriterion
 }
