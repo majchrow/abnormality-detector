@@ -278,7 +278,7 @@ class AnomalyManager(BaseWorkerManager):
             raise AppException.meeting_not_found()
 
     async def fire_anomaly(self, meeting_name, calls, start, end, threshold):
-        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+        if not await self.dao.meeting_exists(meeting_name):
             raise AppException.meeting_not_found()
 
         job = {

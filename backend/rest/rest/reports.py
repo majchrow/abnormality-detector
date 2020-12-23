@@ -99,9 +99,6 @@ class ReportGenerator:
                 data[data_type], start_datetime, info_end, end_datetime
             )
 
-        if not data["anomalies"].empty:
-            data["anomalies"] = self.unify_data(data["anomalies"], start_datetime)
-
         plot = self.pg.create_plot(
             data,
             f"{self.resources_dir}{self.get_plot_filename(start_datetime)}",
@@ -548,6 +545,7 @@ class PlotGenerator:
         ax1 = plt.subplot(gs[index], sharex=ax)
         myFmt = mdates.DateFormatter("%H:%M")
         # ax1.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
+        
         ax1.xaxis.set_major_formatter(myFmt)
         ax1.grid(True)
         line1 = ax1.plot(
