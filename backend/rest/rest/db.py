@@ -47,17 +47,8 @@ class CassandraDAO:
         meetings = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
         modeled_meetings = {m['meeting_name'] for m in self.session.execute(f"SELECT meeting_name FROM models;")}
 
-        current = set()
-        recent = set()
-
-        interval = 604800  # one week in seconds
-        current_datetime = datetime.datetime.now()
-
         current = {call["name"] for call in calls if not call["finished"]}
-        recent = {
-            call["name"] for call in calls 
-            if call["name"] not in current and self.__is_recent(interval, current_datetime, call["start_datetime"])
-        }
+        historical = {call["name"] for call in calls if call["finished"]}
 
         meeting_numbers = {
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
@@ -81,18 +72,18 @@ class CassandraDAO:
                 current,
             )
         )
-        recent = list(
+        historical = list(
             map(
                 lambda call: {
                     "name": call,
                     "meeting_number": meeting_numbers[call],
                     "criteria": [],
                 },
-                recent,
+                historical,
             )
         )
 
-        return {"current": current, "recent": recent, "created": monitored}
+        return {"current": current, "recent": historical, "created": monitored}
 
     def get_calls(
         self,
@@ -280,10 +271,6 @@ class CassandraDAO:
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
         return True
-
-    @staticmethod
-    def __is_recent(interval, current_datetime, call_datetime):
-        return (current_datetime - call_datetime).total_seconds() <= interval
 
     def get_call_info_data(self, name, start_date=None, end_date=None):
         result = pd.DataFrame(
