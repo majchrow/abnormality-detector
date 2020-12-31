@@ -9,7 +9,9 @@ import {Meeting} from '../../class/meeting';
 export class MeetingCardRecentComponent implements OnInit {
 
   @Input() meeting: Meeting;
+  @Output() modelEmitter = new EventEmitter<Meeting>();
   @Output() historyEmitter = new EventEmitter<Meeting>();
+  @Output() settingEmitter = new EventEmitter<Meeting>();
   @Output() inferenceEmitter = new EventEmitter<Meeting>();
 
   constructor() {
@@ -18,12 +20,20 @@ export class MeetingCardRecentComponent implements OnInit {
   ngOnInit(): void {
   }
 
-  onHistoryClick() {
-    this.historyEmitter.emit(this.meeting);
-  }
-
   onInferenceClick() {
     this.inferenceEmitter.emit(this.meeting);
   }
 
+  onModelClick() {
+    this.modelEmitter.emit(this.meeting);
+  }
+
+  onSettingClick() {
+    this.settingEmitter.emit(this.meeting);
+  }
+
+  onHistoryClick() {
+    this.historyEmitter.emit(this.meeting);
+  }
 }
+

@@ -269,6 +269,7 @@ export class MeetingSettingComponent implements OnInit {
   parsePayload(data: Array<any>) {
     const config = this.getDefaultConfig();
     for (const record of data) {
+      console.log(record);
       if (record.parameter === 'days') {
         const daysConfig = MeetingSettingComponent.getDefaultDaysConfig();
         for (const day of record.conditions) {
@@ -280,10 +281,18 @@ export class MeetingSettingComponent implements OnInit {
           daysConfig[dayKey].checked = true;
         }
         config[record.parameter].conditions = daysConfig;
+      } else if (record.parameter === 'active_speaker') {
+        config[record.parameter].conditions = record.conditions.max;
+      } else if (record.parameter === 'current_participants') {
+        config.max_participants.conditions = record.conditions.max;
       } else {
         config[record.parameter].conditions = record.conditions;
       }
-      config[record.parameter].checked = true;
+      if (record.parameter === 'current_participants') {
+        config.max_participants.checked = true;
+      } else {
+        config[record.parameter].checked = true;
+      }
     }
 
     return config;
@@ -312,6 +321,20 @@ export class MeetingSettingComponent implements OnInit {
               parameter: 'days',
               conditions: days
             });
+        } else if (key === 'max_participants') {
+          result.push(
+            {
+              parameter: 'current_participants',
+              conditions: {max: value.conditions}
+            }
+          );
+        } else if (key === 'active_speaker') {
+          result.push(
+            {
+              parameter: key,
+              conditions: {max: value.conditions}
+            }
+          );
         } else {
           result.push(
             {

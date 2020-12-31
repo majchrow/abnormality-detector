@@ -15,48 +15,48 @@
         *ngIf="anomaliesHistoryView && meetingsHistory; then historyOn; else historyOff">
       </ng-container>
       <ng-template #historyOn>
-        <span>
-        <mat-form-field class="first" appearance="fill">
-          <mat-label>Select parameter</mat-label>
-          <mat-select [(value)]="selected" (selectionChange)="onSelectChange()">
-            <mat-option *ngFor="let type of filterTypes" [value]="type">
-              {{ type }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
+        <div>
+            <mat-form-field class="first" appearance="fill">
+              <mat-label>Select meeting</mat-label>
+              <mat-select [(ngModel)]="selectedMeeting" (selectionChange)="onSelectMeetingChange()">
+                <mat-option value="all">
+                  all
+                </mat-option>
+                <mat-option *ngFor="let meeting of meetingsHistory" [value]="meeting.start.toISOString()">
+                  {{meeting.start.toLocaleString('en-GB', options)}}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
 
-        <mat-form-field class="second" appearance="fill">
-          <mat-label>Select meeting</mat-label>
-          <mat-select [(ngModel)]="selectedMeeting" (selectionChange)="onSelectMeetingChange()">
-            <mat-option value="all">
-              all
-            </mat-option>
-            <mat-option *ngFor="let meeting of meetingsHistory" [value]="meeting.start.toISOString()">
-            {{meeting.start.toLocaleString('en-GB', options)}}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
+            <mat-form-field class="second" appearance="fill">
+              <mat-label>Select model</mat-label>
+              <mat-select [(value)]="selectedModel" (selectionChange)="onSelectModelChange()">
+                <mat-option *ngFor="let model of filterModels" [value]="model">
+                  {{ model }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
 
-          <mat-form-field class="second" appearance="fill">
-          <mat-label>Select model</mat-label>
-          <mat-select [(value)]="selectedModel" (selectionChange)="onSelectModelChange()">
-            <mat-option *ngFor="let model of filterModels" [value]="model">
-              {{ model }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-          <span class="report" fxLayoutAlign="end start">
-               <button mat-icon-button (click)="generateReport()">
+            <mat-form-field class="second" appearance="fill">
+              <mat-label>Select parameter</mat-label>
+              <mat-select [(value)]="selected" (selectionChange)="onSelectChange()">
+                <mat-option *ngFor="let type of filterTypes" [value]="type">
+                  {{ type }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          <span class="big-pad"></span>
+          <span class="report">
+               <button title="Generate pdf" mat-icon-button (click)="generateReport()">
                  <i class="app-icon fa fa-2x fa-file-pdf-o"></i>
                </button>
             <span class="fake-pad"></span>
-              <button mat-icon-button [disabled]="this.selectedMeeting === 'all'" (click)="downloadZip()">
+              <button title="Download logs" mat-icon-button [disabled]="this.selectedMeeting === 'all'" (click)="downloadZip()">
                 <i class="app-icon fa fa-2x fa-file-archive-o"></i>
               </button>
-          </span>
+            </span>
 
-          </span>
+        </div>
 
         <div class="card-deck-container">
           <table mat-table [dataSource]="anomaliesHistoryView">
@@ -72,8 +72,8 @@
                   <mat-icon mat-list-icon *ngSwitchCase="'streaming'">ondemand_video</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchCase="'max_participants'">group_add</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchCase="'active_speaker'">record_voice_over</mat-icon>
-                  <mat-icon mat-list-icon *ngSwitchCase="'day'">event_available</mat-icon>
-                  <mat-icon mat-list-icon *ngSwitchCase="'datetime'">event_available</mat-icon>
+                  <mat-icon mat-list-icon *ngSwitchCase="'day'">event_busy</mat-icon>
+                  <mat-icon mat-list-icon *ngSwitchCase="'datetime'">event_busy</mat-icon>
                   <mat-icon mat-list-icon *ngSwitchDefault>warning</mat-icon>
                 </ng-container>
               </td>

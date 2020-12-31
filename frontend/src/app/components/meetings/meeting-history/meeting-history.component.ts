@@ -37,6 +37,16 @@ export class MeetingHistoryComponent implements OnInit {
     hour12: false
   };
 
+  options2 = {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
+
   anomaliesHistory: HistorySpec[];
   anomaliesHistoryTmp: HistorySpec[];
   anomaliesHistoryView: HistorySpecExtended[];
@@ -162,6 +172,7 @@ export class MeetingHistoryComponent implements OnInit {
     }
 
     this.anomaliesHistoryView = [...tmpArr.reverse()];
+    this.anomaliesHistoryView = this.anomaliesHistoryView.slice(0, 100);
     this.changeDetectorRefs.detectChanges();
   }
 
@@ -180,9 +191,9 @@ export class MeetingHistoryComponent implements OnInit {
         const tmp = res.anomalies;
         this.anomaliesHistory = tmp.flatMap(anomalyGroup => anomalyGroup.anomaly_reason.map(
           (anomaly, index) => new HistorySpec(
-            anomaly.parameter,
+            anomaly.parameter === 'current_participants' ? 'max_participants' : anomaly.parameter,
             new Date(Date.parse(anomalyGroup.datetime)),
-            anomaly.parameter,
+            anomaly.parameter === 'current_participants' ? 'max_participants' : anomaly.parameter,
             anomaly.parameter === 'ml_model' ? (anomaly.value * 100).toFixed(2) + '%' :
               anomaly.parameter === 'datetime' ? anomaly.value.substr(0, 8) : anomaly.value,
             anomaly.condition_type,
@@ -190,7 +201,7 @@ export class MeetingHistoryComponent implements OnInit {
           )
         ));
         // tslint:disable-next-line:max-line-length
-        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index)];
+        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index).filter(el => el !== 'ml_model')];
         this.filter();
       }, err => {
         console.log(err);
@@ -204,9 +215,9 @@ export class MeetingHistoryComponent implements OnInit {
         const tmp = res.anomalies;
         this.anomaliesHistory = tmp.flatMap(anomalyGroup => anomalyGroup.anomaly_reason.map(
           (anomaly, index) => new HistorySpec(
-            anomaly.parameter,
+            anomaly.parameter === 'current_participants' ? 'max_participants' : anomaly.parameter,
             new Date(Date.parse(anomalyGroup.datetime)),
-            anomaly.parameter,
+            anomaly.parameter === 'current_participants' ? 'max_participants' : anomaly.parameter,
             anomaly.parameter === 'ml_model' ? (anomaly.value * 100).toFixed(2) + '%' :
               anomaly.parameter === 'datetime' ? anomaly.value.substr(0, 8) : anomaly.value,
             anomaly.condition_type,
@@ -214,7 +225,7 @@ export class MeetingHistoryComponent implements OnInit {
           )
         ));
         // tslint:disable-next-line:max-line-length
-        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index)];
+        this.filterTypes = ['all', ...this.anomaliesHistory.map(spec => spec.parameter).filter((value, index, self) => self.indexOf(value) === index).filter(el => el !== 'ml_model')];
         this.filter();
       }, err => {
         console.log(err);
@@ -238,15 +249,21 @@ export class MeetingHistoryComponent implements OnInit {
 
   downloadZip() {
     let sub: Observable<any>;
+    const historyMeeting = this.meetingsHistory.find(el => el.start.toISOString() === this.selectedMeeting);
     if (this.selectedMeeting === 'all') {
-      sub = this.meetingsService.downloadZips(this.meeting);
+      console.log('not supported');
     } else {
-      const historyMeeting = this.meetingsHistory.find(el => el.start.toISOString() === this.selectedMeeting);
       sub = this.meetingsService.downloadZip(this.meeting, historyMeeting);
     }
     sub.subscribe(
       next => {
-        saveAs(next, 'log.zip');
+        let filename = `${this.meeting.name}_${historyMeeting.start.toLocaleString('en-GB', this.options2)}.zip`;
+        filename = filename.split(' ').join('_');
+        filename = filename.split(',').join('_');
+        filename = filename.split(':').join('_');
+        filename = filename.split('-').join('_');
+        filename = filename.split('__').join('_');
+        saveAs(next, filename);
       },
       err => {
         console.log(err);

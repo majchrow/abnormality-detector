@@ -95,7 +95,9 @@
               >
                 <app-meeting-card-recent
                   [meeting]="meeting"
+                  (modelEmitter)="onModelClick(meeting)"
                   (historyEmitter)="onHistoryClick(meeting)"
+                  (settingEmitter)="onSettingClick(meeting)"
                   (inferenceEmitter)="onInferenceClick(meeting)"
                 >
                 </app-meeting-card-recent>

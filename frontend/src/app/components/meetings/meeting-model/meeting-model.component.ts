@@ -32,6 +32,7 @@ export class MeetingModelComponent implements OnInit {
   participants = 0;
   duration = 0;
   threshold = 95;
+  retrain = false;
   last: string;
 
 
@@ -109,6 +110,10 @@ export class MeetingModelComponent implements OnInit {
     );
   }
 
+  onSliderChange() {
+    this.retrain = !this.retrain;
+  }
+
   save() {
     // tslint:disable-next-line:max-line-length
     this.meetingsService.fetchMeetingHistoryModel(this.meeting.name, this.date.begin, this.date.end, this.participants, this.duration * 60).subscribe(
@@ -117,7 +122,8 @@ export class MeetingModelComponent implements OnInit {
         if (calls.length === 0) {
           this.notificationService.warn('No meetings found for given range and criteria');
         } else {
-          this.meetingSSEService.trainModel(this.meeting, calls, this.threshold).subscribe(
+          // tslint:disable-next-line:max-line-length
+          this.meetingSSEService.trainModel(this.meeting, calls, this.threshold, this.duration * 60, this.participants, this.retrain).subscribe(
             () => {
               setTimeout(() => {
                 this.notificationService.success(`Model scheduled to train on ${calls.length} meetings`);

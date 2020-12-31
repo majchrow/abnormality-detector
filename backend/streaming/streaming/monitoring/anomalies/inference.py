@@ -14,7 +14,6 @@ class Worker:
         self.dao = dao
         self.job_consumer = job_consumer
         self.kafka_producer = producer
-        self.meeting_models = {}
 
         self.loop = None
 
@@ -38,15 +37,6 @@ class Worker:
             ci_predictions = ci_model.predict(ci_batch)
             roster_predictions = roster_model.predict(roster_batch)
 
-            report("CI batch")
-            report(str(ci_batch.shape))
-            report("ROSTER batch")
-            report(str(roster_batch.shape))
-            report("CI predictions")
-            report(str(ci_predictions.shape))
-            report("ROSTER predictions")
-            report(str(roster_predictions.shape))
-
             def anomaly_filter(df):
                 return filter_anomalies(meeting_name, threshold, df)
 
@@ -57,6 +47,8 @@ class Worker:
             self.dao.complete_inference_job(meeting_name, end)
 
             report(f'job finished: run model on {meeting_name} from {start} to {end}')
+            msg = {'meeting_name': meeting_name, 'status': 'success', 'event': 'Inference job finished'}
+            await self.kafka_producer.send_and_wait(topic='anomalies-job-status', value=json.dumps(msg).encode())
 
 
 def filter_anomalies(meeting, threshold, scores_df):

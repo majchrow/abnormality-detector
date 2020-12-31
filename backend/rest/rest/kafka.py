@@ -10,9 +10,7 @@ class KafkaConsumerWrapper:
         self.topics = self.consumer = None
 
     def init(self, bootstrap_server):
-        self.topics = [
-            'preprocessed_callListUpdate', 'anomalies-training'
-        ]
+        self.topics = ['call-events', 'anomalies-job-status']
         self.consumer = KafkaConsumer(bootstrap_servers=bootstrap_server)
         self.consumer.subscribe(topics=self.topics)
 

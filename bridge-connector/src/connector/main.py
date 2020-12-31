@@ -51,9 +51,9 @@ def parse_args():
 
 def main():
     try:
-        login, password = os.environ["BRIDGE_USERNAME"], os.environ["BRIDGE_PASSWORD"]
+        login, password = os.environ["BRIDGE_USER"], os.environ["BRIDGE_PASSWORD"]
     except KeyError:
-        print("Required BRIDGE_USERNAME and BRIDGE_PASSWORD environmental variables")
+        print("Required BRIDGE_USER and BRIDGE_PASSWORD environmental variables")
         sys.exit(1)
 
     args = parse_args()

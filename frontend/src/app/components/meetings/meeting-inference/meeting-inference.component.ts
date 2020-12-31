@@ -234,6 +234,7 @@ export class MeetingInferenceComponent implements OnInit {
     }[key];
   }
 
+
   preparePayload() {
     const result: Array<any> = [];
 
@@ -256,6 +257,20 @@ export class MeetingInferenceComponent implements OnInit {
               parameter: 'days',
               conditions: days
             });
+        } else if (key === 'max_participants') {
+          result.push(
+            {
+              parameter: 'current_participants',
+              conditions: {max: value.conditions}
+            }
+          );
+        } else if (key === 'active_speaker') {
+          result.push(
+            {
+              parameter: key,
+              conditions: {max: value.conditions}
+            }
+          );
         } else {
           result.push(
             {

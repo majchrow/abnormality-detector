@@ -16,6 +16,7 @@ export class FirstCardComponent implements OnInit {
     'Customisable rooms monitoring',
     'Manual conditions model management',
     'ML model training on historical data',
+    'ML model online learning',
     'Models evaluation on historical data',
     'Anomaly history review',
     'Report generation per meeting or room'

@@ -47,19 +47,8 @@ class CassandraDAO:
         meetings = self.session.execute(f"SELECT * FROM {self.meetings_table}").all()
         modeled_meetings = {m['meeting_name'] for m in self.session.execute(f"SELECT meeting_name FROM models;")}
 
-        current = set()
-        recent = set()
-
-        interval = 604800  # one week in seconds
-        current_datetime = datetime.datetime.now()
-
-        for call in calls:
-            if call["finished"] and self.__is_recent(
-                interval, current_datetime, call["start_datetime"]
-            ):
-                recent.add(call["name"])
-            else:
-                current.add(call["name"])
+        current = {call["name"] for call in calls if not call["finished"]}
+        historical = {call["name"] for call in calls if call["finished"]}
 
         meeting_numbers = {
             meeting["meeting_name"]: meeting["meeting_number"] for meeting in meetings
@@ -83,18 +72,18 @@ class CassandraDAO:
                 current,
             )
         )
-        recent = list(
+        historical = list(
             map(
                 lambda call: {
                     "name": call,
                     "meeting_number": meeting_numbers[call],
                     "criteria": [],
                 },
-                recent,
+                historical,
             )
         )
 
-        return {"current": current, "recent": recent, "created": monitored}
+        return {"current": current, "recent": historical, "created": monitored}
 
     def get_calls(
         self,
@@ -180,7 +169,7 @@ class CassandraDAO:
     def clear_meeting(self, name):
         self.session.execute(
             f"UPDATE {self.meetings_table} "
-            f"SET monitored=false, criteria='' "
+            f"SET monitored=false, ml_monitored=false, criteria='' "
             f"WHERE meeting_name=%s IF EXISTS;",
             (name,),
         )
@@ -196,6 +185,18 @@ class CassandraDAO:
         if meetings:
             return meetings[0]
         return {}
+
+    def delete_model(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM models WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
+
+    def delete_retraining(self, meeting_name):
+        self.session.execute(
+            f'DELETE FROM retraining WHERE meeting_name = %s;',
+            (meeting_name,)
+        )
 
     def get_last_training(self, meeting_name):
         result = self.session.execute(
@@ -248,13 +249,28 @@ class CassandraDAO:
             res["ml_threshold"] = ml_threshold
         return {"anomalies": sorted(results, key=lambda r: r["datetime"])}
 
+    def get_monitoring_summary(self):
+        meeting_result = sorted(self.session.execute(
+            f'SELECT meeting_name as name, monitored, ml_monitored, criteria FROM {self.meetings_table};'
+        ).all(), key=lambda m: m['name'])
+        models_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM models;'
+        ).all(), key=lambda m: m['name'])
+        retraining_result = sorted(self.session.execute(
+            'SELECT meeting_name as name FROM retraining;'
+        ).all(), key=lambda m: m['name'])
+
+        return {
+            'with_criteria': [m['name'] for m in meeting_result if m['criteria'] and m['criteria'] != '[]'],
+            'with_model': [m['name'] for m in models_result],
+            'with_online_model': [m['name'] for m in retraining_result],
+            'admin_monitored': [m['name'] for m in meeting_result if m['monitored']],
+            'ml_monitored': [m['name'] for m in meeting_result if m['ml_monitored']],
+        }
+
     # TODO: in case we e.g. want only 1 scheduled task to run in multi-worker setting
     def try_lock(self, resource):
         return True
-
-    @staticmethod
-    def __is_recent(interval, current_datetime, call_datetime):
-        return (current_datetime - call_datetime).total_seconds() <= interval
 
     def get_call_info_data(self, name, start_date=None, end_date=None):
         result = pd.DataFrame(

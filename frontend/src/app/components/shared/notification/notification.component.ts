@@ -30,7 +30,7 @@ export class NotificationComponent implements OnInit {
   }
 
   fetchNotifications() {
-    this.meetingsService.fetchNotifications(15).subscribe(
+    this.meetingsService.fetchNotifications(40).subscribe(
       res => {
         let data: NotificationSpec[] = res.last.map(
           el => new NotificationSpec(

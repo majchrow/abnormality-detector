@@ -3,7 +3,10 @@ import json
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, dict_factory
+from contextlib import asynccontextmanager
+from datetime import datetime
 from dateutil.parser import isoparse
+from uuid import uuid4
 
 from . import STREAM_FINISHED
 from .criteria import check, validate, MsgType
@@ -99,35 +102,72 @@ class Worker:
         result.add_callbacks(on_success, on_error)
         return future
 
-    def set_anomaly(self, msg_dict, topic, anomalies):
+    async def set_anomaly(self, msg_dict, topic, anomalies):
         reason = json.dumps([a.dict() for a in anomalies])
         meeting_name = msg_dict['meeting_name']
 
-        if topic == 'preprocessed_callListUpdate':
-            table = self.calls_table
-            start_datetime, datetime = map(isoparse, [msg_dict['start_datetime'], msg_dict['last_update']])
-            future = self.session.execute_async(
-                f'UPDATE {table} '
-                f'SET anomaly=true, anomaly_reason=%s '
-                f'WHERE meeting_name=%s AND start_datetime=%s;',
-            (reason, meeting_name, start_datetime))
-        else:
-            if topic == 'preprocessed_callInfoUpdate':
-                table = self.call_info_table
+        async with self.try_lock('anomaly-status-update') as locked:
+            if not locked:
+                report('failed to obtain anomaly-status-update lock')
+                return
+            report('obtained anomaly-status-update lock')
+
+            if topic == 'preprocessed_callListUpdate':
+                table = self.calls_table
+                start_datetime, datetime = map(isoparse, [msg_dict['start_datetime'], msg_dict['last_update']])
+                future = self.session.execute_async(
+                    f'UPDATE {table} '
+                    f'SET anomaly=true, anomaly_reason=%s '
+                    f'WHERE meeting_name=%s AND start_datetime=%s;',
+                (reason, meeting_name, start_datetime))
             else:
-                table = self.roster_table
+                if topic == 'preprocessed_callInfoUpdate':
+                    table = self.call_info_table
+                else:
+                    table = self.roster_table
 
-            datetime = isoparse(msg_dict['datetime'])
-            future = self.session.execute_async(
-                f'UPDATE {table} '
-                f'SET anomaly=true, anomaly_reason=%s '
-                f'WHERE meeting_name=%s AND datetime=%s;',
-            (reason, meeting_name, datetime))
+                datetime = isoparse(msg_dict['datetime'])
+                future = self.session.execute_async(
+                    f'UPDATE {table} '
+                    f'SET anomaly=true, anomaly_reason=%s '
+                    f'WHERE meeting_name=%s AND datetime=%s;',
+                (reason, meeting_name, datetime))
 
-        future.add_callbacks(
-            lambda _: report(f'set anomaly status for call {meeting_name} at {datetime} in {table}'),
-            lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} in {table} failed with {e}')
-        )
+            future.add_callbacks(
+                lambda _: report(f'set anomaly status for call {meeting_name} at {datetime} in {table}'),
+                lambda e: report(f'"set anomaly" for {meeting_name} at {datetime} in {table} failed with {e}')
+            )
+        report('released anomaly-status-update lock')
+
+    @asynccontextmanager
+    def try_lock(self, resource):
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_success(result):
+            future.set_result(result[0]['applied'])
+
+        def on_error(e):
+            future.set_exception(e)
+
+        try:
+            # lock using Cassandra's lightweight transactions
+            now = datetime.now()
+            uid = str(uuid4())
+            result = self.session.execute_async(
+                f'UPDATE locks SET lock_id=%s, last_locked=%s '
+                f'WHERE resource_name=%s '
+                f'IF lock_id=null;',
+                (uid, now, resource)
+            ).all()
+            result.add_callbacks(on_success, on_error)
+            yield future
+        finally:
+            self.session.execute_async(
+                'UPDATE locks SET lock_id=null '
+                'WHERE resource_name=%s;',
+                (resource,)
+            )
 
 
 async def setup(config: Config):

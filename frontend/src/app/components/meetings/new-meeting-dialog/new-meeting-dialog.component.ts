@@ -26,13 +26,26 @@ export class NewMeetingDialogComponent implements OnInit {
   selectedName = '';
 
   ngOnInit(): void {
-    this.fetchMeetings();
+    this.fetchCurrentMeetings();
   }
 
-  fetchMeetings() {
+  fetchCurrentMeetings() {
+    this.meetingsService.fetchMeetings().subscribe(
+      next => {
+        this.fetchMeetings(next.created);
+      },
+      error => {
+        console.log(error);
+        this.fetchMeetings([]);
+      }
+    );
+  }
+
+  fetchMeetings(current: Meeting[]) {
+    const names = current.map(el => el.name);
     this.meetingsService.fetchPublicMeetings().subscribe(
       next => {
-        this.meetings = next.meetings.meetings.map(meeting => meeting.name);
+        this.meetings = next.meetings.meetings.map(meeting => meeting.name).filter(el => names.indexOf(el) === -1);
       },
       error => {
         console.log(error);
@@ -40,11 +53,15 @@ export class NewMeetingDialogComponent implements OnInit {
     );
   }
 
-  onExitClick(): void {
+  onExitClick()
+    :
+    void {
     this.dialogRef.close(this.selectedName);
   }
 
-  onRestoreClick(): void {
+  onRestoreClick()
+    :
+    void {
     this.dialogService.openConfirmDialog('Are you sure you want to restore changes? Changes you made will not be saved.')
       .afterClosed().subscribe(res => {
         if (res) {
@@ -54,7 +71,9 @@ export class NewMeetingDialogComponent implements OnInit {
     );
   }
 
-  onSaveClick(): void {
+  onSaveClick()
+    :
+    void {
     this.dialogService.openConfirmDialog('Are you sure you want to create this meeting?')
       .afterClosed().subscribe(res => {
         if (res) {

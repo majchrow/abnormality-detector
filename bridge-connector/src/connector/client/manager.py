@@ -251,11 +251,14 @@ class Call:
                 await self.handler.on_disconnect_from(self.call_name)
                 self.handler = next(iter(self.clients))
                 self.clients.discard(self.handler)
+                logging.info(f'{self.manager.TAG}: handler swap for {self.call_name}')
                 await self.handler.on_connect_to(self.call_name)
             except StopIteration:
                 # No other clients
+                logging.info(f'{self.manager.TAG}: no more clients for {self.call_name}')
                 self.handler = None
         else:
+            logging.info(f'{self.manager.TAG}: secondary client disconnected for {self.call_name}')
             self.clients.remove(client)
 
         if self.handler:

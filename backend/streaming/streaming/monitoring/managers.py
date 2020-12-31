@@ -6,15 +6,34 @@ from aiokafka import AIOKafkaProducer
 from asyncio import Queue
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from dateutil.parser import parse
 from typing import List
 
-from .kafka import KafkaListener
+from .kafka import KafkaEndpoint
 from .serializers import DateTimeEncoder
 from .subprocess import BaseWorkerManager, run_for_result
 from .thresholds import STREAM_FINISHED, validate
 from ..db import CassandraDAO
 from ..config import Config
 from ..exceptions import AppException
+
+
+def async_partial(coro_fun, *args, **kwargs):
+    def run():
+        return coro_fun(*args, **kwargs)
+    return run
+
+
+async def retry_on_failure(task, fmt_exc, retry_s=1):
+    while True:
+        try:
+            await task()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logging.exception(fmt_exc(e))
+            await asyncio.sleep(retry_s)
 
 
 class Manager:
@@ -25,8 +44,8 @@ class Manager:
         self.config = config
         self.dao = dao
 
-        self.anomaly_manager = AnomalyManager(dao, config)
-        self.kafka_manager = KafkaListener(config.kafka_bootstrap_server, config.kafka_call_list_topic)
+        self.kafka_manager = KafkaEndpoint(config.kafka_bootstrap_server, config.kafka_call_list_topic)
+        self.anomaly_manager = AnomalyManager(dao, self.kafka_manager, config)
         self.threshold_manager = ThresholdManager(dao, config)
 
     def start(self):
@@ -36,13 +55,19 @@ class Manager:
         kafka_producer = AIOKafkaProducer(bootstrap_servers=self.config.kafka_bootstrap_server)
         await kafka_producer.start()
         self.anomaly_manager.init(kafka_producer)
+        self.kafka_manager.init(kafka_producer)
         self.threshold_manager.init(kafka_producer)
+
+        kafka_task = retry_on_failure(
+            async_partial(self.kafka_manager.run),
+            lambda e: f'{self.TAG}: kafka_task failed with {e}!'
+        )
 
         try:
             await asyncio.gather(
                 self.anomaly_manager.run(),
                 self.threshold_manager.run(),
-                self.kafka_manager.run(),
+                kafka_task,
                 return_exceptions=True
             )
         finally:
@@ -51,9 +76,16 @@ class Manager:
     ###################
     # anomaly detection
     ###################
-    async def schedule_training(self, meeting_name: str, calls: List[str], threshold: float):
+    async def schedule_training(self, meeting_name: str, calls: List[str], threshold: float, min_duration: int, max_participants: int):
         await self.anomaly_manager.train(meeting_name, calls, threshold)
         logging.info(f'{self.TAG}: scheduled model training for meeting {meeting_name} on calls {calls}')
+
+        if min_duration is not None and max_participants is not None:
+            await self.dao.set_retraining(meeting_name, min_duration, max_participants, threshold)
+            logging.info(f'{self.TAG}: setup model retraining on {meeting_name} with threshold = {threshold} {max_participants} <= participants and {min_duration} <= duration')
+        else:
+            await self.dao.unset_retraining(meeting_name)
+            logging.info(f'{self.TAG}: unset model retraining on {meeting_name} with threshold = {threshold} {max_participants} <= participants and {min_duration} <= duration')
 
     async def schedule_inference(self, meeting_name: str):
         await self.anomaly_manager.schedule(meeting_name)
@@ -102,7 +134,7 @@ class Manager:
         queue = Queue()
 
         async def _listen():
-            self.kafka_manager.call_event_subscribe(queue)
+            self.kafka_manager.user_notifications_subscribe(queue)
             while True:
                 msg = await queue.get()
                 yield msg
@@ -110,7 +142,7 @@ class Manager:
         try:
             yield _listen
         finally:
-            self.kafka_manager.call_event_unsubscribe(queue)
+            self.kafka_manager.user_notifications_unsubscribe(queue)
 
     async def monitoring_receiver(self, call_name):
         if not (await self.is_monitored(call_name)):
@@ -187,11 +219,6 @@ class ThresholdManager(BaseWorkerManager):
         ))
 
 
-def async_partial(coro_fun, *args, **kwargs):
-    def run():
-        return coro_fun(*args, **kwargs)
-    return run
-
 
 # Assumptions:
 #  - when re-running old jobs, it may so happen that it gets completed multiple times (very
@@ -200,12 +227,14 @@ class AnomalyManager(BaseWorkerManager):
 
     TAG = 'AnomalyManager'
 
-    def __init__(self, dao: CassandraDAO, config: Config):
+    def __init__(self, dao: CassandraDAO, kafka_endpoint: KafkaEndpoint, config: Config):
         super().__init__()
         self.dao = dao
+        self.kafka_endpoint = kafka_endpoint
         self.kafka_producer = None
         self.dispatch_period = config.inference_period_s
         self.dispatch_task = None
+        self.retrain_task = None
 
         self.cmd = ['python3', '-m', 'streaming.monitoring.anomalies.inference']
         self.num_workers = config.num_anomaly_workers
@@ -214,19 +243,17 @@ class AnomalyManager(BaseWorkerManager):
     def init(self, kafka_producer):
         self.kafka_producer = kafka_producer
 
-        dispatch_task = self._retry_on_failure(async_partial(self.periodic_dispatch), 'inference dispatch')
+        dispatch_task = retry_on_failure(
+            async_partial(self.periodic_dispatch), 
+            lambda e: f'{self.TAG}: inference dispatch failed with {e}'
+        )
         self.dispatch_task = asyncio.create_task(dispatch_task)
 
-    async def _retry_on_failure(self, task, name):
-        while True:
-            try:
-                await task()
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                logging.exception(f'{self.TAG}: {name} failed with {e}!')
-                await asyncio.sleep(1)
+        retrain_task = retry_on_failure(
+            async_partial(self.retrain), 
+            lambda e: f'{self.TAG}: automatic retraining failed with {e}!'
+        )
+        self.retrain_task = asyncio.create_task(retrain_task)
 
     async def train(self, meeting_name, calls, threshold):
         if not await self.dao.meeting_exists(meeting_name):
@@ -251,7 +278,7 @@ class AnomalyManager(BaseWorkerManager):
             raise AppException.meeting_not_found()
 
     async def fire_anomaly(self, meeting_name, calls, start, end, threshold):
-        if not await self.dao.set_anomaly_monitoring_status(meeting_name, True):
+        if not await self.dao.meeting_exists(meeting_name):
             raise AppException.meeting_not_found()
 
         job = {
@@ -278,8 +305,8 @@ class AnomalyManager(BaseWorkerManager):
 
                 logging.info(f'{self.TAG}: obtained inference-schedule lock')
                 monitored = await self.dao.get_anomaly_monitored_meetings()
-                last_inferences = await self.dao.get_last_inferences(monitored)
 
+                last_inferences = await self.dao.get_last_inferences(monitored)
                 # add inference jobs for meetings with stale results
                 now = datetime.now()
                 jobs = []
@@ -290,7 +317,6 @@ class AnomalyManager(BaseWorkerManager):
                 await asyncio.gather(*[self.dao.add_inference_job(**job) for job in jobs])
                 if jobs:
                     logging.info(f'{self.TAG}: saved {len(jobs)} new inference jobs for {len(monitored)} meetings')
-
             logging.info(f'{self.TAG}: released inference-schedule lock')
 
             # actually schedule them (lock not necessary anymore)
@@ -299,12 +325,55 @@ class AnomalyManager(BaseWorkerManager):
                 logging.info(f'{self.TAG}: pushed to workers')
 
     async def push_inference_job(self, job):
-        payload = json.dumps(job).encode()
-        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=payload, cls=DateTimeEncoder)
+        payload = json.dumps(job, cls=DateTimeEncoder).encode()
+        await self.kafka_producer.send_and_wait(topic='monitoring-anomalies-jobs', value=payload)
 
-    @staticmethod
-    def fmt_dt(dt):
-        return dt
+    async def retrain(self):
+        queue = asyncio.Queue()
+
+        try:
+            self.kafka_endpoint.call_events_subscribe(queue)
+            while True:
+                msg = await queue.get()
+                meeting_name, event = msg['meeting_name'], msg['event']
+                if event != 'Meeting finished':
+                    continue
+
+                start_datetime, timestamp = parse(msg['start_datetime']).replace(tzinfo=None), parse(msg['datetime']).replace(tzinfo=None)
+
+                if not (retraining := await self.dao.get_retraining(meeting_name)):
+                    continue
+                logging.info(f'{self.TAG}: retraining applicable to {meeting_name}...')
+
+                async with self.dao.try_lock('retraining-update') as locked:
+                    if not locked:
+                        logging.info(f'{self.TAG}: failed to obtain retraining-update lock')
+                        continue
+
+                    if retraining['last_update'] and retraining['last_update'] >= timestamp:
+                        logging.info(f'{self.TAG}: last retraining covered finished call')
+                        continue
+                    logging.info(f'{self.TAG}: last retraining till {retraining["last_update"]}')
+
+                    await self.dao.update_retraining(meeting_name, timestamp)
+                    logging.info(f'{self.TAG}: retraining updated on {timestamp}')
+
+                duration, max_participants = await self.dao.get_call_details(meeting_name, start_datetime)
+                if duration < retraining['min_duration'] or max_participants < retraining['max_participants']:
+                    continue
+                logging.info(f'{self.TAG}: duration: {duration}, max_participants: {max_participants}')
+
+                if (model := await self.dao.get_model(meeting_name)) and start_datetime in model['training_call_starts']:
+                    logging.info(f'{self.TAG}: model already trained on last call!')
+                    continue
+                
+                logging.info(f'{self.TAG}: launching retraining...')
+                calls = [start_datetime] + (model['training_call_starts'] if model else [])
+                await self.train(meeting_name, calls, retraining['threshold'])
+        except Exception as e:
+            raise e
+        finally:
+            self.kafka_endpoint.call_events_unsubscribe(queue)
 
     async def shutdown(self):
         await super().shutdown()

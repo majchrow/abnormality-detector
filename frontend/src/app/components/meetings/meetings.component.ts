@@ -32,7 +32,7 @@ export class MeetingsComponent implements OnInit {
   allMeetings: AllMeetings;
   selectedMeetings: AllMeetings;
   viewMeetings: AllMeetings;
-  meetingType = 'current';
+  meetingType = 'created';
 
   ngOnInit(): void {
     this.initAllMeetings();
