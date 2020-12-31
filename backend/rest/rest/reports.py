@@ -236,7 +236,11 @@ class MeetingReportGenerator(ReportGenerator):
             self.last_update_time = details["last_update_time"]
         self.date = details["date"]
         self.start_time = details["start_time"]
-        self.duration = details["duration"]
+        end_datetime = datetime.datetime.combine(self.date, self.last_update_time)
+        start_datetime = datetime.datetime.combine(self.date, self.start_time)
+        self.duration = str(end_datetime - start_datetime)[:-7]
+        if len(self.duration) < 8:
+            self.duration = "0" + self.duration
         self.finished = details["finished"]
         self.plot = self.generate_plot_for_meeting(self.start_datetime)
 
@@ -604,7 +608,10 @@ class CallInfoDataProvider(MeetingDataProvider):
         return pd.DataFrame(filtered)
 
     def get_last_update(self, start_datetime):
-        return self.data[self.data["start_datetime"] == start_datetime].index[-1]
+        filtered = self.data[self.data["start_datetime"] == start_datetime]
+        return list(
+            self.data[self.data["start_datetime"] == start_datetime]["datetime"]
+        )[-1]
 
 
 class CallsDataProvider(MeetingDataProvider):
@@ -738,4 +745,7 @@ class RosterDataProvider(MeetingDataProvider):
         return pd.DataFrame(filtered)
 
     def get_last_update(self, start_datetime):
-        return self.data[self.data["start_datetime"] == start_datetime].index[-1]
+        filtered = self.data[self.data["start_datetime"] == start_datetime]
+        return list(
+            self.data[self.data["start_datetime"] == start_datetime]["datetime"]
+        )[-1]
