@@ -110,7 +110,11 @@ class ClientManager:
     async def run_client(self, host: str, port: int):
         client = Client(host, port, self.config.ssl, self)
         logging.info(f'{self.TAG}: starting client for {host}:{port}...')
-        await client.run(self.config.login, self.config.password, self.session)
+        try:
+            await client.run(self.config.login, self.config.password, self.session)
+        except Exception as e:
+            await self.on_client_error(client)
+            raise e
 
     async def publish(self, msg: dict):
         await self.publish_queue.put(msg)
@@ -192,6 +196,29 @@ class ClientManager:
             await self.publish(msg)
             await self.dump(msg)
 
+    async def on_client_error(self, client_endpoint: Client):
+        def error_remove_msg(call):
+            return {
+                "type": "message", 
+                "message": {
+                    "messageId": 0, "type": "callListUpdate", "subscriptionIndex": 0, "updates": [{
+                        "call": "", "updateType": "remove", "reason": "ERROR", "name": call.call_name, "finished": "True", "startDatetime": call.start_datetime
+                    }]
+                },
+                "date": datetime.now().isoformat()
+            }
+
+        logging.info(f'{self.TAG}: client error handling...')
+
+        calls = list(self.calls.items())
+        for call_name, call in calls:
+            if client_endpoint in call:
+                await call.remove(client_endpoint)
+                if call.done:
+                    del self.calls[call_name]
+                    await self.publish(error_remove_msg(call))
+                    logging.info(f'{self.TAG}: published error callListUpdate message for {call_name}')
+
     async def on_call_info_update(self, msg: dict, call_name: str):
         if not (call := self.calls.get(call_name, None)):
             logging.warning(f'{self.TAG}: received {msg} for non-tracked {call_name}')
@@ -223,6 +250,9 @@ class Call:
         self.handler = None
         self.clients = set()
         self.start_datetime = start_datetime 
+
+    def __contains__(self, client):
+        return self.handler == client or client in self.clients
 
     @property
     def handled(self):
